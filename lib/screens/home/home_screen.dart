@@ -20,6 +20,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _searchQuery = '';
   bool _isSearchFocused = false;
 
+  // Favorites Tab Search Controller & Data
+  final TextEditingController _favoriteSearchController = TextEditingController();
+  String _favoriteSearchQuery = '';
+
+  // Favorite Restaurants matching User - Favorite reference design
+  final List<Map<String, dynamic>> _favoriteRestaurants = [
+    {
+      'name': 'RawTruckr',
+      'category': 'อาหารเกาหลี',
+      'price': '฿฿ 150-350 บาท',
+      'rating': 4.4,
+      'image': 'assets/images/rawtruckr.jpg',
+      'isAsset': true,
+      'isBookmarked': true,
+    },
+    {
+      'name': 'ครัวปันเจียง',
+      'category': 'อาหารไทย/อาหารตามสั่ง',
+      'price': '฿฿ 60-90 บาท',
+      'rating': 4.7,
+      'image': 'assets/images/krua_pan_jiang.jpg',
+      'isAsset': true,
+      'isBookmarked': true,
+    },
+    {
+      'name': 'ก๋วยเตี๋ยวเรือขั้นเทพ',
+      'category': 'อาหารไทย/ก๋วยเตี๋ยว',
+      'price': '฿฿ 50-80 บาท',
+      'rating': 4.3,
+      'image': 'assets/images/boat_noodles.jpg',
+      'isAsset': true,
+      'isBookmarked': true,
+    },
+    {
+      'name': 'TEDS Coffee & Eatery',
+      'category': 'ร้านกาแฟ/ขนมหวาน',
+      'price': '฿฿ 60-150 บาท',
+      'rating': 4.9,
+      'image': 'assets/images/teds_coffee.jpg',
+      'isAsset': true,
+      'isBookmarked': true,
+    },
+  ];
+
   // Curated recommended & searchable restaurants matching the design
   final List<Map<String, dynamic>> _curatedRestaurants = [
     {
@@ -104,6 +148,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _favoriteSearchController.dispose();
     super.dispose();
   }
 
@@ -619,32 +664,271 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // TAB 1: FAVORITES (รายการโปรด)
   // ==========================================
   Widget _buildFavoritesTab() {
-    final favorites = _curatedRestaurants.where((r) => r['isFavorite'] == true).toList();
+    final query = _favoriteSearchQuery.trim().toLowerCase();
+    final list = _favoriteRestaurants.where((r) {
+      if (query.isEmpty) return true;
+      final name = (r['name'] as String).toLowerCase();
+      final cat = (r['category'] as String).toLowerCase();
+      return name.contains(query) || cat.contains(query);
+    }).toList();
 
-    return Padding(
-      padding: const EdgeInsets.only(left: 20, right: 20, top: 16, bottom: 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'รายการโปรดของคุณ',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF6E162B),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header: "รายการโปรด" and burgundy heart icon
+        Padding(
+          padding: const EdgeInsets.only(left: 20, right: 20, top: 12, bottom: 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: const [
+              Text(
+                'รายการโปรด',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF6E162B),
+                  letterSpacing: -0.4,
+                ),
+              ),
+              Icon(
+                Icons.favorite_rounded,
+                color: Color(0xFF6E162B),
+                size: 32,
+              ),
+            ],
+          ),
+        ),
+
+        // Thin divider line
+        Container(
+          height: 1.2,
+          width: double.infinity,
+          color: const Color(0xFFE5CED1),
+        ),
+
+        // Search Bar: "ค้นหาร้านค้า"
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+          child: Container(
+            height: 48,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1ECEF),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _favoriteSearchController,
+                    onChanged: (val) =>
+                        setState(() => _favoriteSearchQuery = val),
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      color: Color(0xFF221F21),
+                    ),
+                    decoration: const InputDecoration(
+                      hintText: 'ค้นหาร้านค้า',
+                      hintStyle: TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF8E888B),
+                        fontWeight: FontWeight.w400,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+                const Icon(
+                  Icons.search_rounded,
+                  color: Color(0xFF221F21),
+                  size: 22,
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 12),
+        ),
+
+        // Favorite Cards List
+        Expanded(
+          child: list.isEmpty
+              ? const Center(
+                  child: Text(
+                    'ไม่พบร้านค้าในรายการโปรด',
+                    style: TextStyle(color: Color(0xFF8E888B), fontSize: 14.5),
+                  ),
+                )
+              : ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 2,
+                    bottom: 100, // Room for bottom dock
+                  ),
+                  itemCount: list.length,
+                  itemBuilder: (context, index) {
+                    return _buildFavoriteCard(list[index]);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFavoriteCard(Map<String, dynamic> item) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Restaurant Thumbnail
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              width: 86,
+              height: 86,
+              child: item['isAsset'] == true
+                  ? Image.asset(
+                      item['image'] as String,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        color: const Color(0xFFEFECEF),
+                        child: const Icon(
+                          Icons.restaurant_rounded,
+                          color: Color(0xFF6E162B),
+                          size: 34,
+                        ),
+                      ),
+                    )
+                  : Image.network(
+                      item['image'] as String,
+                      fit: BoxFit.cover,
+                    ),
+            ),
+          ),
+
+          const SizedBox(width: 14),
+
+          // Information Column
           Expanded(
-            child: ListView.separated(
-              physics: const BouncingScrollPhysics(),
-              itemCount: favorites.length,
-              separatorBuilder: (context, index) => const Divider(
-                color: Color(0xFFE5CED1),
-                height: 24,
-              ),
-              itemBuilder: (context, index) =>
-                  _buildRestaurantRow(favorites[index]),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Name and Bookmark Ribbon
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item['name'] as String,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF221F21),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+                    const Icon(
+                      Icons.bookmark_rounded,
+                      color: Color(0xFF6E162B),
+                      size: 26,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 2),
+
+                // Category
+                Text(
+                  item['category'] as String,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B6568),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+
+                const SizedBox(height: 3),
+
+                // Price Range
+                Text(
+                  item['price'] as String,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF6B6568),
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+
+                const SizedBox(height: 4),
+
+                // Rating & Detail Link
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          color: Color(0xFF6E162B),
+                          size: 17,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${item['rating']}',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF3F3B3E),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Text(
+                          'รายละเอียด',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF221F21),
+                          ),
+                        ),
+                        SizedBox(width: 2),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          size: 16,
+                          color: Color(0xFF221F21),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
