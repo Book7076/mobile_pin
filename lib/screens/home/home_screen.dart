@@ -22,7 +22,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   // Favorites Tab Search Controller & Data
   final TextEditingController _favoriteSearchController = TextEditingController();
+  final FocusNode _favoriteFocusNode = FocusNode();
   String _favoriteSearchQuery = '';
+  bool _isFavoriteFocused = false;
 
   // Favorite Restaurants matching User - Favorite reference design
   final List<Map<String, dynamic>> _favoriteRestaurants = [
@@ -133,6 +135,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         });
       }
     });
+    _favoriteFocusNode.addListener(() {
+      if (mounted) {
+        setState(() {
+          _isFavoriteFocused = _favoriteFocusNode.hasFocus;
+        });
+      }
+    });
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -149,6 +158,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _searchController.dispose();
     _searchFocusNode.dispose();
     _favoriteSearchController.dispose();
+    _favoriteFocusNode.dispose();
     super.dispose();
   }
 
@@ -163,6 +173,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       onTap: () {
         if (_searchFocusNode.hasFocus) {
           _searchFocusNode.unfocus();
+        }
+        if (_favoriteFocusNode.hasFocus) {
+          _favoriteFocusNode.unfocus();
         }
       },
       child: Scaffold(
@@ -714,10 +727,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFFF1ECEF),
               borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: _isFavoriteFocused
+                    ? const Color(0xFF6E162B).withOpacity(0.35)
+                    : Colors.transparent,
+                width: 1.4,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.02),
-                  blurRadius: 6,
+                  color: _isFavoriteFocused
+                      ? const Color(0xFF6E162B).withOpacity(0.08)
+                      : Colors.black.withOpacity(0.02),
+                  blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -728,15 +749,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Expanded(
                   child: TextField(
                     controller: _favoriteSearchController,
+                    focusNode: _favoriteFocusNode,
+                    cursorColor: const Color(0xFF6E162B),
+                    cursorWidth: 2.2,
+                    cursorRadius: const Radius.circular(2),
+                    showCursor: true,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => _favoriteFocusNode.unfocus(),
                     onChanged: (val) =>
                         setState(() => _favoriteSearchQuery = val),
                     style: const TextStyle(
                       fontSize: 14.5,
                       color: Color(0xFF221F21),
+                      fontWeight: FontWeight.w500,
                     ),
-                    decoration: const InputDecoration(
-                      hintText: 'ค้นหาร้านค้า',
-                      hintStyle: TextStyle(
+                    decoration: InputDecoration(
+                      hintText:
+                          (_isFavoriteFocused && _favoriteSearchQuery.isEmpty)
+                              ? ''
+                              : 'ค้นหาร้านค้า',
+                      hintStyle: const TextStyle(
                         fontSize: 14,
                         color: Color(0xFF8E888B),
                         fontWeight: FontWeight.w400,
@@ -747,11 +779,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                 ),
-                const Icon(
-                  Icons.search_rounded,
-                  color: Color(0xFF221F21),
-                  size: 22,
-                ),
+                if (_favoriteSearchQuery.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFF8E888B),
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      _favoriteSearchController.clear();
+                      setState(() => _favoriteSearchQuery = '');
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    splashRadius: 18,
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(
+                      Icons.search_rounded,
+                      color: Color(0xFF221F21),
+                      size: 22,
+                    ),
+                    onPressed: () {
+                      if (!_favoriteFocusNode.hasFocus) {
+                        _favoriteFocusNode.requestFocus();
+                      }
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    splashRadius: 18,
+                  ),
               ],
             ),
           ),
