@@ -3,12 +3,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../main.dart';
-import '../../models/restaurant_model.dart';
 import '../auth/login_screen.dart';
 import '../restaurants/restaurant_detail_screen.dart';
+import '../../models/approval_restaurant.dart';
+import '../../providers/restaurant_approval_provider.dart';
+import 'restaurant_approval_detail_screen.dart';
 
 class AdminDashboard extends ConsumerStatefulWidget {
-  const AdminDashboard({super.key});
+  final int initialTabIndex;
+
+  const AdminDashboard({
+    super.key,
+    this.initialTabIndex = 0,
+  });
 
   @override
   ConsumerState<AdminDashboard> createState() => _AdminDashboardState();
@@ -18,6 +25,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> with SingleTick
   int _selectedTabIndex = 0;
   late TabController _approvalTabController;
   Timer? _liveStatsTimer;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   // Real-time statistics state
   double _rightSwipeRate = 53.52;
@@ -156,7 +165,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> with SingleTick
   @override
   void initState() {
     super.initState();
-    _approvalTabController = TabController(length: 3, vsync: this);
+    _selectedTabIndex = widget.initialTabIndex;
+    _approvalTabController = TabController(length: 3, vsync: this, initialIndex: 1);
     _startLiveStatsSimulation();
     _fetchRealStatsIfAvailable();
   }
@@ -165,6 +175,7 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> with SingleTick
   void dispose() {
     _liveStatsTimer?.cancel();
     _approvalTabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -201,52 +212,11 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> with SingleTick
     }
   }
 
-  Stream<List<RestaurantModel>> _getRestaurants(String status) {
-    try {
-      return supabase
-          .from('restaurants')
-          .stream(primaryKey: ['id'])
-          .eq('status', status)
-          .order('created_at', ascending: false)
-          .map((maps) => maps.map((map) => RestaurantModel.fromJson(map)).toList());
-    } catch (_) {
-      return const Stream.empty();
-    }
-  }
-
   String _getAdminEmail() {
     try {
       return supabase.auth.currentUser?.email ?? 'admin@mealmate.com';
     } catch (_) {
       return 'admin@mealmate.com';
-    }
-  }
-
-  Future<void> _updateStatus(String id, String newStatus) async {
-    try {
-      await supabase.from('restaurants').update({'status': newStatus}).eq('id', id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'เปลี่ยนสถานะร้านเป็น $newStatus สำเร็จ',
-              style: GoogleFonts.notoSansThai(color: Colors.white),
-            ),
-            backgroundColor: primaryBurgundy,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('ข้อผิดพลาด: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
     }
   }
 
@@ -663,37 +633,111 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> with SingleTick
   Widget _buildStoreManagementTab() {
     return Column(
       children: [
+        // Top Header matching Image 1: จัดการร้านอาหาร + Notification Bell
         Container(
           color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+          padding: const EdgeInsets.fromLTRB(20, 16, 12, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'จัดการร้านค้า',
-                style: GoogleFonts.notoSansThai(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: primaryBurgundy,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'จัดการร้านอาหาร',
+                    style: GoogleFonts.notoSansThai(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: primaryBurgundy,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: primaryBurgundy,
+                      size: 26,
+                    ),
+                    onPressed: _showNotificationSheet,
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
+              // TabBar with 3 tabs: รออนุมัติ | อนุมัติ | ไม่อนุมัติ
               TabBar(
                 controller: _approvalTabController,
                 labelColor: primaryBurgundy,
-                unselectedLabelColor: Colors.grey,
+                unselectedLabelColor: const Color(0xFF222222),
                 indicatorColor: primaryBurgundy,
-                indicatorWeight: 3,
-                labelStyle: GoogleFonts.notoSansThai(fontWeight: FontWeight.w700),
+                indicatorWeight: 3.0,
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelStyle: GoogleFonts.notoSansThai(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
+                unselectedLabelStyle: GoogleFonts.notoSansThai(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
                 tabs: const [
                   Tab(text: 'รออนุมัติ'),
-                  Tab(text: 'อนุมัติแล้ว'),
-                  Tab(text: 'ปฏิเสธ'),
+                  Tab(text: 'อนุมัติ'),
+                  Tab(text: 'ไม่อนุมัติ'),
                 ],
               ),
             ],
           ),
         ),
+
+        // Divider below tab bar
+        Container(color: const Color(0xFFF0E2E7), height: 1),
+
+        // Search Bar matching Image 1: ค้นหาร้านค้า
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+          child: Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: const Color(0xFFE2E2E2)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                    style: GoogleFonts.notoSansThai(fontSize: 14, color: const Color(0xFF1E1E1E)),
+                    decoration: InputDecoration(
+                      hintText: 'ค้นหาร้านค้า',
+                      hintStyle: GoogleFonts.notoSansThai(
+                        color: const Color(0xFF9E9E9E),
+                        fontSize: 13.5,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+                if (_searchQuery.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    child: const Icon(Icons.close_rounded, color: Colors.grey, size: 18),
+                  )
+                else
+                  const Icon(Icons.search_rounded, color: Color(0xFF222222), size: 22),
+              ],
+            ),
+          ),
+        ),
+
+        // Tab Views
         Expanded(
           child: TabBarView(
             controller: _approvalTabController,
@@ -709,90 +753,164 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> with SingleTick
   }
 
   Widget _buildApprovalList(String status) {
-    return StreamBuilder<List<RestaurantModel>>(
-      stream: _getRestaurants(status),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator(color: primaryBurgundy));
-        }
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
+    final allRestaurants = ref.watch(restaurantApprovalProvider);
+    var filtered = allRestaurants.where((r) => r.status == status).toList();
 
-        final restaurants = snapshot.data ?? [];
-        if (restaurants.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.store_mall_directory_outlined, size: 64, color: Colors.grey.shade400),
-                const SizedBox(height: 12),
-                Text(
-                  'ไม่มีร้านค้าในหมวดหมู่นี้',
-                  style: GoogleFonts.notoSansThai(color: Colors.grey, fontSize: 15),
-                ),
-              ],
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered
+          .where((r) => r.name.toLowerCase().contains(_searchQuery.toLowerCase()))
+          .toList();
+    }
+
+    if (filtered.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.storefront_outlined, size: 56, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              status == 'approved'
+                  ? (_searchQuery.isNotEmpty ? 'ไม่พบร้านอาหารที่ค้นหา' : 'ไม่มีร้านอาหารที่อนุมัติแล้ว')
+                  : (status == 'pending' ? 'ไม่มีคำขอรออนุมัติ' : 'ไม่มีร้านอาหารที่ไม่อนุมัติ'),
+              style: GoogleFonts.notoSansThai(color: Colors.grey.shade600, fontSize: 14),
             ),
-          );
-        }
+          ],
+        ),
+      );
+    }
 
-        return ListView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
-          itemCount: restaurants.length,
-          itemBuilder: (context, index) {
-            final restaurant = restaurants[index];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: cardBorderColor),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          restaurant.name,
-                          style: GoogleFonts.notoSansThai(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          restaurant.address,
-                          style: GoogleFonts.notoSansThai(color: Colors.grey, fontSize: 13),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'โทร: ${restaurant.phone}',
-                          style: GoogleFonts.notoSansThai(color: Colors.grey, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (status == 'pending') ...[
-                    IconButton(
-                      icon: const Icon(Icons.check_circle_rounded, color: Colors.green, size: 30),
-                      onPressed: () => _updateStatus(restaurant.id, 'approved'),
-                      tooltip: 'อนุมัติ',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.cancel_rounded, color: Colors.redAccent, size: 30),
-                      onPressed: () => _updateStatus(restaurant.id, 'rejected'),
-                      tooltip: 'ปฏิเสธ',
-                    ),
-                  ],
-                ],
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 95),
+      itemCount: filtered.length,
+      itemBuilder: (context, index) {
+        final restaurant = filtered[index];
+        return _buildRestaurantApprovalCard(restaurant);
+      },
+    );
+  }
+
+  Widget _buildRestaurantApprovalCard(ApprovalRestaurant restaurant) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7F8), // Soft warm blush/pinkish card background from Image 1
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFDEEF2)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF700F2B).withValues(alpha: 0.04),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => RestaurantApprovalDetailScreen(restaurant: restaurant),
               ),
             );
           },
-        );
-      },
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Restaurant Image
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    restaurant.imageAsset,
+                    width: 82,
+                    height: 82,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 82,
+                      height: 82,
+                      color: const Color(0xFFF9EEF2),
+                      child: const Icon(Icons.storefront_rounded, color: primaryBurgundy, size: 36),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Info & "รายละเอียด >"
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        restaurant.name,
+                        style: GoogleFonts.notoSansThai(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFF1E1E1E),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'อัปเดตล่าสุด',
+                        style: GoogleFonts.notoSansThai(
+                          fontSize: 12,
+                          color: const Color(0xFF757575),
+                        ),
+                      ),
+                      Text(
+                        restaurant.lastUpdated,
+                        style: GoogleFonts.notoSansThai(
+                          fontSize: 12,
+                          color: const Color(0xFF757575),
+                        ),
+                      ),
+                      if (restaurant.rejectionReason != null && restaurant.rejectionReason!.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'เหตุผล: ${restaurant.rejectionReason}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.notoSansThai(
+                            fontSize: 11,
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 4),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'รายละเอียด',
+                              style: GoogleFonts.notoSansThai(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF1E1E1E),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.arrow_forward_ios_rounded,
+                              size: 11,
+                              color: Color(0xFF1E1E1E),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
