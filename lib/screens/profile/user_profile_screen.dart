@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../main.dart';
 import '../auth/login_screen.dart';
+import 'edit_user_profile_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
@@ -33,6 +34,25 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
     );
+  }
+
+  void _openEditProfileScreen() async {
+    final result = await Navigator.of(context).push<Map<String, String>>(
+      MaterialPageRoute(
+        builder: (_) => EditUserProfileScreen(
+          initialName: _name,
+          initialEmail: _email,
+          initialPhone: _phone,
+        ),
+      ),
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _name = result['name'] ?? _name;
+        _email = result['email'] ?? _email;
+        _phone = result['phone'] ?? _phone;
+      });
+    }
   }
 
   void _showEditProfileModal() {
@@ -503,7 +523,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           borderRadius: BorderRadius.circular(14),
                         ),
                       ),
-                      onPressed: _showEditProfileModal,
+                      onPressed: _openEditProfileScreen,
                       child: const Text(
                         'แก้ไขข้อมูล',
                         style: TextStyle(
