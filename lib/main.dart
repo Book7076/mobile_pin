@@ -4,6 +4,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/constants.dart';
 import 'screens/splash_screen.dart';
+import 'screens/restaurants/shop_registration_screen.dart';
+import 'screens/restaurants/shop_details_screen.dart';
+import 'screens/restaurants/add_menu_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -42,6 +45,11 @@ class MyApp extends StatelessWidget {
         fontFamily: 'Roboto',
       ),
       home: const SplashScreen(),
+      routes: {
+        '/shop-registration': (context) => const ShopRegistrationScreen(),
+        '/shop-details': (context) => const ShopDetailsScreen(),
+        '/add-menu': (context) => const AddMenuScreen(),
+      },
     );
   }
 }
