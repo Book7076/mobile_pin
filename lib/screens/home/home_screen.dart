@@ -188,6 +188,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Positioned.fill(
               child: SafeArea(
                 bottom: false,
+                top: _currentTab != 2,
                 child: IndexedStack(
                   index: _currentTab,
                   children: [
@@ -1037,81 +1038,517 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   // ==========================================
-  // TAB 2: PROFILE (โปรไฟล์)
+  // TAB 2: PROFILE (ผู้ใช้งาน - User - Profiles)
   // ==========================================
   Widget _buildProfileTab() {
-    final user = supabase.auth.currentUser;
-    final email = user?.email ?? 'test@test.com';
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.only(left: 24, right: 24, top: 20, bottom: 100),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const SizedBox(height: 16),
-          // User Avatar
-          Container(
-            width: 86,
-            height: 86,
-            decoration: BoxDecoration(
-              color: const Color(0xFF6E162B).withOpacity(0.1),
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFF6E162B), width: 2),
-            ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Color(0xFF6E162B),
-              size: 52,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 1. Solid Burgundy Header with Title "ผู้ใช้งาน"
+        Container(
+          color: const Color(0xFF6E162B),
+          padding: EdgeInsets.only(
+            top: MediaQuery.of(context).padding.top + 34,
+            left: 24,
+            right: 24,
+            bottom: 24,
+          ),
+          alignment: Alignment.bottomLeft,
+          child: const Text(
+            'ผู้ใช้งาน',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              letterSpacing: -0.3,
             ),
           ),
-          const SizedBox(height: 14),
-          Text(
-            email,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF221F21),
+        ),
+
+        // 2. White Body with 5 Menu Action Cards and Sign Out Button
+        Expanded(
+          child: Container(
+            color: Colors.white,
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 26,
+                bottom: 110, // Room for floating bottom dock
+              ),
+              child: Column(
+                children: [
+                  // 1. โปรไฟล์
+                  _buildProfileMenuCard(
+                    icon: Icons.people_outline_rounded,
+                    title: 'โปรไฟล์',
+                    onTap: _showProfileInfoDialog,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 2. การตั้งค่า
+                  _buildProfileMenuCard(
+                    icon: Icons.settings_outlined,
+                    title: 'การตั้งค่า',
+                    onTap: _showSettingsDialog,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 3. ศูนย์ช่วยเหลือ
+                  _buildProfileMenuCard(
+                    icon: Icons.search_rounded,
+                    title: 'ศูนย์ช่วยเหลือ',
+                    onTap: _showHelpCenterDialog,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 4. รายงานปัญหา
+                  _buildProfileMenuCard(
+                    icon: Icons.error_outline_rounded,
+                    title: 'รายงานปัญหา',
+                    onTap: _showReportIssueDialog,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 5. เปิดร้านอาหาร
+                  _buildProfileMenuCard(
+                    icon: Icons.storefront_outlined,
+                    title: 'เปิดร้านอาหาร',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CreateRestaurantScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 36),
+
+                  // ปุ่ม ลงชื่อออก
+                  _buildSignOutButton(),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          const Text(
-            'สมาชิก MealMate',
-            style: TextStyle(fontSize: 14, color: Color(0xFF8E888B)),
-          ),
-          const SizedBox(height: 32),
+        ),
+      ],
+    );
+  }
 
-          // Manage restaurants option
-          ListTile(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            tileColor: Colors.white,
-            leading: const Icon(Icons.storefront_rounded, color: Color(0xFF6E162B)),
-            title: const Text('เปิดร้านอาหารของคุณ', style: TextStyle(fontWeight: FontWeight.w700)),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CreateRestaurantScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 14),
-
-          // Logout Button
-          ListTile(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            tileColor: Colors.white,
-            leading: const Icon(Icons.logout_rounded, color: Colors.red),
-            title: const Text('ออกจากระบบ', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w700)),
-            onTap: () async {
-              await supabase.auth.signOut();
-              if (mounted) {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
-              }
-            },
+  Widget _buildProfileMenuCard({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      height: 54,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCF7F8),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: const Color(0xFF6E162B),
+          width: 1.1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.015),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  color: const Color(0xFF6E162B),
+                  size: 25,
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF6E162B),
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const Spacer(),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF6E162B),
+                  size: 26,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSignOutButton() {
+    return Container(
+      height: 46,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCF7F8),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF6E162B),
+          width: 1.0,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: _showSignOutConfirmDialog,
+          child: const Center(
+            child: Text(
+              'ลงชื่อออก',
+              style: TextStyle(
+                fontSize: 14.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF6E162B),
+                letterSpacing: -0.2,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showProfileInfoDialog() {
+    final user = supabase.auth.currentUser;
+    final email = user?.email ?? 'test@test.com';
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (context) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: 290,
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 68,
+                    height: 68,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6E162B).withOpacity(0.08),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: const Color(0xFF6E162B), width: 1.5),
+                    ),
+                    child: const Icon(
+                      Icons.person_rounded,
+                      color: Color(0xFF6E162B),
+                      size: 40,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'ข้อมูลผู้ใช้งาน',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF221F21)),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    email,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF6E162B)),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'สถานะ: สมาชิก MealMate',
+                    style: TextStyle(fontSize: 12.5, color: Color(0xFF8E888B)),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 42,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF6E162B),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('ปิด', style: TextStyle(fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showSettingsDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: const [
+              Icon(Icons.settings_outlined, color: Color(0xFF6E162B), size: 22),
+              SizedBox(width: 8),
+              Text('การตั้งค่า', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF221F21))),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('• การแจ้งเตือน: เปิดใช้งานแล้ว', style: TextStyle(fontSize: 13.5, color: Color(0xFF5A5255))),
+              SizedBox(height: 6),
+              Text('• ภาษา: ภาษาไทย (TH)', style: TextStyle(fontSize: 13.5, color: Color(0xFF5A5255))),
+              SizedBox(height: 6),
+              Text('• เวอร์ชันแอป: v1.0.0 (MealMate)', style: TextStyle(fontSize: 13.5, color: Color(0xFF5A5255))),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('ตกลง', style: TextStyle(color: Color(0xFF6E162B), fontWeight: FontWeight.w700)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showHelpCenterDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: const [
+              Icon(Icons.search_rounded, color: Color(0xFF6E162B), size: 22),
+              SizedBox(width: 8),
+              Text('ศูนย์ช่วยเหลือ', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF221F21))),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('ติดต่อทีมงาน MealMate Support:', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: Color(0xFF221F21))),
+              SizedBox(height: 8),
+              Text('• อีเมล: support@mealmate.app', style: TextStyle(fontSize: 13, color: Color(0xFF5A5255))),
+              SizedBox(height: 4),
+              Text('• เบอร์โทร: 094-449-8544', style: TextStyle(fontSize: 13, color: Color(0xFF5A5255))),
+              SizedBox(height: 4),
+              Text('• เวลาทำการ: จันทร์ - ศุกร์ 09:00 - 18:00', style: TextStyle(fontSize: 13, color: Color(0xFF5A5255))),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('ตกลง', style: TextStyle(color: Color(0xFF6E162B), fontWeight: FontWeight.w700)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showReportIssueDialog() {
+    final issueController = TextEditingController();
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (dialogCtx) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: const [
+              Icon(Icons.error_outline_rounded, color: Color(0xFF6E162B), size: 22),
+              SizedBox(width: 8),
+              Text('รายงานปัญหา', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: Color(0xFF221F21))),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: issueController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'อธิบายปัญหาที่พบในการใช้งาน...',
+                  hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF8E888B)),
+                  filled: true,
+                  fillColor: const Color(0xFFF6ECEE),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('ยกเลิก', style: TextStyle(color: Color(0xFF8E888B))),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF6E162B),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () {
+                Navigator.of(dialogCtx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('ส่งรายงานปัญหาเรียบร้อยแล้ว ขอบคุณครับ'),
+                    backgroundColor: const Color(0xFF6E162B),
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                );
+              },
+              child: const Text('ส่งรายงาน'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showSignOutConfirmDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (BuildContext dialogContext) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: 275,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7EAEC),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: const Color(0xFFD4ADB5),
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 26),
+                    child: Text(
+                      'ต้องการลงชื่อออกจากระบบ?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF221F21),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+                  Container(height: 1.0, color: const Color(0xFFD4ADB5)),
+                  SizedBox(
+                    height: 48,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(18),
+                            ),
+                            onTap: () => Navigator.of(dialogContext).pop(),
+                            child: const Center(
+                              child: Text(
+                                'ยกเลิก',
+                                style: TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF221F21),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Container(width: 1.0, height: double.infinity, color: const Color(0xFFD4ADB5)),
+                        Expanded(
+                          child: InkWell(
+                            borderRadius: const BorderRadius.only(
+                              bottomRight: Radius.circular(18),
+                            ),
+                            onTap: () async {
+                              Navigator.of(dialogContext).pop();
+                              await supabase.auth.signOut();
+                              if (mounted) {
+                                Navigator.of(context).pushReplacement(
+                                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                                );
+                              }
+                            },
+                            child: const Center(
+                              child: Text(
+                                'ยืนยัน',
+                                style: TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF6E162B),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
