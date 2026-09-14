@@ -16,7 +16,9 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentTab = 0; // 0: Home, 1: Favorites, 2: Profile
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
+  bool _isSearchFocused = false;
 
   // Curated recommended restaurants matching the design
   final List<Map<String, dynamic>> _curatedRestaurants = [
@@ -49,6 +51,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _searchFocusNode.addListener(() {
+      if (mounted) {
+        setState(() {
+          _isSearchFocused = _searchFocusNode.hasFocus;
+        });
+      }
+    });
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -63,40 +72,54 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     const Color bgWarmColor = Color(0xFFFDF7F7); // Subtle blush background
+    final double keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final bool isKeyboardVisible = keyboardHeight > 0;
 
-    return Scaffold(
-      backgroundColor: bgWarmColor,
-      body: Stack(
-        children: [
-          // Main Body by active tab
-          Positioned.fill(
-            child: SafeArea(
-              bottom: false,
-              child: IndexedStack(
-                index: _currentTab,
-                children: [
-                  _buildHomeTab(),
-                  _buildFavoritesTab(),
-                  _buildProfileTab(),
-                ],
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () {
+        if (_searchFocusNode.hasFocus) {
+          _searchFocusNode.unfocus();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: bgWarmColor,
+        resizeToAvoidBottomInset: true,
+        body: Stack(
+          children: [
+            // Main Body by active tab
+            Positioned.fill(
+              child: SafeArea(
+                bottom: false,
+                child: IndexedStack(
+                  index: _currentTab,
+                  children: [
+                    _buildHomeTab(),
+                    _buildFavoritesTab(),
+                    _buildProfileTab(),
+                  ],
+                ),
               ),
             ),
-          ),
 
-          // Section 4: Floating Bottom Navigation Bar (3 Main Icons)
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: 22,
-            child: _buildFloatingBottomBar(),
-          ),
-        ],
+            // Section 4: Floating Bottom Navigation Bar (3 Main Icons)
+            // Seamlessly hide when keyboard pops up, smoothly reappear when keyboard closes
+            if (!isKeyboardVisible)
+              Positioned(
+                left: 24,
+                right: 24,
+                bottom: 22,
+                child: _buildFloatingBottomBar(),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -147,10 +170,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFFF1ECEF), // Soft grey pill
               borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: _isSearchFocused
+                    ? const Color(0xFF6E162B).withOpacity(0.35)
+                    : Colors.transparent,
+                width: 1.4,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 8,
+                  color: _isSearchFocused
+                      ? const Color(0xFF6E162B).withOpacity(0.08)
+                      : Colors.black.withOpacity(0.03),
+                  blurRadius: 10,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -161,14 +192,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Expanded(
                   child: TextField(
                     controller: _searchController,
+                    focusNode: _searchFocusNode,
+                    cursorColor: const Color(0xFF6E162B),
+                    cursorWidth: 2.2,
+                    cursorRadius: const Radius.circular(2),
+                    showCursor: true,
+                    textInputAction: TextInputAction.search,
+                    onSubmitted: (_) => _searchFocusNode.unfocus(),
                     onChanged: (val) => setState(() => _searchQuery = val),
                     style: const TextStyle(
                       fontSize: 15,
                       color: Color(0xFF221F21),
+                      fontWeight: FontWeight.w500,
                     ),
-                    decoration: const InputDecoration(
-                      hintText: 'ค้นหาร้านอาหาร',
-                      hintStyle: TextStyle(
+                    decoration: InputDecoration(
+                      // When focused and empty, hint text clears so cursor blinks cleanly as in mockup
+                      hintText: (_isSearchFocused && _searchQuery.isEmpty)
+                          ? ''
+                          : 'ค้นหาร้านอาหาร',
+                      hintStyle: const TextStyle(
                         fontSize: 14.5,
                         color: Color(0xFF8E888B),
                         fontWeight: FontWeight.w400,
@@ -179,17 +221,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(
-                    Icons.search_rounded,
-                    color: Color(0xFF6E162B),
-                    size: 26,
+                if (_searchQuery.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: Color(0xFF8E888B),
+                      size: 22,
+                    ),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    splashRadius: 20,
+                  )
+                else
+                  IconButton(
+                    icon: const Icon(
+                      Icons.search_rounded,
+                      color: Color(0xFF6E162B),
+                      size: 26,
+                    ),
+                    onPressed: () {
+                      if (!_searchFocusNode.hasFocus) {
+                        _searchFocusNode.requestFocus();
+                      }
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    splashRadius: 20,
                   ),
-                  onPressed: () {},
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  splashRadius: 20,
-                ),
               ],
             ),
           ),
