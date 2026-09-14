@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../main.dart';
 import '../auth/login_screen.dart';
+import '../profile/user_profile_screen.dart';
 import '../restaurants/create_restaurant_screen.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 import 'discover_screen.dart';
@@ -1083,7 +1084,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _buildProfileMenuCard(
                     icon: Icons.people_outline_rounded,
                     title: 'โปรไฟล์',
-                    onTap: _showProfileInfoDialog,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const UserProfileScreen(),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
 
