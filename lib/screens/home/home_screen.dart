@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../main.dart';
 import '../auth/login_screen.dart';
 import '../restaurants/create_restaurant_screen.dart';
+import '../restaurants/restaurant_detail_screen.dart';
 import 'discover_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -518,8 +519,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildRestaurantRow(Map<String, dynamic> restaurant) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => RestaurantDetailScreen(restaurantData: restaurant),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // Restaurant Image
         ClipRRect(
@@ -595,8 +605,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
   // ==========================================
   // SECTION 4: FLOATING BOTTOM NAVIGATION BAR
@@ -856,140 +867,155 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Restaurant Thumbnail
-          ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: SizedBox(
-              width: 86,
-              height: 86,
-              child: item['isAsset'] == true
-                  ? Image.asset(
-                      item['image'] as String,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        color: const Color(0xFFEFECEF),
-                        child: const Icon(
-                          Icons.restaurant_rounded,
-                          color: Color(0xFF6E162B),
-                          size: 34,
-                        ),
-                      ),
-                    )
-                  : Image.network(
-                      item['image'] as String,
-                      fit: BoxFit.cover,
-                    ),
-            ),
-          ),
-
-          const SizedBox(width: 14),
-
-          // Information Column
-          Expanded(
-            child: Column(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => RestaurantDetailScreen(restaurantData: item),
+              ),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Name and Bookmark Ribbon
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        item['name'] as String,
+                // Restaurant Thumbnail
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: SizedBox(
+                    width: 86,
+                    height: 86,
+                    child: item['isAsset'] == true
+                        ? Image.asset(
+                            item['image'] as String,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: const Color(0xFFEFECEF),
+                              child: const Icon(
+                                Icons.restaurant_rounded,
+                                color: Color(0xFF6E162B),
+                                size: 34,
+                              ),
+                            ),
+                          )
+                        : Image.network(
+                            item['image'] as String,
+                            fit: BoxFit.cover,
+                          ),
+                  ),
+                ),
+
+                const SizedBox(width: 14),
+
+                // Information Column
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Name and Bookmark Ribbon
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item['name'] as String,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF221F21),
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.bookmark_rounded,
+                            color: Color(0xFF6E162B),
+                            size: 26,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 2),
+
+                      // Category
+                      Text(
+                        item['category'] as String,
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF221F21),
-                          letterSpacing: -0.2,
+                          fontSize: 13,
+                          color: Color(0xFF6B6568),
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
-                    ),
-                    const Icon(
-                      Icons.bookmark_rounded,
-                      color: Color(0xFF6E162B),
-                      size: 26,
-                    ),
-                  ],
-                ),
 
-                const SizedBox(height: 2),
+                      const SizedBox(height: 3),
 
-                // Category
-                Text(
-                  item['category'] as String,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B6568),
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-
-                const SizedBox(height: 3),
-
-                // Price Range
-                Text(
-                  item['price'] as String,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFF6B6568),
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-
-                const SizedBox(height: 4),
-
-                // Rating & Detail Link
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.star_rounded,
-                          color: Color(0xFF6E162B),
-                          size: 17,
+                      // Price Range
+                      Text(
+                        item['price'] as String,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF6B6568),
+                          fontWeight: FontWeight.w400,
                         ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${item['rating']}',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF3F3B3E),
+                      ),
+
+                      const SizedBox(height: 4),
+
+                      // Rating & Detail Link
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Color(0xFF6E162B),
+                                size: 17,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${item['rating']}',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF3F3B3E),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text(
-                          'รายละเอียด',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF221F21),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Text(
+                                'รายละเอียด',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF221F21),
+                                ),
+                              ),
+                              SizedBox(width: 2),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 16,
+                                color: Color(0xFF221F21),
+                              ),
+                            ],
                           ),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(
-                          Icons.chevron_right_rounded,
-                          size: 16,
-                          color: Color(0xFF221F21),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
