@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
 import '../home/home_screen.dart';
 import '../admin/admin_dashboard.dart';
+import '../admin/admin_login_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -125,6 +126,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 });
               },
               child: Text(_isLogin ? 'Create an account' : 'I already have an account'),
+            ),
+            const SizedBox(height: 24),
+            const Divider(),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+                );
+              },
+              icon: const Icon(Icons.security_rounded, size: 18, color: Color(0xFF7B182D)),
+              label: const Text(
+                'เข้าสู่ระบบสำหรับแอดมิน (Admin Portal)',
+                style: TextStyle(color: Color(0xFF7B182D), fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),

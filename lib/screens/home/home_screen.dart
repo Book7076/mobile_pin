@@ -48,10 +48,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               if (snapshot.hasError) {
                 return Center(child: Text('Error: ${snapshot.error}'));
               }
-              
+
               final restaurants = snapshot.data ?? [];
               if (restaurants.isEmpty) {
-                return const Center(child: Text('You have not opened any restaurants yet.'));
+                return const Center(
+                  child: Text('You have not opened any restaurants yet.'),
+                );
               }
 
               return ListView.builder(
@@ -60,26 +62,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 itemBuilder: (context, index) {
                   final restaurant = restaurants[index];
                   final status = restaurant['status'] as String;
-                  
+
                   Color statusColor = Colors.orange;
                   if (status == 'approved') statusColor = Colors.green;
                   if (status == 'rejected') statusColor = Colors.red;
 
                   return Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    margin: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
                     child: ListTile(
-                      title: Text(restaurant['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                      title: Text(
+                        restaurant['name'],
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       subtitle: Text(restaurant['address']),
                       trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
+                          color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: statusColor),
                         ),
                         child: Text(
                           status.toUpperCase(),
-                          style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            color: statusColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -94,7 +109,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: FloatingActionButton.extended(
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CreateRestaurantScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const CreateRestaurantScreen(),
+                ),
               );
             },
             backgroundColor: const Color(0xFFFF5252),
@@ -111,7 +128,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Food Tinder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Food Tinder',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
         backgroundColor: const Color(0xFFFF5252),
         actions: [
           IconButton(
@@ -133,8 +153,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onTap: (index) => setState(() => _currentIndex = index),
         selectedItemColor: const Color(0xFFFF5252),
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.local_fire_department), label: 'Discover'),
-          BottomNavigationBarItem(icon: Icon(Icons.storefront), label: 'My Restaurants'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.local_fire_department),
+            label: 'Discover',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.storefront),
+            label: 'My Restaurants',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
