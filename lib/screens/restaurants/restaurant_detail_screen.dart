@@ -40,6 +40,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     } else {
       setState(() {
         _isBookmarked = true;
+        widget.restaurantData?['isBookmarked'] = true;
       });
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -146,6 +147,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
                               Navigator.of(dialogContext).pop();
                               setState(() {
                                 _isBookmarked = false;
+                                widget.restaurantData?['isBookmarked'] = false;
                               });
 
                               ScaffoldMessenger.of(context).hideCurrentSnackBar();

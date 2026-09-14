@@ -520,12 +520,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildRestaurantRow(Map<String, dynamic> restaurant) {
     return InkWell(
-      onTap: () {
-        Navigator.of(context).push(
+      onTap: () async {
+        final bool? isBookmarked = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (_) => RestaurantDetailScreen(restaurantData: restaurant),
           ),
         );
+        if (isBookmarked != null && mounted) {
+          setState(() {
+            restaurant['isBookmarked'] = isBookmarked;
+            if (!isBookmarked) {
+              _favoriteRestaurants.removeWhere((r) => r['name'] == restaurant['name']);
+            }
+          });
+        }
       },
       borderRadius: BorderRadius.circular(16),
       child: Row(
