@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'edit_profile_success_screen.dart';
+import 'forgot_password_screen.dart';
 
 class EditUserProfileScreen extends StatefulWidget {
   final String initialName;
@@ -84,44 +85,14 @@ class _EditUserProfileScreenState extends State<EditUserProfileScreen> {
   }
 
   void _showForgotPasswordDialog() {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.35),
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          title: Row(
-            children: const [
-              Icon(Icons.lock_reset_rounded, color: Color(0xFF6E162B), size: 24),
-              SizedBox(width: 8),
-              Text(
-                'รีเซ็ตรหัสผ่าน',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF221F21),
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            'ระบบได้ส่งลิงก์สำหรับตั้งรหัสผ่านใหม่ไปยังอีเมล ${_emailController.text} เรียบร้อยแล้ว กรุณาตรวจสอบกล่องข้อความของคุณ',
-            style: const TextStyle(fontSize: 13.5, color: Color(0xFF5A5255), height: 1.35),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text(
-                'ตกลง',
-                style: TextStyle(
-                  color: Color(0xFF6E162B),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ForgotPasswordScreen(
+          initialEmail: _emailController.text.isNotEmpty
+              ? _emailController.text
+              : widget.initialEmail,
+        ),
+      ),
     );
   }
 
