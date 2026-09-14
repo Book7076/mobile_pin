@@ -200,7 +200,7 @@ void main() {
     });
 
     testWidgets(
-        'FoodSwipeScreen "ถัดไป >" with < 5 restaurants navigates to IncompleteResultScreen',
+        'FoodSwipeScreen "ถัดไป >" with liked restaurants navigates to FinishTransitionScreen',
         (tester) async {
       await tester.pumpWidget(
         const ProviderScope(
@@ -212,19 +212,23 @@ void main() {
 
       await tester.pumpAndSettle();
 
+      // Like 1 restaurant first
+      final likeBtn = find.byKey(const ValueKey('swipe_like_button'));
+      expect(likeBtn, findsOneWidget);
+      await tester.tap(likeBtn);
+      await tester.pumpAndSettle();
+
       // Find "ถัดไป >" button
       final nextButton = find.byKey(const ValueKey('swipe_next_button'));
       expect(nextButton, findsOneWidget);
 
-      // Tap "ถัดไป" when 0 restaurants are liked
+      // Tap "ถัดไป"
       await tester.tap(nextButton);
       await tester.pumpAndSettle();
 
-      // Navigated to IncompleteResultScreen with 0 count
-      expect(find.text('คุณเลือกได้ 0 ร้าน'), findsOneWidget);
-      expect(find.text('จากทั้งหมดที่มี'), findsOneWidget);
-      expect(find.text('ดูผลลัพธ์เลย'), findsOneWidget);
-      expect(find.text('ค้นหาร้านเพิ่มเติม'), findsOneWidget);
+      // Navigated to FinishTransitionScreen
+      expect(find.text('จบแล้วจ้า'), findsOneWidget);
+      expect(find.byKey(const ValueKey('finish_pill_button')), findsOneWidget);
     });
   });
 }

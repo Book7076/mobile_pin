@@ -1,13 +1,88 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pin_mobile/main.dart';
 
+final List<int> _kTransparentImage = [
+  0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D,
+  0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+  0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00,
+  0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+  0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+  0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+];
+
+class _MockHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return _MockHttpClient();
+  }
+}
+
+class _MockHttpClient extends Fake implements HttpClient {
+  @override
+  bool autoUncompress = true;
+
+  @override
+  Future<HttpClientRequest> getUrl(Uri url) async {
+    return _MockHttpClientRequest();
+  }
+}
+
+class _MockHttpClientRequest extends Fake implements HttpClientRequest {
+  @override
+  final HttpHeaders headers = _MockHttpHeaders();
+
+  @override
+  Future<HttpClientResponse> close() async {
+    return _MockHttpClientResponse();
+  }
+}
+
+class _MockHttpHeaders extends Fake implements HttpHeaders {
+  @override
+  void add(String name, Object value, {bool preserveHeaderCase = false}) {}
+}
+
+class _MockHttpClientResponse extends Fake implements HttpClientResponse {
+  @override
+  int get statusCode => 200;
+
+  @override
+  int get contentLength => _kTransparentImage.length;
+
+  @override
+  HttpClientResponseCompressionState get compressionState =>
+      HttpClientResponseCompressionState.notCompressed;
+
+  @override
+  StreamSubscription<List<int>> listen(void Function(List<int> event)? onData,
+      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
+    return Stream<List<int>>.fromIterable([_kTransparentImage]).listen(
+      onData,
+      onError: onError,
+      onDone: onDone,
+      cancelOnError: cancelOnError,
+    );
+  }
+}
+
 void main() {
-  testWidgets('App smoke test loads MaterialApp', (WidgetTester tester) async {
-    // Avoid real HTTP network calls during test
+  setUpAll(() {
+    HttpOverrides.global = _MockHttpOverrides();
+  });
+
+  tearDownAll(() {
     HttpOverrides.global = null;
+  });
+
+  testWidgets('App smoke test loads MaterialApp and starts at CategorySelectionScreen',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(tester.view.resetPhysicalSize);
 
     await tester.pumpWidget(
       const ProviderScope(
@@ -15,9 +90,9 @@ void main() {
       ),
     );
 
-    expect(find.byType(MaterialApp), findsOneWidget);
+    await tester.pumpAndSettle();
 
-    // Drain splash screen timer
-    await tester.pump(const Duration(seconds: 3));
+    expect(find.byType(MaterialApp), findsOneWidget);
+    expect(find.text('เลือกประเภทอาหาร'), findsOneWidget);
   });
 }

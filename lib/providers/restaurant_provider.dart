@@ -69,6 +69,33 @@ final filterCriteriaProvider =
     StateProvider<FilterCriteriaModel>((ref) => FilterCriteriaModel());
 
 // 3. Filtered Restaurants for Swipe & Discover
+bool _checkCategoryMatch(String selectedCat, List<String> restaurantCategories) {
+  if (restaurantCategories.contains(selectedCat)) return true;
+
+  // Category alias mappings between Flow categories and restaurant dataset
+  const aliases = <String, List<String>>{
+    'shabu_hotpot': ['shabu_grill', 'mookata', 'buffet'],
+    'mookata': ['shabu_grill', 'shabu_hotpot', 'buffet'],
+    'a_la_carte': ['made_to_order', 'street_food', 'thai'],
+    'made_to_order': ['a_la_carte', 'street_food'],
+    'street_food': ['a_la_carte', 'made_to_order'],
+    'cafe_beverage': ['cafe_dessert'],
+    'cafe_dessert': ['cafe_beverage', 'dessert_bakery'],
+    'dessert_bakery': ['cafe_dessert'],
+    'healthy': ['healthy_clean'],
+    'healthy_clean': ['healthy'],
+    'fast_food': ['fastfood'],
+    'fastfood': ['fast_food'],
+    'somtum_isan': ['thai', 'street_food'],
+  };
+
+  final mapped = aliases[selectedCat];
+  if (mapped != null) {
+    return mapped.any((alias) => restaurantCategories.contains(alias));
+  }
+  return false;
+}
+
 final filteredRestaurantsProvider = Provider<List<RestaurantModel>>((ref) {
   final allRestaurants = ref.watch(restaurantsProvider);
   final criteria = ref.watch(filterCriteriaProvider);
@@ -83,12 +110,12 @@ final filteredRestaurantsProvider = Provider<List<RestaurantModel>>((ref) {
       if (criteria.matchAllCategories) {
         // AND match: restaurant must contain ALL selected categories
         final hasAll = criteria.selectedCategories
-            .every((cat) => restaurant.categories.contains(cat));
+            .every((cat) => _checkCategoryMatch(cat, restaurant.categories));
         if (!hasAll) return false;
       } else {
         // OR match: restaurant must contain AT LEAST ONE of selected categories
         final hasAny = criteria.selectedCategories
-            .any((cat) => restaurant.categories.contains(cat));
+            .any((cat) => _checkCategoryMatch(cat, restaurant.categories));
         if (!hasAny) return false;
       }
     }

@@ -6,7 +6,6 @@ import '../../models/restaurant_model.dart';
 import '../../providers/restaurant_provider.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 import 'finish_transition_screen.dart';
-import 'incomplete_result_screen.dart';
 
 /// Screen for swiping restaurants:
 /// - Swipe right or tap green heart icon to LIKE
@@ -26,7 +25,6 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
   Animation<Offset>? _flyAnimation;
   Animation<double>? _rotationAnimation;
 
-  int _currentIndex = 0;
   Offset _dragOffset = Offset.zero;
   bool _isAnimating = false;
 
@@ -78,7 +76,6 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
     HapticFeedback.lightImpact();
     _animateCard(const Offset(-500, 0), -0.3, onComplete: () {
       ref.read(swipeSessionProvider.notifier).pass(restaurant);
-      _nextCard();
     });
   }
 
@@ -95,8 +92,6 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
             builder: (_) => const FinishTransitionScreen(),
           ),
         );
-      } else {
-        _nextCard();
       }
     });
   }
@@ -127,37 +122,6 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
     });
   }
 
-  void _nextCard() {
-    final allFiltered = ref.read(filteredRestaurantsProvider);
-    final allRestaurants = ref.read(restaurantsProvider);
-    final listToSwipe = allFiltered.isNotEmpty
-        ? _getSwipeList(allFiltered)
-        : _getSwipeList(allRestaurants);
-
-    if (_currentIndex + 1 >= listToSwipe.length) {
-      // Swiped all cards!
-      final updatedLiked = ref.read(swipeSessionProvider).likedRestaurants;
-      if (updatedLiked.length >= 5) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const FinishTransitionScreen(),
-          ),
-        );
-      } else {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) =>
-                IncompleteResultScreen(likedCount: updatedLiked.length),
-          ),
-        );
-      }
-    } else {
-      setState(() {
-        _currentIndex++;
-      });
-    }
-  }
-
   void _navigateToDetails(RestaurantModel restaurant) {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
@@ -170,16 +134,32 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
   void _navigateToSelectedRestaurants() {
     HapticFeedback.mediumImpact();
     final likedList = ref.read(swipeSessionProvider).likedRestaurants;
-    if (likedList.length >= 5) {
+    if (likedList.isNotEmpty) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => const FinishTransitionScreen(),
         ),
       );
     } else {
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => IncompleteResultScreen(likedCount: likedList.length),
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.info_outline_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'กรุณาปัดขวาเพื่อเลือกร้านอย่างน้อย 1 ร้านก่อนไปต่อจ้า',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppConstants.burgundyPrimary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(milliseconds: 2200),
         ),
       );
     }
@@ -187,17 +167,25 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final swipeSession = ref.watch(swipeSessionProvider);
+    final swipedIds = {
+      ...swipeSession.likedRestaurants.map((r) => r.id),
+      ...swipeSession.passedRestaurants.map((r) => r.id),
+    };
+
+    // Only show restaurants that match the selected Category and Budget criteria
     final allFiltered = ref.watch(filteredRestaurantsProvider);
-    final allRestaurants = ref.watch(restaurantsProvider);
+    final orderedList = _getSwipeList(allFiltered);
 
-    final listToSwipe = allFiltered.isNotEmpty
-        ? _getSwipeList(allFiltered)
-        : _getSwipeList(allRestaurants);
+    // Filter out any restaurants that have already been swiped (left or right)
+    final listToSwipe = orderedList
+        .where((r) => !swipedIds.contains(r.id))
+        .toList();
 
-    final isEnd = _currentIndex >= listToSwipe.length;
-    final currentRestaurant = isEnd ? null : listToSwipe[_currentIndex];
+    final isEnd = listToSwipe.isEmpty;
+    final currentRestaurant = isEnd ? null : listToSwipe.first;
     final nextRestaurant =
-        (_currentIndex + 1 < listToSwipe.length) ? listToSwipe[_currentIndex + 1] : null;
+        (listToSwipe.length > 1) ? listToSwipe[1] : null;
 
     final screenSize = MediaQuery.of(context).size;
 
@@ -474,7 +462,7 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
                           size: 64, color: Colors.white70),
                     ),
 
-              // Bookmark Button (Top-Right)
+              // Flag / Favorite Button (Top-Right)
               Positioned(
                 top: 16,
                 right: 16,
@@ -483,18 +471,52 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
                   shape: const CircleBorder(),
                   elevation: 4,
                   child: InkWell(
-                    key: const ValueKey('swipe_bookmark_button'),
+                    key: isInteractive ? const ValueKey('swipe_flag_button') : null,
                     customBorder: const CircleBorder(),
-                    onTap: () {
-                      HapticFeedback.lightImpact();
+                    onTap: isInteractive
+                        ? () {
+                            HapticFeedback.lightImpact();
                       ref
                           .read(restaurantsProvider.notifier)
                           .toggleFavorite(restaurant.id);
-                    },
+                      final newFav = !isFav;
+                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              Icon(
+                                newFav
+                                    ? Icons.flag_rounded
+                                    : Icons.outlined_flag_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  newFav
+                                      ? 'เพิ่ม "${restaurant.name}" เข้าสู่รายการโปรดแล้ว'
+                                      : 'นำ "${restaurant.name}" ออกจากรายการโปรดแล้ว',
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
+                            ],
+                          ),
+                          backgroundColor: AppConstants.burgundyPrimary,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          duration: const Duration(milliseconds: 1800),
+                        ),
+                      );
+                    }
+                  : null,
                     child: Padding(
                       padding: const EdgeInsets.all(10),
                       child: Icon(
-                        isFav ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                        isFav ? Icons.flag_rounded : Icons.outlined_flag_rounded,
                         color: AppConstants.burgundyPrimary,
                         size: 24,
                       ),
@@ -852,9 +874,7 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
             const SizedBox(height: 12),
             TextButton(
               onPressed: () {
-                setState(() {
-                  _currentIndex = 0;
-                });
+                ref.read(swipeSessionProvider.notifier).reset();
               },
               child: const Text(
                 'เริ่มปัดใหม่อีกครั้ง',

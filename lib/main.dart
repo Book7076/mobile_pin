@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/constants.dart';
-import 'screens/splash_screen.dart';
+import 'screens/flow/category_selection_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,7 +41,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         fontFamily: 'Kanit',
       ),
-      home: const SplashScreen(),
+      home: const CategorySelectionScreen(isStandalone: false),
     );
   }
 }

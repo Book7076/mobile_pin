@@ -125,7 +125,18 @@ void main() {
     expect(find.byIcon(Icons.favorite_rounded), findsWidgets);
     expect(find.text('ถัดไป'), findsOneWidget);
 
-    // 4. Test Liking with Heart button
+    // 4. Test Flag favorite button
+    final flagButtonFinder = find.byKey(const ValueKey('swipe_flag_button'));
+    expect(flagButtonFinder, findsOneWidget);
+    await tester.tap(flagButtonFinder);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('เข้าสู่รายการโปรดแล้ว'), findsOneWidget);
+
+    // Let snackbar dismiss so it doesn't obscure next button
+    await tester.pump(const Duration(seconds: 2));
+    await tester.pumpAndSettle();
+
+    // 5. Test Liking with Heart button
     final heartButtonFinder = find.byKey(const ValueKey('swipe_like_button'));
     expect(heartButtonFinder, findsOneWidget);
     await tester.tap(heartButtonFinder);
@@ -140,18 +151,19 @@ void main() {
     expect(find.text('RawTruckr'), findsOneWidget);
     expect(find.text('อาหารเกาหลี'), findsOneWidget);
 
-    // 5. Test "ถัดไป" navigation to IncompleteResultScreen (< 5 liked)
+    // 6. Test "ถัดไป" navigation to FinishTransitionScreen ("จบแล้วจ้า")
     final nextBtn = find.byKey(const ValueKey('swipe_next_button'));
     expect(nextBtn, findsOneWidget);
-    await tester.tap(nextBtn);
+    await tester.tap(nextBtn, warnIfMissed: false);
     await tester.pumpAndSettle();
 
-    // In IncompleteResultScreen (liked 1 restaurant)
-    expect(find.text('คุณเลือกได้ 1 ร้าน'), findsOneWidget);
-    expect(find.text('จากทั้งหมดที่มี'), findsOneWidget);
+    // In FinishTransitionScreen
+    expect(find.text('จบแล้วจ้า'), findsOneWidget);
 
-    // Tap "ดูผลลัพธ์เลย" to proceed to SelectedRestaurantsScreen
-    await tester.tap(find.text('ดูผลลัพธ์เลย'));
+    // Tap "จบแล้วจ้า" pill to proceed to SelectedRestaurantsScreen
+    final finishPill = find.byKey(const ValueKey('finish_pill_button'));
+    expect(finishPill, findsOneWidget);
+    await tester.tap(finishPill);
     await tester.pumpAndSettle();
     expect(find.text('ผลลัพธ์'), findsOneWidget);
     expect(find.text('ร้านไหน...ถูกใจคุณ'), findsOneWidget);

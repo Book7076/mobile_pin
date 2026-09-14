@@ -343,7 +343,7 @@ class FinalWinnerScreen extends StatelessWidget {
                     customBorder: const CircleBorder(),
                     onTap: () {
                       HapticFeedback.lightImpact();
-                      Navigator.of(context).pop();
+                      Navigator.of(context).popUntil((route) => route.isFirst);
                     },
                     child: const Center(
                       child: Icon(
