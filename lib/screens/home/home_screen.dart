@@ -871,12 +871,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
-          onTap: () {
-            Navigator.of(context).push(
+          onTap: () async {
+            final bool? isBookmarked = await Navigator.of(context).push<bool>(
               MaterialPageRoute(
                 builder: (_) => RestaurantDetailScreen(restaurantData: item),
               ),
             );
+            if (isBookmarked != null && mounted) {
+              setState(() {
+                item['isBookmarked'] = isBookmarked;
+                if (!isBookmarked) {
+                  _favoriteRestaurants.removeWhere((r) => r['name'] == item['name']);
+                }
+              });
+            }
           },
           child: Padding(
             padding: const EdgeInsets.all(12),

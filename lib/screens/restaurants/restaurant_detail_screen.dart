@@ -34,24 +34,154 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
     );
   }
 
-  void _toggleBookmark() {
-    setState(() {
-      _isBookmarked = !_isBookmarked;
-    });
+  void _onBookmarkTapped() {
+    if (_isBookmarked) {
+      _showRemoveFavoriteDialog();
+    } else {
+      setState(() {
+        _isBookmarked = true;
+      });
 
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isBookmarked
-              ? 'บันทึกในรายการโปรดเรียบร้อยแล้ว'
-              : 'ลบออกจากรายการโปรดแล้ว',
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('บันทึกในรายการโปรดเรียบร้อยแล้ว'),
+          backgroundColor: const Color(0xFF6E162B),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        backgroundColor: const Color(0xFF6E162B),
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
+      );
+    }
+  }
+
+  void _showRemoveFavoriteDialog() {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (BuildContext dialogContext) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: 275,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7EAEC), // Tinted soft rose background matching screenshot
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: const Color(0xFFD4ADB5), // Subtle border
+                  width: 1.2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Dialog Title Text
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 26),
+                    child: Text(
+                      'ต้องการลบจากรายการโปรด',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF221F21),
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ),
+
+                  // Horizontal Divider Line
+                  Container(
+                    height: 1.0,
+                    color: const Color(0xFFD4ADB5),
+                  ),
+
+                  // Actions Row: ยกเลิก | ยืนยัน
+                  SizedBox(
+                    height: 48,
+                    child: Row(
+                      children: [
+                        // Left Button: ยกเลิก
+                        Expanded(
+                          child: InkWell(
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(18),
+                            ),
+                            onTap: () => Navigator.of(dialogContext).pop(),
+                            child: const Center(
+                              child: Text(
+                                'ยกเลิก',
+                                style: TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF221F21),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Vertical Divider Line
+                        Container(
+                          width: 1.0,
+                          height: double.infinity,
+                          color: const Color(0xFFD4ADB5),
+                        ),
+
+                        // Right Button: ยืนยัน
+                        Expanded(
+                          child: InkWell(
+                            borderRadius: const BorderRadius.only(
+                              bottomRight: Radius.circular(18),
+                            ),
+                            onTap: () {
+                              Navigator.of(dialogContext).pop();
+                              setState(() {
+                                _isBookmarked = false;
+                              });
+
+                              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('ลบออกจากรายการโปรดแล้ว'),
+                                  backgroundColor: const Color(0xFF6E162B),
+                                  behavior: SnackBarBehavior.floating,
+                                  duration: const Duration(seconds: 2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Center(
+                              child: Text(
+                                'ยืนยัน',
+                                style: TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF221F21),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -88,7 +218,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
             color: Color(0xFF6E162B),
             size: 32,
           ),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(_isBookmarked),
         ),
         titleSpacing: 0,
         title: const Text(
@@ -173,7 +303,7 @@ class _RestaurantDetailScreenState extends State<RestaurantDetailScreen> {
 
                 // Filled Bookmark Ribbon (ป้ายแสดงสีที่เต็มช่อง)
                 GestureDetector(
-                  onTap: _toggleBookmark,
+                  onTap: _onBookmarkTapped,
                   behavior: HitTestBehavior.opaque,
                   child: Padding(
                     padding: const EdgeInsets.only(left: 8.0, top: 2.0),
