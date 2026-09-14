@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'edit_profile_success_screen.dart';
 
 class EditUserProfileScreen extends StatefulWidget {
   final String initialName;
@@ -68,20 +69,18 @@ class _EditUserProfileScreenState extends State<EditUserProfileScreen> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('บันทึกข้อมูลเรียบร้อยแล้ว'),
-        backgroundColor: const Color(0xFF6E162B),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    // Navigate to Success Screen
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => EditProfileSuccessScreen(
+          updatedData: {
+            'name': name,
+            'email': email.isNotEmpty ? email : widget.initialEmail,
+            'phone': phone.isNotEmpty ? phone : widget.initialPhone,
+          },
+        ),
       ),
     );
-
-    Navigator.of(context).pop<Map<String, String>>({
-      'name': name,
-      'email': email.isNotEmpty ? email : widget.initialEmail,
-      'phone': phone.isNotEmpty ? phone : widget.initialPhone,
-    });
   }
 
   void _showForgotPasswordDialog() {
