@@ -1,31 +1,39 @@
-﻿class SignatureDish {
+class SignatureDish {
   final String name;
   final int price;
   final String? imageUrl;
   final String? description;
+  final String? priceDisplay;
 
   SignatureDish({
     required this.name,
     required this.price,
     this.imageUrl,
     this.description,
+    this.priceDisplay,
   });
+
+  String get formattedPrice => priceDisplay ?? '฿$price';
 
   factory SignatureDish.fromJson(Map<String, dynamic> json) {
     return SignatureDish(
       name: json['name'] as String? ?? '',
-      price: json['price'] is int ? json['price'] as int : int.tryParse(json['price'].toString()) ?? 0,
+      price: json['price'] is int
+          ? json['price'] as int
+          : int.tryParse(json['price'].toString()) ?? 0,
       imageUrl: json['image_url'] as String?,
       description: json['description'] as String?,
+      priceDisplay: json['price_display'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    'price': price,
-    'image_url': imageUrl,
-    'description': description,
-  };
+        'name': name,
+        'price': price,
+        'image_url': imageUrl,
+        'description': description,
+        'price_display': priceDisplay,
+      };
 }
 
 class RestaurantModel {
@@ -52,6 +60,7 @@ class RestaurantModel {
   final bool isFavorite;
   final bool isLiked;
   final double? distanceKm;
+  final String? locationBadge;
 
   RestaurantModel({
     required this.id,
@@ -77,6 +86,7 @@ class RestaurantModel {
     this.isFavorite = false,
     this.isLiked = false,
     this.distanceKm,
+    this.locationBadge,
   });
 
   factory RestaurantModel.fromJson(Map<String, dynamic> json) {

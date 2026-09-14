@@ -270,7 +270,7 @@ class RestaurantDetailScreen extends ConsumerWidget {
       return 'ชาบู, หมูกระทะ';
     }
     if (restaurant.id == 'rest_rawtruckr') {
-      return 'อาหารเกาหลี, ฟาสต์ฟู้ด';
+      return 'อาหารเกาหลี';
     }
     if (restaurant.id == 'rest_teds_coffee') {
       return 'กาแฟ, ขนมหวาน/เบเกอรี่';
@@ -440,14 +440,21 @@ class RestaurantDetailScreen extends ConsumerWidget {
     );
   }
 
-  /// 4. สิ่งอำนวยความสะดวก
+  /// 4. สิ่งอำนวยความสะดวก (8 items in 2 rows of 4 matching Mockup Image 1)
   Widget _buildAmenitiesSection(RestaurantModel restaurant) {
-    final amenities = [
-      {'icon': Icons.groups_rounded, 'label': 'เหมาะกับกลุ่ม'},
-      {'icon': Icons.ac_unit_rounded, 'label': 'เครื่องปรับอากาศ'},
+    final List<Map<String, dynamic>> allAmenities = [
+      {'icon': Icons.wifi_rounded, 'label': 'มีอินเทอร์เน็ต'},
+      {'icon': Icons.directions_car_rounded, 'label': 'ที่จอดรถยนต์'},
       {'icon': Icons.two_wheeler_rounded, 'label': 'รถจักรยานยนต์'},
+      {'icon': Icons.delivery_dining_rounded, 'label': 'เดลิเวอรี่'},
+      {'icon': Icons.ac_unit_rounded, 'label': 'เครื่องปรับอากาศ'},
       {'icon': Icons.favorite_border_rounded, 'label': 'มีห้องน้ำ'},
+      {'icon': Icons.groups_rounded, 'label': 'เหมาะกับกลุ่ม'},
+      {'icon': Icons.child_care_rounded, 'label': 'เหมาะกับเด็ก'},
     ];
+
+    final row1 = allAmenities.sublist(0, 4);
+    final row2 = allAmenities.sublist(4, 8);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,62 +469,67 @@ class RestaurantDetailScreen extends ConsumerWidget {
         ),
         const SizedBox(height: 14),
         Row(
-          children: amenities.map((item) {
-            return Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 14,
-                  horizontal: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: const Color(0xFFF1F5F9),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      item['icon'] as IconData,
-                      color: AppConstants.burgundyPrimary,
-                      size: 28,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      item['label'] as String,
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF334155),
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }).toList(),
+          children: row1.map((item) => _buildAmenityCard(item)).toList(),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: row2.map((item) => _buildAmenityCard(item)).toList(),
         ),
       ],
     );
   }
 
+  Widget _buildAmenityCard(Map<String, dynamic> item) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.symmetric(
+          vertical: 12,
+          horizontal: 2,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: const Color(0xFFF1F5F9),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              item['icon'] as IconData,
+              color: AppConstants.burgundyPrimary,
+              size: 26,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              item['label'] as String,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF334155),
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 5. เมนูอาหาร
   Widget _buildMenuSection(RestaurantModel restaurant) {
-    // Default dishes matching Mockup Image 4
     final dishes = restaurant.signatureDishes.isNotEmpty
         ? restaurant.signatureDishes
         : [
@@ -601,17 +613,26 @@ class RestaurantDetailScreen extends ConsumerWidget {
                             color: Color(0xFF1E293B),
                           ),
                         ),
-                        if (dish.price > 0) ...[
-                          const SizedBox(height: 4),
+                        if (dish.description != null &&
+                            dish.description!.isNotEmpty) ...[
+                          const SizedBox(height: 3),
                           Text(
-                            '฿${dish.price.round()}',
+                            dish.description!,
                             style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF1E293B),
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
                             ),
                           ),
                         ],
+                        const SizedBox(height: 4),
+                        Text(
+                          dish.formattedPrice,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1E293B),
+                          ),
+                        ),
                       ],
                     ),
                   ),

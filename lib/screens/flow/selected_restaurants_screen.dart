@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,12 +5,14 @@ import '../../core/constants.dart';
 import '../../models/restaurant_model.dart';
 import '../../providers/restaurant_provider.dart';
 import '../restaurants/restaurant_detail_screen.dart';
+import 'final_winner_screen.dart';
 
 /// Screen "result - เลือกครบ 5 ร้าน" (ผลลัพธ์ ร้านไหน...ถูกใจคุณ)
-/// Matches Figma Mockup Image 2:
+/// Matches Figma Mockup Image 3:
 /// - Header: "ผลลัพธ์ \n ร้านไหน...ถูกใจคุณ"
-/// - List of cards with rose border: Thumbnail, Name, Category, Price (฿฿ ...), Chevron, Burgundy star + rating
-/// - Bottom circular cutlery button (🍴) for picking a random winner
+/// - List of cards with rose border and selection highlight
+/// - Tapping chevron arrow (>) in upper-right navigates to RestaurantDetailScreen
+/// - Bottom circular cutlery button (🍴) opens FinalWinnerScreen ("ร้านที่ใช่ โดนใจคุณ")
 class SelectedRestaurantsScreen extends ConsumerStatefulWidget {
   const SelectedRestaurantsScreen({super.key});
 
@@ -22,127 +23,17 @@ class SelectedRestaurantsScreen extends ConsumerStatefulWidget {
 
 class _SelectedRestaurantsScreenState
     extends ConsumerState<SelectedRestaurantsScreen> {
-  void _pickRandomWinner(List<RestaurantModel> liked) {
+  int _selectedIndex = 0;
+
+  void _openWinnerScreen(List<RestaurantModel> liked) {
     if (liked.isEmpty) return;
     HapticFeedback.mediumImpact();
-    final random = Random();
-    final winner = liked[random.nextInt(liked.length)];
+    final index = _selectedIndex.clamp(0, liked.length - 1);
+    final winner = liked[index];
 
-    // Show celebratory Dialog
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        contentPadding: const EdgeInsets.all(20),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 68,
-              height: 68,
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFF3E0),
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: Text('🎉', style: TextStyle(fontSize: 34)),
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'MealMate สุ่มเลือกร้านนี้ให้คุณ!',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppConstants.burgundyPrimary,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: winner.imageUrls.isNotEmpty
-                  ? Image.network(
-                      winner.imageUrls.first,
-                      width: 150,
-                      height: 110,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        width: 150,
-                        height: 110,
-                        color: Colors.grey[200],
-                        child: const Icon(Icons.restaurant, size: 40),
-                      ),
-                    )
-                  : Container(
-                      width: 150,
-                      height: 110,
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.restaurant, size: 40),
-                    ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              winner.name,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E293B),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '⭐ ${winner.rating}  •  ${winner.priceRange}',
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppConstants.burgundyPrimary,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFCBD5E1)),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: const Text('ปิด',
-                        style: TextStyle(color: Color(0xFF64748B))),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              RestaurantDetailScreen(restaurantId: winner.id),
-                        ),
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppConstants.burgundyPrimary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                    child: const Text('ดูรายละเอียด'),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FinalWinnerScreen(restaurant: winner),
       ),
     );
   }
@@ -210,7 +101,7 @@ class _SelectedRestaurantsScreenState
                 separatorBuilder: (_, _) => const SizedBox(height: 14),
                 itemBuilder: (context, index) {
                   final restaurant = likedList[index];
-                  return _buildMockupRestaurantCard(context, restaurant);
+                  return _buildMockupRestaurantCard(context, restaurant, index);
                 },
               ),
             ),
@@ -241,7 +132,7 @@ class _SelectedRestaurantsScreenState
           child: InkWell(
             key: const ValueKey('random_pick_fab'),
             customBorder: const CircleBorder(),
-            onTap: () => _pickRandomWinner(likedList),
+            onTap: () => _openWinnerScreen(likedList),
             child: const Center(
               child: Icon(
                 Icons.restaurant_rounded,
@@ -255,25 +146,25 @@ class _SelectedRestaurantsScreenState
     );
   }
 
-  /// Restaurant card matching Figma Mockup Image 2
+  /// Restaurant card matching Figma Mockup Image 3
   Widget _buildMockupRestaurantCard(
-      BuildContext context, RestaurantModel restaurant) {
+      BuildContext context, RestaurantModel restaurant, int index) {
     final hasImage = restaurant.imageUrls.isNotEmpty;
+    final isSelected = index == _selectedIndex;
 
     return InkWell(
+      key: ValueKey('restaurant_item_$index'),
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) =>
-                RestaurantDetailScreen(restaurantId: restaurant.id),
-          ),
-        );
+        HapticFeedback.selectionClick();
+        setState(() {
+          _selectedIndex = index;
+        });
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isSelected ? const Color(0xFFF1D5D5) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: const Color(0xFFF9DADA),
@@ -361,12 +252,28 @@ class _SelectedRestaurantsScreenState
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppConstants.burgundyPrimary,
-                  size: 22,
+                InkWell(
+                  key: ValueKey('card_arrow_$index'),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            RestaurantDetailScreen(restaurantId: restaurant.id),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4.0),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppConstants.burgundyPrimary,
+                      size: 24,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

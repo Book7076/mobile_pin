@@ -131,24 +131,43 @@ void main() {
       expect(find.text('TEDS Coffee & Eatery'), findsOneWidget);
       expect(find.text('ข้าวซอยแม่สาย'), findsOneWidget);
 
-      // Cutlery FAB check
+      // 1. Test upper-right arrow (>) navigation to details
+      final arrowFinder = find.byKey(const ValueKey('card_arrow_0'));
+      expect(arrowFinder, findsOneWidget);
+      await tester.tap(arrowFinder);
+      await tester.pumpAndSettle();
+
+      // Now on RestaurantDetailScreen
+      expect(find.text('รายละเอียดร้านอาหาร'), findsOneWidget);
+      expect(find.text('มีอินเทอร์เน็ต'), findsOneWidget);
+      expect(find.text('เดลิเวอรี่'), findsOneWidget);
+      expect(find.text('เหมาะกับเด็ก'), findsOneWidget);
+
+      // Go back to SelectedRestaurantsScreen
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+      await tester.pumpAndSettle();
+
+      // 2. Cutlery FAB check
       final fabFinder = find.byKey(const ValueKey('random_pick_fab'));
       expect(fabFinder, findsOneWidget);
 
-      // Tap Cutlery FAB to trigger random winner dialog
+      // Tap Cutlery FAB to trigger FinalWinnerScreen ("ร้านที่ใช่ โดนใจคุณ")
       await tester.tap(fabFinder);
       await tester.pumpAndSettle();
 
-      // Dialog check
-      expect(find.text('🎉'), findsOneWidget);
-      expect(find.text('MealMate สุ่มเลือกร้านนี้ให้คุณ!'), findsOneWidget);
-      expect(find.text('ดูรายละเอียด'), findsOneWidget);
-      expect(find.text('ปิด'), findsOneWidget);
+      // FinalWinnerScreen verification
+      expect(find.text('ร้านที่ใช่'), findsOneWidget);
+      expect(find.text('โดนใจคุณ'), findsOneWidget);
+      expect(find.byKey(const ValueKey('winner_restaurant_card')), findsOneWidget);
 
-      // Close dialog
-      await tester.tap(find.text('ปิด'));
+      // Tap "X" button to return to SelectedRestaurantsScreen
+      final closeBtn = find.byKey(const ValueKey('winner_close_button'));
+      expect(closeBtn, findsOneWidget);
+      await tester.tap(closeBtn);
       await tester.pumpAndSettle();
-      expect(find.text('MealMate สุ่มเลือกร้านนี้ให้คุณ!'), findsNothing);
+
+      expect(find.text('ผลลัพธ์'), findsOneWidget);
+      expect(find.text('ร้านไหน...ถูกใจคุณ'), findsOneWidget);
     });
 
     testWidgets(

@@ -256,6 +256,7 @@ void main() {
     await tester.tap(fabFinder);
     await tester.pumpAndSettle();
 
-    expect(find.text('MealMate สุ่มเลือกร้านนี้ให้คุณ!'), findsOneWidget);
+    expect(find.text('ร้านที่ใช่'), findsOneWidget);
+    expect(find.text('โดนใจคุณ'), findsOneWidget);
   });
 }
