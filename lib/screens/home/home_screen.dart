@@ -20,7 +20,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _searchQuery = '';
   bool _isSearchFocused = false;
 
-  // Curated recommended restaurants matching the design
+  // Curated recommended & searchable restaurants matching the design
   final List<Map<String, dynamic>> _curatedRestaurants = [
     {
       'name': 'ข้าวซอยแม่สาย',
@@ -29,6 +29,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       'image': 'assets/images/khao_soi.jpg',
       'isAsset': true,
       'isFavorite': true,
+      'tags': ['ข้าวซอย', 'ก๋วยเตี๋ยว', 'อาหารไทย', 'khao soi', 'thai'],
     },
     {
       'name': 'โกเผือกโกดำ',
@@ -37,6 +38,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       'image': 'assets/images/go_puek.jpg',
       'isAsset': true,
       'isFavorite': true,
+      'tags': ['โกเผือกโกดำ', 'อาหารเช้า', 'ขนมปัง', 'ชาไทย', 'breakfast', 'toast'],
     },
     {
       'name': 'ข้าวมันไก่นันทาราม',
@@ -45,6 +47,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       'image': 'assets/images/khao_man_gai.jpg',
       'isAsset': true,
       'isFavorite': false,
+      'tags': ['ข้าวมันไก่', 'อาหารไทย', 'ไก่ตอน', 'chicken rice'],
+    },
+    // Shabu Category Restaurants
+    {
+      'name': 'สุกี้ตี๋น้อย (Suki Teenoi)',
+      'category': 'ประเภท: ชาบู, สุกี้, บุฟเฟต์',
+      'rating': 4.8,
+      'image': 'assets/images/shabu_teenoi.jpg',
+      'isAsset': true,
+      'isFavorite': true,
+      'tags': ['shabu', 'ชาบู', 'สุกี้', 'ตี๋น้อย', 'teenoi', 'บุฟเฟต์', 'หม้อไฟ'],
+    },
+    {
+      'name': 'Mo-Mo-Paradise',
+      'category': 'ประเภท: ชาบู, สุกี้ยากี้ญี่ปุ่น',
+      'rating': 4.9,
+      'image': 'assets/images/shabu_momo.jpg',
+      'isAsset': true,
+      'isFavorite': true,
+      'tags': ['shabu', 'ชาบู', 'momo', 'โมโม', 'สุกี้', 'ญี่ปุ่น', 'บุฟเฟต์'],
+    },
+    {
+      'name': 'Shabushi (ชาบูชิ)',
+      'category': 'ประเภท: ชาบู, บุฟเฟต์สายพาน',
+      'rating': 4.7,
+      'image': 'assets/images/shabushi.jpg',
+      'isAsset': true,
+      'isFavorite': false,
+      'tags': ['shabu', 'ชาบู', 'ชาบูชิ', 'shabushi', 'สายพาน', 'บุฟเฟต์'],
     },
   ];
 
@@ -128,11 +159,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // TAB 0: HOME PAGE (4 Sections)
   // ==========================================
   Widget _buildHomeTab() {
+    final String query = _searchQuery.trim().toLowerCase();
     final filteredList = _curatedRestaurants.where((r) {
+      if (query.isEmpty) {
+        return (r['tags'] as List<String>?)?.contains('khao soi') == true ||
+            (r['tags'] as List<String>?)?.contains('breakfast') == true ||
+            (r['tags'] as List<String>?)?.contains('chicken rice') == true;
+      }
       final name = (r['name'] as String).toLowerCase();
       final cat = (r['category'] as String).toLowerCase();
-      return name.contains(_searchQuery.toLowerCase()) ||
-          cat.contains(_searchQuery.toLowerCase());
+      final tags = (r['tags'] as List<String>?)?.map((t) => t.toLowerCase()).toList() ?? [];
+      return name.contains(query) ||
+          cat.contains(query) ||
+          tags.any((t) => t.contains(query));
     }).toList();
 
     return SingleChildScrollView(
@@ -206,7 +245,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       fontWeight: FontWeight.w500,
                     ),
                     decoration: InputDecoration(
-                      // When focused and empty, hint text clears so cursor blinks cleanly as in mockup
                       hintText: (_isSearchFocused && _searchQuery.isEmpty)
                           ? ''
                           : 'ค้นหาร้านอาหาร',
@@ -252,6 +290,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     constraints: const BoxConstraints(),
                     splashRadius: 20,
                   ),
+              ],
+            ),
+          ),
+
+          // Quick category chips
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            physics: const BouncingScrollPhysics(),
+            child: Row(
+              children: [
+                _buildQuickCategoryChip('ชาบู (Shabu)', 'Shabu'),
+                const SizedBox(width: 8),
+                _buildQuickCategoryChip('ก๋วยเตี๋ยว', 'ก๋วยเตี๋ยว'),
+                const SizedBox(width: 8),
+                _buildQuickCategoryChip('อาหารเช้า', 'อาหารเช้า'),
+                const SizedBox(width: 8),
+                _buildQuickCategoryChip('ข้าวมันไก่', 'ข้าวมันไก่'),
+                const SizedBox(width: 8),
+                _buildQuickCategoryChip('บุฟเฟต์', 'บุฟเฟต์'),
               ],
             ),
           ),
@@ -324,15 +382,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
           const SizedBox(height: 26),
 
-          // SECTION 3: Recommended Restaurants (แนะนำร้านอาหารสำหรับคุณ !)
-          const Text(
-            'แนะนำร้านอาหารสำหรับคุณ !',
-            style: TextStyle(
-              fontSize: 17.5,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF6E162B),
-              letterSpacing: -0.2,
-            ),
+          // SECTION 3: Recommended Restaurants or Dynamic Search Results
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                query.isEmpty
+                    ? 'แนะนำร้านอาหารสำหรับคุณ !'
+                    : 'ร้านอาหารประเภท "$_searchQuery"',
+                style: const TextStyle(
+                  fontSize: 17.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF6E162B),
+                  letterSpacing: -0.2,
+                ),
+              ),
+              if (query.isNotEmpty)
+                GestureDetector(
+                  onTap: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                    _searchFocusNode.unfocus();
+                  },
+                  child: const Text(
+                    'ดูทั้งหมด',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF6E162B),
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+            ],
           ),
 
           const SizedBox(height: 8),
@@ -645,6 +727,51 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickCategoryChip(String label, String categoryKey) {
+    final bool isSelected =
+        _searchQuery.toLowerCase() == categoryKey.toLowerCase();
+    return GestureDetector(
+      onTap: () {
+        if (isSelected) {
+          _searchController.clear();
+          setState(() => _searchQuery = '');
+        } else {
+          _searchController.text = categoryKey;
+          setState(() => _searchQuery = categoryKey);
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF6E162B) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFF6E162B)
+                : const Color(0xFFE5CED1),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : const Color(0xFF5A5255),
+          ),
+        ),
       ),
     );
   }
