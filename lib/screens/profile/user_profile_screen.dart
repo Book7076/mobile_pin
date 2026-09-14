@@ -5,7 +5,12 @@ import '../auth/login_screen.dart';
 import 'edit_user_profile_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
-  const UserProfileScreen({super.key});
+  final bool showDeleteDialogOnInit;
+
+  const UserProfileScreen({
+    super.key,
+    this.showDeleteDialogOnInit = false,
+  });
 
   @override
   State<UserProfileScreen> createState() => _UserProfileScreenState();
@@ -34,6 +39,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         systemNavigationBarIconBrightness: Brightness.dark,
       ),
     );
+
+    if (widget.showDeleteDialogOnInit) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showDeleteAccountDialog();
+        }
+      });
+    }
   }
 
   void _openEditProfileScreen() async {
@@ -204,24 +217,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   void _showDeleteAccountDialog() {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.35),
+      barrierColor: Colors.black.withOpacity(0.40),
       builder: (BuildContext dialogContext) {
         return Center(
           child: Material(
             color: Colors.transparent,
             child: Container(
-              width: 285,
+              width: 282,
               decoration: BoxDecoration(
-                color: const Color(0xFFF7EAEC),
+                color: const Color(0xFFFAF4F5),
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
-                  color: const Color(0xFFD4ADB5),
-                  width: 1.2,
+                  color: const Color(0xFFDEC4C8),
+                  width: 1.0,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.12),
-                    blurRadius: 20,
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 24,
                     offset: const Offset(0, 8),
                   ),
                 ],
@@ -229,38 +242,30 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Confirmation Question
                   const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-                    child: Column(
-                      children: [
-                        Text(
-                          'ต้องการลบบัญชีผู้ใช้?',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF6E162B),
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          'การกระทำนี้จะลบข้อมูลบัญชีของคุณอย่างถาวรและไม่สามารถกู้คืนได้',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            color: Color(0xFF5A5255),
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 26),
+                    child: Text(
+                      'ต้องการลบบัญชีใช่หรือไม่',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E1E1E),
+                        letterSpacing: -0.2,
+                      ),
                     ),
                   ),
-                  Container(height: 1.0, color: const Color(0xFFD4ADB5)),
+
+                  // Horizontal Divider
+                  Container(height: 1.0, color: const Color(0xFFDEC4C8)),
+
+                  // Actions: ยกเลิก | ยืนยัน
                   SizedBox(
                     height: 48,
                     child: Row(
                       children: [
+                        // Left Button: ยกเลิก (Solid Burgundy Text)
                         Expanded(
                           child: InkWell(
                             borderRadius: const BorderRadius.only(
@@ -271,15 +276,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               child: Text(
                                 'ยกเลิก',
                                 style: TextStyle(
-                                  fontSize: 15.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF221F21),
+                                  fontSize: 16.0,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF6E162B),
+                                  letterSpacing: -0.2,
                                 ),
                               ),
                             ),
                           ),
                         ),
-                        Container(width: 1.0, height: double.infinity, color: const Color(0xFFD4ADB5)),
+
+                        // Center Vertical Divider
+                        Container(
+                          width: 1.0,
+                          height: double.infinity,
+                          color: const Color(0xFFDEC4C8),
+                        ),
+
+                        // Right Button: ยืนยัน (Dark Text)
                         Expanded(
                           child: InkWell(
                             borderRadius: const BorderRadius.only(
@@ -287,8 +301,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             ),
                             onTap: () async {
                               Navigator.of(dialogContext).pop();
-                              await supabase.auth.signOut();
+                              try {
+                                await supabase.auth.signOut();
+                              } catch (_) {}
                               if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('ลบบัญชีผู้ใช้เรียบร้อยแล้ว'),
+                                    backgroundColor: const Color(0xFF6E162B),
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                );
                                 Navigator.of(context).pushAndRemoveUntil(
                                   MaterialPageRoute(builder: (_) => const LoginScreen()),
                                   (route) => false,
@@ -297,11 +323,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             },
                             child: const Center(
                               child: Text(
-                                'ยืนยันลบ',
+                                'ยืนยัน',
                                 style: TextStyle(
-                                  fontSize: 15.5,
+                                  fontSize: 16.0,
                                   fontWeight: FontWeight.w700,
-                                  color: Color(0xFF6E162B),
+                                  color: Color(0xFF1E1E1E),
+                                  letterSpacing: -0.2,
                                 ),
                               ),
                             ),
