@@ -8,12 +8,22 @@ import 'screens/splash_screen.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  await dotenv.load(fileName: ".env");
+  try {
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    debugPrint("Note: .env file loading error or missing: $e");
+  }
   
-  await Supabase.initialize(
-    url: AppConstants.supabaseUrl,
-    anonKey: AppConstants.supabaseAnonKey,
-  );
+  if (AppConstants.supabaseUrl.isNotEmpty && AppConstants.supabaseAnonKey.isNotEmpty) {
+    try {
+      await Supabase.initialize(
+        url: AppConstants.supabaseUrl,
+        anonKey: AppConstants.supabaseAnonKey,
+      );
+    } catch (e) {
+      debugPrint("Supabase initialization failed: $e");
+    }
+  }
   
   runApp(
     const ProviderScope(
@@ -30,13 +40,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Food Tinder',
+      title: 'MealMate',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFF5252), // Tinder-like red
-          primary: const Color(0xFFFF5252),
-          secondary: const Color(0xFFFF7A7A),
+          seedColor: const Color(0xFF70182E), // MealMate signature wine red
+          primary: const Color(0xFF70182E),
+          secondary: const Color(0xFF9E2A47),
         ),
         useMaterial3: true,
         fontFamily: 'Roboto',
