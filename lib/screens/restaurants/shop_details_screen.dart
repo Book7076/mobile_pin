@@ -23,6 +23,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
 
   bool _isInitialized = false;
 
+  String? _restaurantId;
   late String _shopCode;
   late String _name;
   late String _category;
@@ -37,12 +38,18 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
 
   bool _isSubmitted = false;
 
+  // 3 possible statuses: 'pending' (รอตรวจสอบ), 'approved' (ผ่านการตรวจสอบ), 'rejected' (ไม่ผ่านการตรวจสอบ)
+  String _status = 'pending';
+  String? _rejectionReason;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isInitialized) {
       final routeArgs = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
       final data = widget.shopData ?? routeArgs ?? {};
+
+      _restaurantId = data['id']?.toString();
 
       // 1. Shop Code: Retain the passed shop code or generate once so it doesn't change on re-render
       if (data['shopCode'] != null && data['shopCode'].toString().isNotEmpty) {
@@ -104,17 +111,27 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         ];
       }
 
-      // 5. Menus (Stored in state, but NOT displayed in "ข้อมูลร้าน" screen as per Figma)
+      // 5. Menus
       if (data['menus'] is List) {
         _menus = List<Map<String, dynamic>>.from(data['menus']);
       } else {
         _menus = [];
       }
 
-      // If already submitted or has status 'รอตรวจสอบ'
-      _isSubmitted = data['isSubmitted'] == true ||
-          data['status'] == 'รอตรวจสอบ' ||
-          _menus.isNotEmpty;
+      // 6. Status initialization: 'pending', 'approved', or 'rejected'
+      final rawStatus = data['status']?.toString().toLowerCase();
+      if (rawStatus == 'approved' || rawStatus == 'ผ่านการตรวจสอบ') {
+        _status = 'approved';
+        _isSubmitted = true;
+      } else if (rawStatus == 'rejected' || rawStatus == 'ไม่ผ่านการตรวจสอบ') {
+        _status = 'rejected';
+        _rejectionReason = data['rejectionReason']?.toString() ??
+            'เอกสารหรือข้อมูลที่อยู่ร้านอาหารไม่ถูกต้องครบถ้วน กรุณาแก้ไขข้อมูลและส่งคำขอใหม่อีกครั้ง';
+        _isSubmitted = true;
+      } else {
+        _status = 'pending';
+        _isSubmitted = data['isSubmitted'] == true || _menus.isNotEmpty;
+      }
 
       _isInitialized = true;
     }
@@ -426,6 +443,34 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     }
   }
 
+  // Re-submit flow for Rejected status -> Pending
+  Future<void> _reSubmitRequest() async {
+    setState(() {
+      _status = 'pending';
+      _rejectionReason = null;
+    });
+
+    // Update status in Supabase if restaurantId exists
+    if (_restaurantId != null) {
+      try {
+        await supabase
+            .from('restaurants')
+            .update({'status': 'pending'})
+            .eq('id', _restaurantId!);
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ส่งคำขอตรวจสอบร้านใหม่อีกครั้งเรียบร้อยแล้ว สถานะเปลี่ยนเป็น "รอตรวจสอบ"'),
+          backgroundColor: maroonColor,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
   // Bottom button pressed handler
   Future<void> _onBottomButtonPressed() async {
     if (!_isSubmitted) {
@@ -444,6 +489,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         setState(() {
           _menus.add(newMenu);
           _isSubmitted = true;
+          _status = 'pending';
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -455,12 +501,17 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         );
       }
     } else {
-      // User is on "ข้อมูลร้าน" and taps "ตกลง"
-      // Save to Supabase (pending status) if user is logged in
+      // When status is rejected, primary bottom button re-submits the request
+      if (_status == 'rejected') {
+        await _reSubmitRequest();
+        return;
+      }
+
+      // When status is pending or approved, save to Supabase (if needed) and return to Owner Dashboard
       final currentUser = supabase.auth.currentUser;
-      if (currentUser != null) {
+      if (currentUser != null && _restaurantId == null) {
         try {
-          await supabase.from('restaurants').insert({
+          final res = await supabase.from('restaurants').insert({
             'owner_id': currentUser.id,
             'name': _name,
             'address': _address,
@@ -469,11 +520,10 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
             'menu': _menus.isNotEmpty ? _menus.map((m) => m['name']).join(', ') : null,
             'lat': 18.7883, // default Chiang Mai lat/lng
             'lng': 98.9853,
-            'status': 'pending', // 'pending' = รอตรวจสอบ
-          });
-        } catch (_) {
-          // If already created or offline, proceed safely
-        }
+            'status': _status,
+          }).select().single();
+          _restaurantId = res['id']?.toString();
+        } catch (_) {}
       }
 
       // Navigate back to Shop Owner Dashboard (HomeScreen)
@@ -486,27 +536,111 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     }
   }
 
-  // Stepper Widget exactly matching Figma Image 2
+  // Stepper Widget dynamically supporting 3 statuses (pending, approved, rejected)
   Widget _buildStatusStepper() {
+    // 1. Step 1: Always completed once submitted
+    // 2. Step 2 (รอตรวจสอบ):
+    //    - pending: Active (maroon)
+    //    - approved: Completed (green)
+    //    - rejected: Completed (green)
+    // 3. Step 3 (กำลังตรวจสอบ):
+    //    - pending: Pending (grey)
+    //    - approved: Completed (green)
+    //    - rejected: Completed (green)
+    // 4. Step 4 (ผลการตรวจสอบ):
+    //    - pending: Pending (grey)
+    //    - approved: Completed (green)
+    //    - rejected: Failed (red with 'X' icon)
+
+    final String step2State = _status == 'pending' ? 'active' : 'completed';
+    final String step3State = (_status == 'approved' || _status == 'rejected') ? 'completed' : 'pending';
+    final String step4State = _status == 'approved'
+        ? 'completed'
+        : (_status == 'rejected' ? 'failed' : 'pending');
+
+    final Color line1to2Color = const Color(0xFF10B981); // Green
+    final Color line2to3Color = (_status == 'approved' || _status == 'rejected')
+        ? const Color(0xFF10B981)
+        : const Color(0xFFD1D5DB);
+    final Color line3to4Color = _status == 'approved'
+        ? const Color(0xFF10B981)
+        : (_status == 'rejected' ? const Color(0xFFEF4444) : const Color(0xFFD1D5DB));
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'สถานะร้านค้า',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'สถานะร้านค้า',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            // Status Switcher Menu (For development / testing preview of all 3 states)
+            PopupMenuButton<String>(
+              tooltip: 'สลับดูสถานะ (Preview)',
+              icon: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _status == 'approved'
+                      ? const Color(0xFFECFDF5)
+                      : (_status == 'rejected' ? const Color(0xFFFEF2F2) : const Color(0xFFF3F4F6)),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _status == 'approved'
+                        ? const Color(0xFF10B981)
+                        : (_status == 'rejected' ? const Color(0xFFEF4444) : const Color(0xFFD1D5DB)),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _status == 'approved'
+                          ? 'ผ่านแล้ว'
+                          : (_status == 'rejected' ? 'ไม่ผ่าน' : 'รอตรวจ'),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: _status == 'approved'
+                            ? const Color(0xFF059669)
+                            : (_status == 'rejected' ? const Color(0xFFDC2626) : maroonColor),
+                      ),
+                    ),
+                    const SizedBox(width: 2),
+                    const Icon(Icons.arrow_drop_down, size: 16, color: Colors.grey),
+                  ],
+                ),
+              ),
+              onSelected: (val) {
+                setState(() {
+                  _status = val;
+                  if (val == 'rejected' && _rejectionReason == null) {
+                    _rejectionReason =
+                        'เอกสารหรือข้อมูลที่อยู่ร้านอาหารไม่ถูกต้องครบถ้วน กรุณาแก้ไขข้อมูลและส่งคำขอใหม่อีกครั้ง';
+                  }
+                });
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'pending', child: Text('1. PENDING (รอตรวจสอบ)')),
+                PopupMenuItem(value: 'approved', child: Text('2. APPROVED (ผ่านการตรวจสอบ)')),
+                PopupMenuItem(value: 'rejected', child: Text('3. REJECTED (ไม่ผ่านการตรวจสอบ)')),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
         // Stepper Horizontal Row
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Step 1: ส่งคำขอ (Completed)
+            // Step 1: ส่งคำขอ
             _buildStepItem(
               stepNumber: 1,
               title: 'ส่งคำขอ',
@@ -519,16 +653,16 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
               child: Container(
                 margin: const EdgeInsets.only(top: 24),
                 height: 2.5,
-                color: const Color(0xFF10B981), // Green
+                color: line1to2Color,
               ),
             ),
 
-            // Step 2: รอตรวจสอบ (Current Active Step)
+            // Step 2: รอตรวจสอบ
             _buildStepItem(
               stepNumber: 2,
               title: 'รอตรวจสอบ',
               icon: Icons.hourglass_empty,
-              state: 'active',
+              state: step2State,
             ),
 
             // Line 2 -> 3
@@ -536,16 +670,16 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
               child: Container(
                 margin: const EdgeInsets.only(top: 24),
                 height: 2.0,
-                color: const Color(0xFFD1D5DB), // Grey
+                color: line2to3Color,
               ),
             ),
 
-            // Step 3: กำลังตรวจสอบ (Pending)
+            // Step 3: กำลังตรวจสอบ
             _buildStepItem(
               stepNumber: 3,
               title: 'กำลังตรวจสอบ',
               icon: Icons.update,
-              state: 'pending',
+              state: step3State,
             ),
 
             // Line 3 -> 4
@@ -553,78 +687,177 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
               child: Container(
                 margin: const EdgeInsets.only(top: 24),
                 height: 2.0,
-                color: const Color(0xFFD1D5DB), // Grey
+                color: line3to4Color,
               ),
             ),
 
-            // Step 4: ผลการตรวจสอบ (Pending)
+            // Step 4: ผลการตรวจสอบ
             _buildStepItem(
               stepNumber: 4,
-              title: 'ผลการตรวจสอบ',
-              icon: Icons.shopping_basket_outlined,
-              state: 'pending',
+              title: _status == 'rejected' ? 'ไม่ผ่าน' : 'ผลการตรวจสอบ',
+              icon: _status == 'rejected'
+                  ? Icons.close_rounded
+                  : Icons.shopping_basket_outlined,
+              state: step4State,
             ),
           ],
         ),
         const SizedBox(height: 22),
 
-        // Waiting Notice Card matching Figma Image 2
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF3F4F6),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: const [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.access_time_rounded,
-                    size: 20,
-                    color: Colors.black87,
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'อยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบ',
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 8),
-              Text(
-                'โดยปกติใช้เวลาประมาณ 3-5 วันทำการ\n(ไม่รวมวันหยุดเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์)',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: Color(0xFF4B5563),
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
+        // Notice Box matching Figma for each of the 3 statuses
+        _buildStatusNoticeBox(),
       ],
     );
+  }
+
+  // Dynamic Notice Box based on status (pending, approved, rejected)
+  Widget _buildStatusNoticeBox() {
+    if (_status == 'approved') {
+      // APPROVED: Green box
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFECFDF5),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFA7F3D0), width: 1.2),
+        ),
+        child: Column(
+          children: const [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 22,
+                  color: Color(0xFF059669),
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'ร้านค้าผ่านการตรวจสอบเรียบร้อยแล้ว',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF065F46),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              'ยินดีด้วย! ร้านของคุณผ่านการอนุมัติและพร้อมเปิดให้บริการบน MealMate แล้ว\nลูกค้าสามารถค้นหาและสั่งอาหารจากร้านของคุณได้ทันที',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF047857),
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (_status == 'rejected') {
+      // REJECTED: Red box
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEF2F2),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFFECACA), width: 1.2),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(
+                  Icons.cancel_rounded,
+                  size: 22,
+                  color: Color(0xFFDC2626),
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'ร้านค้าไม่ผ่านการตรวจสอบ',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF991B1B),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'เหตุผล: ${_rejectionReason ?? "ข้อมูลร้านค้าหรือเอกสารไม่ถูกต้องครบถ้วน กรุณาแก้ไขข้อมูลและส่งคำขอใหม่อีกครั้ง"}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF7F1D1D),
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else {
+      // PENDING: Grey box (default)
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: const [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.access_time_rounded,
+                  size: 20,
+                  color: Colors.black87,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'อยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบ',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 8),
+            Text(
+              'โดยปกติใช้เวลาประมาณ 3-5 วันทำการ\n(ไม่รวมวันหยุดเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์)',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: Color(0xFF4B5563),
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   Widget _buildStepItem({
     required int stepNumber,
     required String title,
     required IconData icon,
-    required String state, // 'completed', 'active', 'pending'
+    required String state, // 'completed', 'active', 'pending', 'failed'
   }) {
     Color circleBorderColor;
     Color iconColor;
     Color badgeColor;
     Color numberColor;
     Color textColor;
+    IconData badgeIcon = Icons.check;
 
     if (state == 'completed') {
       circleBorderColor = const Color(0xFF10B981);
@@ -638,6 +871,13 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       badgeColor = maroonColor;
       numberColor = maroonColor;
       textColor = maroonColor;
+    } else if (state == 'failed') {
+      circleBorderColor = const Color(0xFFEF4444);
+      iconColor = const Color(0xFFEF4444);
+      badgeColor = const Color(0xFFEF4444);
+      numberColor = const Color(0xFFEF4444);
+      textColor = const Color(0xFFDC2626);
+      badgeIcon = Icons.close;
     } else {
       circleBorderColor = const Color(0xFF9CA3AF);
       iconColor = const Color(0xFF6B7280);
@@ -650,7 +890,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
       width: 70,
       child: Column(
         children: [
-          // Circle with Icon & Checkmark Badge
+          // Circle with Icon & Checkmark / X Badge
           Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.bottomCenter,
@@ -673,8 +913,8 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                     color: badgeColor,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.check,
+                  child: Icon(
+                    badgeIcon,
                     color: Colors.white,
                     size: 10,
                   ),
@@ -701,7 +941,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 10.5,
-              fontWeight: state == 'active' || state == 'completed'
+              fontWeight: state == 'active' || state == 'completed' || state == 'failed'
                   ? FontWeight.bold
                   : FontWeight.normal,
               color: textColor,
@@ -716,7 +956,19 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   Widget build(BuildContext context) {
     // Header title: "ข้อมูลร้าน" when submitted, otherwise "รายละเอียดร้านอาหาร"
     final headerTitle = _isSubmitted ? 'ข้อมูลร้าน' : 'รายละเอียดร้านอาหาร';
-    final buttonText = _isSubmitted ? 'ตกลง' : 'ถัดไป';
+
+    // Button text:
+    // If not submitted: "ถัดไป"
+    // If submitted and rejected: "แก้ไขข้อมูลและส่งคำขอใหม่"
+    // If submitted and pending/approved: "ตกลง"
+    String buttonText = 'ถัดไป';
+    if (_isSubmitted) {
+      if (_status == 'rejected') {
+        buttonText = 'แก้ไขข้อมูลและส่งคำขอใหม่';
+      } else {
+        buttonText = 'ตกลง';
+      }
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1113,7 +1365,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                         );
                       }),
 
-                    // --- 5. สถานะร้านค้า (Shown in "ข้อมูลร้าน" as per Figma Image 2) ---
+                    // --- 5. สถานะร้านค้า (Shown in "ข้อมูลร้าน" with 3 distinct visual states) ---
                     if (_isSubmitted) ...[
                       const Divider(color: Color(0xFFECECEC), thickness: 1, height: 32),
                       _buildStatusStepper(),
@@ -1125,32 +1377,56 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
               ),
             ),
 
-            // --- 6. ปุ่ม “ถัดไป” / “ตกลง” ---
+            // --- 6. ปุ่ม “ถัดไป” / “ตกลง” / “แก้ไขข้อมูลและส่งคำขอใหม่” ---
             Container(
               padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
               color: Colors.white,
-              child: SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _onBottomButtonPressed,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: maroonColor,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: _onBottomButtonPressed,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: maroonColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: Text(
+                        buttonText,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
                     ),
                   ),
-                  child: Text(
-                    buttonText,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                  if (_isSubmitted && _status == 'rejected') ...[
+                    const SizedBox(height: 8),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const HomeScreen()),
+                          (route) => false,
+                        );
+                      },
+                      child: const Text(
+                        'กลับสู่หน้าหลัก',
+                        style: TextStyle(
+                          color: Colors.black54,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                  ],
+                ],
               ),
             ),
           ],
