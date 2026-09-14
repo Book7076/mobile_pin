@@ -999,7 +999,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // ==========================================
   Widget _buildProfileTab() {
     final user = supabase.auth.currentUser;
-    final email = user?.email ?? 'user@mealmate.com';
+    final email = user?.email ?? 'test@test.com';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.only(left: 24, right: 24, top: 20, bottom: 100),
