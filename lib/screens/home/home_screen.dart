@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants.dart';
 import '../../main.dart';
 import '../auth/login_screen.dart';
+import '../flow/category_selection_screen.dart';
+import '../flow/food_swipe_screen.dart';
+import '../flow/selected_restaurants_screen.dart';
 import '../restaurants/create_restaurant_screen.dart';
 import 'discover_screen.dart';
 
@@ -73,7 +77,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       trailing: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
+                          color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(color: statusColor),
                         ),
@@ -97,7 +101,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 MaterialPageRoute(builder: (_) => const CreateRestaurantScreen()),
               );
             },
-            backgroundColor: const Color(0xFFFF5252),
+            backgroundColor: AppConstants.burgundyPrimary,
             foregroundColor: Colors.white,
             icon: const Icon(Icons.add),
             label: const Text('Open Restaurant'),
@@ -111,11 +115,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Food Tinder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFFFF5252),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.restaurant_rounded,
+                color: AppConstants.burgundyPrimary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'MealMate',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: AppConstants.burgundyPrimary,
         actions: [
           IconButton(
+            icon: const Icon(Icons.style_rounded, color: Colors.white),
+            tooltip: 'ปัดเลือกร้านอาหาร (Food Swipe)',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const FoodSwipeScreen(),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.favorite_rounded, color: Colors.white),
+            tooltip: 'ร้านที่เลือกแล้ว (Selected)',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const SelectedRestaurantsScreen(),
+                ),
+              );
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.tune_rounded, color: Colors.white),
+            tooltip: 'เลือกประเภทอาหารและงบประมาณ (Flow 3-4)',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const CategorySelectionScreen(),
+                ),
+              );
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
+            tooltip: 'ออกจากระบบ',
             onPressed: () async {
               await supabase.auth.signOut();
               if (context.mounted) {
@@ -131,7 +193,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
-        selectedItemColor: const Color(0xFFFF5252),
+        selectedItemColor: AppConstants.burgundyPrimary,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.local_fire_department), label: 'Discover'),
           BottomNavigationBarItem(icon: Icon(Icons.storefront), label: 'My Restaurants'),
@@ -141,3 +203,4 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 }
+

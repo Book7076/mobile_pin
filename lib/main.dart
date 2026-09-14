@@ -30,16 +30,16 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Food Tinder',
+      title: 'MealMate',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFFF5252), // Tinder-like red
-          primary: const Color(0xFFFF5252),
-          secondary: const Color(0xFFFF7A7A),
+          seedColor: AppConstants.burgundyPrimary,
+          primary: AppConstants.burgundyPrimary,
+          secondary: AppConstants.burgundyLight,
         ),
         useMaterial3: true,
-        fontFamily: 'Roboto',
+        fontFamily: 'Kanit',
       ),
       home: const SplashScreen(),
     );
