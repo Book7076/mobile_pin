@@ -11,10 +11,12 @@ import 'restaurant_approval_detail_screen.dart';
 
 class AdminDashboard extends ConsumerStatefulWidget {
   final int initialTabIndex;
+  final int initialApprovalTabIndex;
 
   const AdminDashboard({
     super.key,
     this.initialTabIndex = 0,
+    this.initialApprovalTabIndex = 0,
   });
 
   @override
@@ -166,7 +168,11 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> with SingleTick
   void initState() {
     super.initState();
     _selectedTabIndex = widget.initialTabIndex;
-    _approvalTabController = TabController(length: 3, vsync: this, initialIndex: 1);
+    _approvalTabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: widget.initialApprovalTabIndex.clamp(0, 2),
+    );
     _startLiveStatsSimulation();
     _fetchRealStatsIfAvailable();
   }
@@ -852,21 +858,40 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard> with SingleTick
                           color: const Color(0xFF1E1E1E),
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'อัปเดตล่าสุด',
-                        style: GoogleFonts.notoSansThai(
-                          fontSize: 12,
-                          color: const Color(0xFF757575),
+                      if (restaurant.status == 'pending') ...[
+                        Text(
+                          'วันที่สมัคร',
+                          style: GoogleFonts.notoSansThai(
+                            fontSize: 12,
+                            color: const Color(0xFF757575),
+                          ),
                         ),
-                      ),
-                      Text(
-                        restaurant.lastUpdated,
-                        style: GoogleFonts.notoSansThai(
-                          fontSize: 12,
-                          color: const Color(0xFF757575),
+                        const SizedBox(height: 2),
+                        Text(
+                          restaurant.requestDate,
+                          style: GoogleFonts.notoSansThai(
+                            fontSize: 12.5,
+                            color: const Color(0xFF333333),
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
+                      ] else ...[
+                        Text(
+                          'อัปเดตล่าสุด',
+                          style: GoogleFonts.notoSansThai(
+                            fontSize: 12,
+                            color: const Color(0xFF757575),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          restaurant.lastUpdated,
+                          style: GoogleFonts.notoSansThai(
+                            fontSize: 12,
+                            color: const Color(0xFF757575),
+                          ),
+                        ),
+                      ],
                       if (restaurant.rejectionReason != null && restaurant.rejectionReason!.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(

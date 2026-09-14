@@ -14,11 +14,11 @@ void main() {
     tester.view.devicePixelRatio = 2.0;
     addTearDown(tester.view.resetPhysicalSize);
 
-    // 1. Launch AdminDashboard on Store Management tab (initialTabIndex: 1)
+    // 1. Launch AdminDashboard on Store Management tab (initialTabIndex: 1, initialApprovalTabIndex: 1 for approved tab)
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
-          home: AdminDashboard(initialTabIndex: 1),
+          home: AdminDashboard(initialTabIndex: 1, initialApprovalTabIndex: 1),
         ),
       ),
     );

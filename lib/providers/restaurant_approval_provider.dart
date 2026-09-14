@@ -5,6 +5,130 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
   RestaurantApprovalNotifier() : super(_initialRestaurants);
 
   static final List<ApprovalRestaurant> _initialRestaurants = [
+    // 1. Kohatsu Matcha (Pending from Image 1 & Image 3)
+    const ApprovalRestaurant(
+      id: 'kohatsu_matcha',
+      name: 'Kohatsu Matcha',
+      code: '111U1103',
+      category: 'เครื่องดื่ม/คาเฟ่',
+      lastUpdated: '2 ส.ค. 2569',
+      requestDate: '2 ส.ค. 2569',
+      address: 'เทศบาลเชียงใหม่ อำเภอเมือง จังหวัดเชียงใหม่ ประเทศไทย',
+      mapUrl: 'www.googlemap.com',
+      phone: '083-666-7777',
+      imageAsset: 'assets/images/kohatsu_matcha.jpg',
+      openingHours: {
+        'อาทิตย์': '07.00 - 16.00',
+        'จันทร์': '07.00 - 16.00',
+        'อังคาร': '07.00 - 16.00',
+        'พุธ': '07.00 - 16.00',
+        'พฤหัสบดี': '07.00 - 16.00',
+        'ศุกร์': '07.00 - 16.00',
+        'เสาร์': '07.00 - 16.00',
+      },
+      amenities: ['รถจักรยานยนต์', 'มีอินเทอร์เน็ต'],
+      menuItems: [
+        ApprovalMenuItem(
+          name: 'Earl Grey Matcha Foam',
+          ingredients: 'ชาเอิร์ลเกรย์พรีเมียม ท็อปด้วยโฟมมัทฉะเข้มข้น',
+          price: '฿99',
+          imageAsset: 'assets/images/earl_grey_matcha.jpg',
+        ),
+        ApprovalMenuItem(
+          name: 'Matcha Ocean',
+          ingredients: 'มัทฉะชิซูโอกะ เลเยอร์นมสดและน้ำเชื่อมบลูคูราโซ่',
+          price: '฿89',
+          imageAsset: 'assets/images/matcha_ocean.jpg',
+        ),
+        ApprovalMenuItem(
+          name: 'Matcha Foam Latte',
+          ingredients: 'มัทฉะลาเต้นมสดนุ่มละมุน ท็อปด้วยฟองนมหนานุ่ม',
+          price: '฿75',
+          imageAsset: 'assets/images/matcha_foam_latte.jpg',
+        ),
+      ],
+      status: 'pending',
+    ),
+
+    // 2. ข้าวบ้านก๋ง (Pending from Image 1)
+    const ApprovalRestaurant(
+      id: 'khao_baan_gong',
+      name: 'ข้าวบ้านก๋ง',
+      code: '111U1104',
+      category: 'อาหารไทย/อาหารตามสั่ง',
+      lastUpdated: '1 ส.ค. 2569',
+      requestDate: '1 ส.ค. 2569',
+      address: '45/1 ถนนสุเทพ ตำบลสุเทพ อำเภอเมือง จังหวัดเชียงใหม่ 50200',
+      mapUrl: 'www.googlemap.com',
+      phone: '082-345-6789',
+      imageAsset: 'assets/images/khao_baan_gong.jpg',
+      openingHours: {
+        'อาทิตย์': '09.00 - 20.00',
+        'จันทร์': '09.00 - 20.00',
+        'อังคาร': '09.00 - 20.00',
+        'พุธ': '09.00 - 20.00',
+        'พฤหัสบดี': '09.00 - 20.00',
+        'ศุกร์': '09.00 - 20.00',
+        'เสาร์': '09.00 - 20.00',
+      },
+      amenities: ['รถจักรยานยนต์'],
+      menuItems: [
+        ApprovalMenuItem(
+          name: 'ข้าวผัดโบราณก๋ง',
+          ingredients: 'ข้าวผัดซีอิ๊วดำหอมกลิ่นกระทะ หมูหมักนุ่ม',
+          price: '฿55',
+          imageAsset: 'assets/images/food_fried_rice.jpg',
+        ),
+        ApprovalMenuItem(
+          name: 'ต้มยำกุ้งน้ำข้นยอดมะพร้าว',
+          ingredients: 'กุ้งสดตัวโต ต้มยำสมุนไพรสดแท้',
+          price: '฿80',
+          imageAsset: 'assets/images/food_tomyum.jpg',
+        ),
+      ],
+      status: 'pending',
+    ),
+
+    // 3. Potto Hot Pot (Pending from Image 1)
+    const ApprovalRestaurant(
+      id: 'potto_hot_pot',
+      name: 'Potto Hot Pot',
+      code: '111U1105',
+      category: 'ชาบู/สุกี้',
+      lastUpdated: '1 ส.ค. 2569',
+      requestDate: '1 ส.ค. 2569',
+      address: 'นิมมานเหมินท์ ซอย 9 ตำบลสุเทพ อำเภอเมือง จังหวัดเชียงใหม่ 50200',
+      mapUrl: 'www.googlemap.com',
+      phone: '089-777-6655',
+      imageAsset: 'assets/images/potto_hot_pot.jpg',
+      openingHours: {
+        'อาทิตย์': '11.00 - 22.00',
+        'จันทร์': '11.00 - 22.00',
+        'อังคาร': '11.00 - 22.00',
+        'พุธ': '11.00 - 22.00',
+        'พฤหัสบดี': '11.00 - 22.00',
+        'ศุกร์': '11.00 - 22.00',
+        'เสาร์': '11.00 - 22.00',
+      },
+      amenities: ['รถจักรยานยนต์', 'มีอินเทอร์เน็ต'],
+      menuItems: [
+        ApprovalMenuItem(
+          name: 'ชุดชาบูหมูพรีเมียม',
+          ingredients: 'สันคอ สันนอก สามชั้น สไลซ์บางพร้อมชุดผักสด',
+          price: '฿299',
+          imageAsset: 'assets/images/food_shabu_pork.jpg',
+        ),
+        ApprovalMenuItem(
+          name: 'ชุดเนื้อวากิวออสเตรเลีย',
+          ingredients: 'เนื้อวากิวลายหินอ่อน นุ่มละลายในปาก',
+          price: '฿459',
+          imageAsset: 'assets/images/food_shabu_beef.jpg',
+        ),
+      ],
+      status: 'pending',
+    ),
+
+    // 4. ดำเนินสะดวก (Approved)
     const ApprovalRestaurant(
       id: 'damnoen_saduak',
       name: 'ดำเนินสะดวก',
@@ -39,15 +163,11 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
           price: '฿65',
           imageAsset: 'assets/images/food_crispy_pork.jpg',
         ),
-        ApprovalMenuItem(
-          name: 'ข้าวไข่ข้นทะเล',
-          ingredients: 'มีส่วนประกอบของไข่ไก่ กุ้ง ปลาหมึก',
-          price: '฿65',
-          imageAsset: 'assets/images/food_creamy_omelette.jpg',
-        ),
       ],
       status: 'approved',
     ),
+
+    // 5. The Volcano (Approved)
     const ApprovalRestaurant(
       id: 'the_volcano',
       name: 'The Volcano',
@@ -79,6 +199,8 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
       ],
       status: 'approved',
     ),
+
+    // 6. เจียวดาวหลังมอ(เจ้าแรก) (Approved)
     const ApprovalRestaurant(
       id: 'jeaw_dao',
       name: 'เจียวดาวหลังมอ(เจ้าแรก)',
@@ -110,28 +232,42 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
       ],
       status: 'approved',
     ),
-    const ApprovalRestaurant(
-      id: 'raw_truckr',
-      name: 'RawTruckr',
-      code: '111U1105',
-      category: 'อาหารเกาหลี',
-      lastUpdated: '3 ส.ค. 2569',
-      requestDate: '3 ส.ค. 2569',
-      address: 'สยามสแควร์ ซอย 7 กรุงเทพฯ',
-      mapUrl: 'www.googlemap.com',
-      phone: '089-111-2233',
-      imageAsset: 'assets/images/Logo_mm.png',
-      openingHours: {
-        'อาทิตย์': '11.00 - 21.00',
-      },
-      amenities: ['รถจักรยานยนต์'],
-      menuItems: [],
-      status: 'pending',
-    ),
   ];
 
-  /// Revoke approval for a restaurant with a reason.
-  /// Updates status to 'rejected' and records reason & time.
+  /// Approve a pending restaurant.
+  /// Moves status from 'pending' to 'approved'.
+  void approveRestaurant(String restaurantId) {
+    state = [
+      for (final r in state)
+        if (r.id == restaurantId)
+          r.copyWith(
+            status: 'approved',
+            lastUpdated: '2 ส.ค. 2569',
+          )
+        else
+          r,
+    ];
+  }
+
+  /// Reject a pending restaurant with reason and optional details.
+  /// Moves status from 'pending' to 'rejected'.
+  void rejectRestaurant(String restaurantId, String reason, {String? details}) {
+    state = [
+      for (final r in state)
+        if (r.id == restaurantId)
+          r.copyWith(
+            status: 'rejected',
+            rejectionReason: reason.trim(),
+            rejectionDetails: details?.trim(),
+            lastUpdated: '2 ส.ค. 2569',
+            revokedAt: DateTime.now(),
+          )
+        else
+          r,
+    ];
+  }
+
+  /// Revoke approval for an already approved restaurant.
   void revokeApproval(String restaurantId, String reason) {
     state = [
       for (final r in state)
@@ -141,17 +277,6 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
             rejectionReason: reason.trim(),
             revokedAt: DateTime.now(),
           )
-        else
-          r,
-    ];
-  }
-
-  /// Optional: Approve a pending restaurant
-  void approveRestaurant(String restaurantId) {
-    state = [
-      for (final r in state)
-        if (r.id == restaurantId)
-          r.copyWith(status: 'approved')
         else
           r,
     ];

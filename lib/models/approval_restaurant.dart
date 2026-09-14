@@ -28,6 +28,7 @@ class ApprovalRestaurant {
   final List<ApprovalMenuItem> menuItems;
   final String status; // 'pending', 'approved', 'rejected'
   final String? rejectionReason;
+  final String? rejectionDetails;
   final DateTime? revokedAt;
 
   const ApprovalRestaurant({
@@ -46,6 +47,7 @@ class ApprovalRestaurant {
     required this.menuItems,
     required this.status,
     this.rejectionReason,
+    this.rejectionDetails,
     this.revokedAt,
   });
 
@@ -65,6 +67,7 @@ class ApprovalRestaurant {
     List<ApprovalMenuItem>? menuItems,
     String? status,
     String? rejectionReason,
+    String? rejectionDetails,
     DateTime? revokedAt,
   }) {
     return ApprovalRestaurant(
@@ -83,6 +86,7 @@ class ApprovalRestaurant {
       menuItems: menuItems ?? this.menuItems,
       status: status ?? this.status,
       rejectionReason: rejectionReason ?? this.rejectionReason,
+      rejectionDetails: rejectionDetails ?? this.rejectionDetails,
       revokedAt: revokedAt ?? this.revokedAt,
     );
   }
