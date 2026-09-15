@@ -23,8 +23,8 @@ class _FaqItem {
 }
 
 class _HelpCenterScreenState extends State<HelpCenterScreen> {
-  // Index of the currently expanded FAQ card (1 is expanded to show Question 2 answer as requested)
-  int? _expandedIndex = 1;
+  // Index of the currently expanded FAQ card (2 is expanded to show Question 3 answer as requested)
+  int? _expandedIndex = 2;
 
   final List<_FaqItem> _faqList = const [
     _FaqItem(
@@ -51,13 +51,10 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     _FaqItem(
       icon: Icons.edit_outlined,
       question: 'วิธีการเปลี่ยนอีเมลและเบอร์โทร?',
-      isNumbered: true,
+      isNumbered: false,
       content: [
-        'เข้าสู่แท็บ "ผู้ใช้งาน" จากแถบเมนูด้านล่าง',
-        'แตะที่แถบโปรไฟล์เพื่อเข้าสู่หน้า "ข้อมูลผู้ใช้งาน"',
-        'กดปุ่ม "แก้ไขข้อมูล"',
-        'กรอกอีเมลหรือเบอร์โทรศัพท์ใหม่ที่ต้องการเปลี่ยน',
-        'กดปุ่ม "บันทึกข้อมูล" เพื่อยืนยันการเปลี่ยนแปลง',
+        'ไปที่เมนู “ผู้ใช้งาน”\nแล้วกด “โปรไฟล์”\nจะมีให้กด “แก้ไขข้อมูล”\nแล้วจะสามารถแก้ไขชื่อ อีเมล และเบอร์โทรได้\nแล้วกด “บันทึกข้อมูล”\nระบบจะขึ้น “แก้ไขข้อมูลผู้ใช้สำเร็จ”\nแล้วกด “กลับเข้าสู่หน้าโปรไฟล์”',
+        'การเปลี่ยนอีเมลและเบอร์โทรจะเสร็จสิ้นทันที',
       ],
     ),
     _FaqItem(
