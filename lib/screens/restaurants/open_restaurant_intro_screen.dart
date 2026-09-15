@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'create_restaurant_screen.dart';
+import 'go_to_owner_screen.dart';
 
 class OpenRestaurantIntroScreen extends StatefulWidget {
   const OpenRestaurantIntroScreen({super.key});
@@ -28,7 +29,7 @@ class _OpenRestaurantIntroScreenState extends State<OpenRestaurantIntroScreen> {
     HapticFeedback.lightImpact();
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const CreateRestaurantScreen(),
+        builder: (_) => const GoToOwnerScreen(),
       ),
     );
   }
