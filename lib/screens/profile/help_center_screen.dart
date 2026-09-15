@@ -23,8 +23,8 @@ class _FaqItem {
 }
 
 class _HelpCenterScreenState extends State<HelpCenterScreen> {
-  // Index of the currently expanded FAQ card (3 is expanded to show Question 4 answer as requested)
-  int? _expandedIndex = 3;
+  // Index of the currently expanded FAQ card (4 is expanded to show Question 5 answer as requested)
+  int? _expandedIndex = 4;
 
   final List<_FaqItem> _faqList = const [
     _FaqItem(
@@ -70,13 +70,10 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     _FaqItem(
       icon: Icons.error_outline_rounded,
       question: 'ลืมรหัสผ่านทำยังไง?',
-      isNumbered: true,
+      isNumbered: false,
       content: [
-        'ไปที่หน้า "แก้ไขข้อมูล" แล้วกดที่ข้อความ "ลืมรหัสผ่าน"',
-        'กรอกอีเมลที่ลงทะเบียนไว้ แล้วกด "ส่งรหัสยืนยัน"',
-        'นำรหัส OTP 6 หลักที่ได้รับในอีเมลมากรอกเพื่อยืนยัน',
-        'ตั้งรหัสผ่านใหม่ทั้ง 2 ช่องให้ตรงกัน แล้วกดยืนยัน',
-        'ระบบจะแจ้งเตือนแก้ไขรหัสผ่านสำเร็จและสามารถเข้าใช้งานได้ทันที',
+        'สามารถแก้ไขรหัสผ่านได้โดย',
+        'ไปที่เมนู “ผู้ใช้งาน”\nแล้วกด “โปรไฟล์”\nจะมีให้กด “แก้ไขข้อมูล”\nแล้วกด “ลืมรหัสผ่าน”\nให้กรอกอีเมลหรือเบอร์โทร\nระบบจะให้ยืนยันรหัสที่ได้รับผ่านอีเมลหรือเบอร์โทร เมื่อกรอกรหัสที่ได้รับแล้ว\nให้กรอก “รหัสผ่านใหม่และยืนยันรหัสผ่าน”\nกด “ยืนยันรหัสผ่าน”\nระบบจะขึ้น “แก้ไขข้อมูลผู้ใช้สำเร็จ”\nแล้วกด “กลับเข้าสู่หน้าโปรไฟล์”',
       ],
     ),
   ];
