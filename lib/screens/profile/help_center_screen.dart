@@ -11,24 +11,27 @@ class HelpCenterScreen extends StatefulWidget {
 class _FaqItem {
   final IconData icon;
   final String question;
-  final List<String> steps;
+  final bool isNumbered;
+  final List<String> content;
 
   const _FaqItem({
     required this.icon,
     required this.question,
-    required this.steps,
+    this.isNumbered = true,
+    required this.content,
   });
 }
 
 class _HelpCenterScreenState extends State<HelpCenterScreen> {
-  // Index of the currently expanded FAQ card (0 is expanded initially to match mockup)
-  int? _expandedIndex = 0;
+  // Index of the currently expanded FAQ card (1 is expanded to show Question 2 answer as requested)
+  int? _expandedIndex = 1;
 
   final List<_FaqItem> _faqList = const [
     _FaqItem(
       icon: Icons.storefront_outlined,
       question: 'วิธีการใช้งานแอปพลิเคชั่น?',
-      steps: [
+      isNumbered: true,
+      content: [
         'เมื่อสมัครสมาชิกแล้วเข้าสู่ระบบแล้ว',
         'เข้าสู่ “หน้าหลัก” กดตรงปัดสู่ร้านอาหาร',
         'เมื่อมีร้านอาหารขึ้นมา ปัดขวาคือถูกใจ ปัดซ้ายคือไม่ถูกใจ',
@@ -39,17 +42,17 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     _FaqItem(
       icon: Icons.favorite_outline_rounded,
       question: 'เมื่อเจอร้านที่ถูกใจแล้วทำยังไงต่อ?',
-      steps: [
-        'แตะที่ป้ายบุ๊กมาร์กมุมขวาบนเพื่อบันทึกเป็น "รายการโปรด"',
-        'กดปุ่มโทรเพื่อติดต่อสอบถามกับทางร้านได้โดยตรง',
-        'กดปุ่มแผนที่เพื่อเปิดระบบนำทางไปยังร้านอาหารทันที',
-        'สามารถเลือกดูร้านโปรดทั้งหมดได้ที่แท็บ "รายการโปรด"',
+      isNumbered: false,
+      content: [
+        'เมื่อปัดขวาครบ 5 ร้านแล้วระบบจะพาเข้าสู่หน้าสรุปร้านอาหารที่ถูกใจทันทีและสามารถเข้าดูรายละเอียดของแต่ละร้านอาหารได้',
+        'หากเจอร้านที่ถูกใจแล้วสามารถกด"ถัดไป"เพื่อไปหน้าสรุปร้านอาหารได้ทันทีโดยไม่ต้องปัดขวาให้ครบ 5 ร้าน',
       ],
     ),
     _FaqItem(
       icon: Icons.edit_outlined,
       question: 'วิธีการเปลี่ยนอีเมลและเบอร์โทร?',
-      steps: [
+      isNumbered: true,
+      content: [
         'เข้าสู่แท็บ "ผู้ใช้งาน" จากแถบเมนูด้านล่าง',
         'แตะที่แถบโปรไฟล์เพื่อเข้าสู่หน้า "ข้อมูลผู้ใช้งาน"',
         'กดปุ่ม "แก้ไขข้อมูล"',
@@ -60,7 +63,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     _FaqItem(
       icon: Icons.restaurant_rounded,
       question: 'เพิ่มหรือลบรายการโปรดอย่างไร?',
-      steps: [
+      isNumbered: true,
+      content: [
         'เข้าไปที่หน้ารายละเอียดของร้านอาหารที่ต้องการ',
         'แตะที่ไอคอนบุ๊กมาร์กมุมขวาบนเพื่อบันทึกร้านเป็นรายการโปรด',
         'เมื่อบันทึกแล้ว ไอคอนจะเปลี่ยนเป็นสีเลือดหมูทึบ',
@@ -70,7 +74,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     _FaqItem(
       icon: Icons.error_outline_rounded,
       question: 'ลืมรหัสผ่านทำยังไง?',
-      steps: [
+      isNumbered: true,
+      content: [
         'ไปที่หน้า "แก้ไขข้อมูล" แล้วกดที่ข้อความ "ลืมรหัสผ่าน"',
         'กรอกอีเมลที่ลงทะเบียนไว้ แล้วกด "ส่งรหัสยืนยัน"',
         'นำรหัส OTP 6 หลักที่ได้รับในอีเมลมากรอกเพื่อยืนยัน',
@@ -248,16 +253,12 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                     const SizedBox(width: 8),
 
                     // Trailing Arrow (Up Chevron if expanded, Right Chevron if collapsed)
-                    AnimatedRotation(
-                      turns: isExpanded ? 0.0 : 0.0,
-                      duration: const Duration(milliseconds: 200),
-                      child: Icon(
-                        isExpanded
-                            ? Icons.keyboard_arrow_up_rounded
-                            : Icons.chevron_right_rounded,
-                        color: const Color(0xFF6E162B),
-                        size: 23,
-                      ),
+                    Icon(
+                      isExpanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.chevron_right_rounded,
+                      color: const Color(0xFF6E162B),
+                      size: 23,
                     ),
                   ],
                 ),
@@ -266,43 +267,63 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                 AnimatedCrossFade(
                   firstChild: const SizedBox.shrink(),
                   secondChild: Padding(
-                    padding: const EdgeInsets.only(top: 14, left: 16, right: 6, bottom: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: item.steps.asMap().entries.map((entry) {
-                        final stepIndex = entry.key + 1;
-                        final stepText = entry.value;
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: Row(
+                    padding: const EdgeInsets.only(top: 14, left: 20, right: 6, bottom: 4),
+                    child: item.isNumbered
+                        ? Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '$stepIndex. ',
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF1E1E1E),
-                                  height: 1.45,
+                            children: item.content.asMap().entries.map((entry) {
+                              final stepIndex = entry.key + 1;
+                              final stepText = entry.value;
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '$stepIndex. ',
+                                      style: const TextStyle(
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF1E1E1E),
+                                        height: 1.48,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Text(
+                                        stepText,
+                                        style: const TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF1E1E1E),
+                                          height: 1.48,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                              Expanded(
+                              );
+                            }).toList(),
+                          )
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: item.content.asMap().entries.map((entry) {
+                              final isLast = entry.key == item.content.length - 1;
+                              return Padding(
+                                padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
                                 child: Text(
-                                  stepText,
+                                  entry.value,
                                   style: const TextStyle(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w500,
                                     color: Color(0xFF1E1E1E),
-                                    height: 1.45,
+                                    height: 1.5,
+                                    letterSpacing: -0.1,
                                   ),
                                 ),
-                              ),
-                            ],
+                              );
+                            }).toList(),
                           ),
-                        );
-                      }).toList(),
-                    ),
                   ),
                   crossFadeState: isExpanded
                       ? CrossFadeState.showSecond
