@@ -2,31 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class ReportProblemScreen extends StatefulWidget {
-  const ReportProblemScreen({super.key});
+  final String? initialCategory;
+  final String? initialRestaurant;
+
+  const ReportProblemScreen({
+    super.key,
+    this.initialCategory,
+    this.initialRestaurant,
+  });
 
   @override
   State<ReportProblemScreen> createState() => _ReportProblemScreenState();
 }
 
 class _ReportProblemScreenState extends State<ReportProblemScreen> {
-  String? _selectedCategory;
-  final TextEditingController _restaurantController = TextEditingController();
-  final TextEditingController _detailController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
+  late String? _selectedCategory;
+  late final TextEditingController _restaurantController;
+  late final TextEditingController _detailController;
+  late final TextEditingController _emailController;
 
   final List<String> _categories = [
-    'ปัญหาการใช้งานแอปพลิเคชันทั่วไป',
-    'ข้อมูลร้านอาหารไม่ถูกต้อง',
-    'ร้านอาหารปิดหรือไม่พบร้าน',
+    'ข้อมูลร้านค้าไม่ถูกต้อง',
+    'ร้านค้าปิดหรือไม่พบร้าน',
+    'ปัญหาการใช้งานแอปพลิเคชัน',
     'ปัญหาเกี่ยวกับบัญชีหรือรหัสผ่าน',
     'ปัญหาเกี่ยวกับรายการโปรด',
-    'ข้อเสนอแนะเพื่อการพัฒนาแอป',
+    'ข้อเสนอแนะเพื่อการพัฒนา',
     'อื่นๆ',
   ];
 
   @override
   void initState() {
     super.initState();
+    // Default to initialCategory or 'ข้อมูลร้านค้าไม่ถูกต้อง' as displayed in the mockup
+    _selectedCategory = widget.initialCategory ?? 'ข้อมูลร้านค้าไม่ถูกต้อง';
+    _restaurantController = TextEditingController(text: widget.initialRestaurant ?? '');
+    _detailController = TextEditingController();
+    _emailController = TextEditingController();
+
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -129,7 +142,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   void _submitReport() {
     FocusScope.of(context).unfocus();
 
-    if (_selectedCategory == null) {
+    if (_selectedCategory == null || _selectedCategory!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
@@ -159,7 +172,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
       return;
     }
 
-    // Show Success Dialog
+    // Show Success Dialog with reported summary
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -196,10 +209,10 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               ),
             ),
             const SizedBox(height: 10),
-            const Text(
-              'ทีมงานได้รับรายงานของท่านเรียบร้อยแล้ว และจะเร่งตรวจสอบพร้อมปรับปรุงบริการต่อไป',
+            Text(
+              'ทีมงานได้รับรายงานประเภท "$_selectedCategory" เรียบร้อยแล้ว และจะเร่งตรวจสอบพร้อมปรับปรุงบริการต่อไป',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13.5,
                 color: Color(0xFF666666),
                 height: 1.45,
@@ -383,6 +396,8 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   }
 
   Widget _buildCategorySelector() {
+    final hasSelection = _selectedCategory != null && _selectedCategory!.isNotEmpty;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -410,11 +425,11 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _selectedCategory ?? 'เลือกประเภทปัญหา',
+                  hasSelection ? _selectedCategory! : 'เลือกประเภทปัญหา',
                   style: TextStyle(
                     fontSize: 14.5,
-                    fontWeight: _selectedCategory != null ? FontWeight.w600 : FontWeight.w400,
-                    color: _selectedCategory != null
+                    fontWeight: hasSelection ? FontWeight.w500 : FontWeight.w400,
+                    color: hasSelection
                         ? const Color(0xFF221F21)
                         : const Color(0xFFAAAAAA),
                   ),
