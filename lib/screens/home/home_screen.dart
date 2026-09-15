@@ -12,14 +12,15 @@ import '../restaurants/restaurant_detail_screen.dart';
 import 'discover_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  final int initialTab;
+  const HomeScreen({super.key, this.initialTab = 0});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _currentTab = 0; // 0: Home, 1: Favorites, 2: Profile
+  late int _currentTab;
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
@@ -133,6 +134,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _currentTab = widget.initialTab;
     _searchFocusNode.addListener(() {
       if (mounted) {
         setState(() {

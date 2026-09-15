@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'report_problem_success_screen.dart';
 
 /// Data model representing each of the 4 problem categories
 class ReportCategory {
@@ -395,205 +396,16 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     setState(() => _isSubmitting = true);
 
     // Simulate quick professional submission delay
-    Future.delayed(const Duration(milliseconds: 300), () {
+    Future.delayed(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
 
-      final ticketId = 'MM-${Random().nextInt(90000) + 10000}';
-
-      // Show Success Dialog with reported summary
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          backgroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          contentPadding: const EdgeInsets.all(24),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 64,
-                height: 64,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF7EAEC),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.check_circle_rounded,
-                    color: Color(0xFF6E162B),
-                    size: 40,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'ส่งรายงานปัญหาสำเร็จ',
-                style: TextStyle(
-                  fontSize: 18.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF1E1E1E),
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF5F5F5),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  'รหัสแจ้งเรื่อง: $ticketId',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6E162B),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFAFAFA),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFF0F0F0)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.category_outlined,
-                          size: 16,
-                          color: Color(0xFF6E162B),
-                        ),
-                        const SizedBox(width: 6),
-                        const Text(
-                          'ประเภทปัญหา: ',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF555555),
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            _selectedCategory.title,
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF221F21),
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_restaurantController.text.trim().isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.storefront_outlined,
-                            size: 16,
-                            color: Color(0xFF6E162B),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'ร้านค้า: ',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF555555),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              _restaurantController.text.trim(),
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF221F21),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                    if (_emailController.text.trim().isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.email_outlined,
-                            size: 16,
-                            color: Color(0xFF6E162B),
-                          ),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'อีเมลติดต่อกลับ: ',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF555555),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              _emailController.text.trim(),
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF221F21),
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'ทีมงานได้รับเรื่องเรียบร้อยแล้ว และจะเร่งตรวจสอบพร้อมปรับปรุงบริการให้ดียิ่งขึ้น',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: Color(0xFF666666),
-                  height: 1.4,
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6E162B),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text(
-                    'ตกลง',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ],
+      // Navigate to full-screen ReportProblemSuccessScreen matching the reference design
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => ReportProblemSuccessScreen(
+            category: _selectedCategory.title,
+            restaurant: _restaurantController.text.trim(),
           ),
         ),
       );
