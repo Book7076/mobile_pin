@@ -10,6 +10,7 @@ import '../profile/report_problem_screen.dart';
 import '../restaurants/create_restaurant_screen.dart';
 import '../restaurants/open_restaurant_intro_screen.dart';
 import '../restaurants/restaurant_detail_screen.dart';
+import '../../models/favorite_manager.dart';
 import 'discover_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -33,45 +34,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _favoriteSearchQuery = '';
   bool _isFavoriteFocused = false;
 
-  // Favorite Restaurants matching User - Favorite reference design
-  final List<Map<String, dynamic>> _favoriteRestaurants = [
-    {
-      'name': 'RawTruckr',
-      'category': 'อาหารเกาหลี',
-      'price': '฿฿ 150-350 บาท',
-      'rating': 4.4,
-      'image': 'assets/images/rawtruckr.jpg',
-      'isAsset': true,
-      'isBookmarked': true,
-    },
-    {
-      'name': 'ครัวปันเจียง',
-      'category': 'อาหารไทย/อาหารตามสั่ง',
-      'price': '฿฿ 60-90 บาท',
-      'rating': 4.7,
-      'image': 'assets/images/krua_pan_jiang.jpg',
-      'isAsset': true,
-      'isBookmarked': true,
-    },
-    {
-      'name': 'ก๋วยเตี๋ยวเรือขั้นเทพ',
-      'category': 'อาหารไทย/ก๋วยเตี๋ยว',
-      'price': '฿฿ 50-80 บาท',
-      'rating': 4.3,
-      'image': 'assets/images/boat_noodles.jpg',
-      'isAsset': true,
-      'isBookmarked': true,
-    },
-    {
-      'name': 'TEDS Coffee & Eatery',
-      'category': 'ร้านกาแฟ/ขนมหวาน',
-      'price': '฿฿ 60-150 บาท',
-      'rating': 4.9,
-      'image': 'assets/images/teds_coffee.jpg',
-      'isAsset': true,
-      'isBookmarked': true,
-    },
-  ];
+  // Favorite Restaurants synced with FavoriteManager
+  List<Map<String, dynamic>> get _favoriteRestaurants => FavoriteManager.favorites;
 
   // Curated recommended & searchable restaurants matching the design
   final List<Map<String, dynamic>> _curatedRestaurants = [
@@ -129,6 +93,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       'isAsset': true,
       'isFavorite': false,
       'tags': ['shabu', 'ชาบู', 'ชาบูชิ', 'shabushi', 'สายพาน', 'บุฟเฟต์'],
+    },
+    {
+      'name': 'ดังเจริญ',
+      'category': 'ประเภทร้านอาหาร: อาหารญี่ปุ่น',
+      'rating': 4.8,
+      'image': 'assets/images/dang_jaroen.jpg',
+      'isAsset': true,
+      'isFavorite': false,
+      'isBookmarked': false,
+      'price': '฿฿ 89-109 บาท',
+      'address': '84/2 ม.14 ถ.สุเทพ ต.สุเทพ อ.เมือง เมืองเชียงใหม่ เชียงใหม่',
+      'phone': '0951409878',
+      'mapUrl': 'www.googlemap.com',
+      'tags': ['ดังเจริญ', 'อาหารญี่ปุ่น', 'ญี่ปุ่น', 'japanese', 'ข้าวหน้าเนื้อ', 'แกงกะหรี่', 'dang jaroen'],
     },
   ];
 
@@ -534,11 +512,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             builder: (_) => RestaurantDetailScreen(restaurantData: restaurant),
           ),
         );
-        if (isBookmarked != null && mounted) {
+        if (mounted) {
           setState(() {
-            restaurant['isBookmarked'] = isBookmarked;
-            if (!isBookmarked) {
-              _favoriteRestaurants.removeWhere((r) => r['name'] == restaurant['name']);
+            if (isBookmarked != null) {
+              restaurant['isBookmarked'] = isBookmarked;
+              restaurant['isFavorite'] = isBookmarked;
             }
           });
         }
@@ -893,11 +871,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 builder: (_) => RestaurantDetailScreen(restaurantData: item),
               ),
             );
-            if (isBookmarked != null && mounted) {
+            if (mounted) {
               setState(() {
-                item['isBookmarked'] = isBookmarked;
-                if (!isBookmarked) {
-                  _favoriteRestaurants.removeWhere((r) => r['name'] == item['name']);
+                if (isBookmarked != null) {
+                  item['isBookmarked'] = isBookmarked;
+                  item['isFavorite'] = isBookmarked;
                 }
               });
             }
