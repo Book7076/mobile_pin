@@ -8,7 +8,78 @@ class HelpCenterScreen extends StatefulWidget {
   State<HelpCenterScreen> createState() => _HelpCenterScreenState();
 }
 
+class _FaqItem {
+  final IconData icon;
+  final String question;
+  final List<String> steps;
+
+  const _FaqItem({
+    required this.icon,
+    required this.question,
+    required this.steps,
+  });
+}
+
 class _HelpCenterScreenState extends State<HelpCenterScreen> {
+  // Index of the currently expanded FAQ card (0 is expanded initially to match mockup)
+  int? _expandedIndex = 0;
+
+  final List<_FaqItem> _faqList = const [
+    _FaqItem(
+      icon: Icons.storefront_outlined,
+      question: 'วิธีการใช้งานแอปพลิเคชั่น?',
+      steps: [
+        'เมื่อสมัครสมาชิกแล้วเข้าสู่ระบบแล้ว',
+        'เข้าสู่ “หน้าหลัก” กดตรงปัดสู่ร้านอาหาร',
+        'เมื่อมีร้านอาหารขึ้นมา ปัดขวาคือถูกใจ ปัดซ้ายคือไม่ถูกใจ',
+        'เมื่อได้รับร้านที่ถูกใจครบ 5 ร้านแล้วหรือกดหยุด',
+        'ระบบจะแสดงผลร้านทั้งหมดพร้อมรายละเอียดร้านเพื่อใช้ในการตัดสินใจ',
+      ],
+    ),
+    _FaqItem(
+      icon: Icons.favorite_outline_rounded,
+      question: 'เมื่อเจอร้านที่ถูกใจแล้วทำยังไงต่อ?',
+      steps: [
+        'แตะที่ป้ายบุ๊กมาร์กมุมขวาบนเพื่อบันทึกเป็น "รายการโปรด"',
+        'กดปุ่มโทรเพื่อติดต่อสอบถามกับทางร้านได้โดยตรง',
+        'กดปุ่มแผนที่เพื่อเปิดระบบนำทางไปยังร้านอาหารทันที',
+        'สามารถเลือกดูร้านโปรดทั้งหมดได้ที่แท็บ "รายการโปรด"',
+      ],
+    ),
+    _FaqItem(
+      icon: Icons.edit_outlined,
+      question: 'วิธีการเปลี่ยนอีเมลและเบอร์โทร?',
+      steps: [
+        'เข้าสู่แท็บ "ผู้ใช้งาน" จากแถบเมนูด้านล่าง',
+        'แตะที่แถบโปรไฟล์เพื่อเข้าสู่หน้า "ข้อมูลผู้ใช้งาน"',
+        'กดปุ่ม "แก้ไขข้อมูล"',
+        'กรอกอีเมลหรือเบอร์โทรศัพท์ใหม่ที่ต้องการเปลี่ยน',
+        'กดปุ่ม "บันทึกข้อมูล" เพื่อยืนยันการเปลี่ยนแปลง',
+      ],
+    ),
+    _FaqItem(
+      icon: Icons.restaurant_rounded,
+      question: 'เพิ่มหรือลบรายการโปรดอย่างไร?',
+      steps: [
+        'เข้าไปที่หน้ารายละเอียดของร้านอาหารที่ต้องการ',
+        'แตะที่ไอคอนบุ๊กมาร์กมุมขวาบนเพื่อบันทึกร้านเป็นรายการโปรด',
+        'เมื่อบันทึกแล้ว ไอคอนจะเปลี่ยนเป็นสีเลือดหมูทึบ',
+        'หากต้องการลบ ให้แตะที่ไอคอนบุ๊กมาร์กอีกครั้งและกดยืนยันการลบ',
+      ],
+    ),
+    _FaqItem(
+      icon: Icons.error_outline_rounded,
+      question: 'ลืมรหัสผ่านทำยังไง?',
+      steps: [
+        'ไปที่หน้า "แก้ไขข้อมูล" แล้วกดที่ข้อความ "ลืมรหัสผ่าน"',
+        'กรอกอีเมลที่ลงทะเบียนไว้ แล้วกด "ส่งรหัสยืนยัน"',
+        'นำรหัส OTP 6 หลักที่ได้รับในอีเมลมากรอกเพื่อยืนยัน',
+        'ตั้งรหัสผ่านใหม่ทั้ง 2 ช่องให้ตรงกัน แล้วกดยืนยัน',
+        'ระบบจะแจ้งเตือนแก้ไขรหัสผ่านสำเร็จและสามารถเข้าใช้งานได้ทันที',
+      ],
+    ),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -19,91 +90,6 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         statusBarBrightness: Brightness.dark,
         systemNavigationBarColor: Colors.white,
         systemNavigationBarIconBrightness: Brightness.dark,
-      ),
-    );
-  }
-
-  void _showFaqDetail({
-    required String question,
-    required String answer,
-    required IconData icon,
-  }) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF7EAEC),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Center(
-                    child: Icon(icon, color: const Color(0xFF6E162B), size: 22),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    question,
-                    style: const TextStyle(
-                      fontSize: 16.5,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF221F21),
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Container(height: 1.0, color: const Color(0xFFF3DFE2)),
-            const SizedBox(height: 18),
-            Text(
-              answer,
-              style: const TextStyle(
-                fontSize: 14.5,
-                color: Color(0xFF555555),
-                height: 1.55,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6E162B),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text(
-                  'เข้าใจแล้ว',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -165,7 +151,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Title: คำถามที่พบบ่อย
+                  // Section Title: คำถามที่พบบ่อย
                   const Text(
                     'คำถามที่พบบ่อย',
                     style: TextStyle(
@@ -178,52 +164,15 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
 
                   const SizedBox(height: 18),
 
-                  // 1. วิธีการใช้งานแอปพลิเคชั่น?
-                  _buildFaqCard(
-                    icon: Icons.storefront_outlined,
-                    question: 'วิธีการใช้งานแอปพลิเคชั่น?',
-                    answer:
-                        'คุณสามารถค้นหาร้านอาหารที่ต้องการจากแถบค้นหา หรือเลือกดูตามหมวดหมู่อาหารยอดนิยม และกดดูรายละเอียดร้านอาหาร รวมถึงตำแหน่งที่ตั้งและเมนูเด็ดได้ทันที',
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 2. เมื่อเจอร้านที่ถูกใจแล้วทำยังไงต่อ?
-                  _buildFaqCard(
-                    icon: Icons.access_time_rounded,
-                    question: 'เมื่อเจอร้านที่ถูกใจแล้วทำยังไงต่อ?',
-                    answer:
-                        'คุณสามารถกดบันทึกเป็น "รายการโปรด" โดยแตะที่ป้ายบุ๊กมาร์กมุมขวาบน หรือกดโทรเพื่อติดต่อสอบถาม และกดปุ่มแผนที่เพื่อนำทางไปยังร้านอาหารได้ทันที',
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 3. วิธีการเปลี่ยนอีเมลและเบอร์โทร?
-                  _buildFaqCard(
-                    icon: Icons.edit_outlined,
-                    question: 'วิธีการเปลี่ยนอีเมลและเบอร์โทร?',
-                    answer:
-                        'เข้าสู่เมนู "โปรไฟล์" จากแถบเมนูด้านล่าง จากนั้นกดปุ่ม "แก้ไขข้อมูล" เพื่อกรอกชื่อ อีเมล หรือเบอร์โทรศัพท์ใหม่ แล้วกดปุ่ม "บันทึกข้อมูล"',
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 4. เพิ่มหรือลบรายการโปรดอย่างไร?
-                  _buildFaqCard(
-                    icon: Icons.restaurant_rounded,
-                    question: 'เพิ่มหรือลบรายการโปรดอย่างไร?',
-                    answer:
-                        'แตะที่ไอคอนป้ายบุ๊กมาร์กมุมขวาบนของหน้ารายละเอียดร้านอาหาร เมื่อเป็นป้ายสีแดงทึบแสดงว่าบันทึกแล้ว หากต้องการลบให้แตะป้ายอีกครั้งและกดยืนยันการลบ',
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // 5. ลืมรหัสผ่านทำยังไง?
-                  _buildFaqCard(
-                    icon: Icons.error_outline_rounded,
-                    question: 'ลืมรหัสผ่านทำยังไง?',
-                    answer:
-                        'ไปที่หน้า "แก้ไขข้อมูล" แล้วแตะที่ข้อความ "ลืมรหัสผ่าน" ระบบจะให้กรอกอีเมลเพื่อส่งรหัส OTP 6 หลัก เมื่อยืนยันรหัสแล้วจะสามารถตั้งรหัสผ่านใหม่ได้ทันที',
+                  // 5 Expandable FAQ Cards
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: _faqList.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      return _buildFaqCard(index, _faqList[index]);
+                    },
                   ),
 
                   const SizedBox(height: 30),
@@ -236,12 +185,12 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     );
   }
 
-  Widget _buildFaqCard({
-    required IconData icon,
-    required String question,
-    required String answer,
-  }) {
-    return Container(
+  Widget _buildFaqCard(int index, _FaqItem item) {
+    final isExpanded = _expandedIndex == index;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
@@ -261,44 +210,104 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () => _showFaqDetail(
-            question: question,
-            answer: answer,
-            icon: icon,
-          ),
+          onTap: () {
+            setState(() {
+              _expandedIndex = isExpanded ? null : index;
+            });
+          },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Burgundy Icon
-                Icon(
-                  icon,
-                  color: const Color(0xFF6E162B),
-                  size: 23,
+                // Header Row
+                Row(
+                  children: [
+                    // Burgundy Icon
+                    Icon(
+                      item.icon,
+                      color: const Color(0xFF6E162B),
+                      size: 23,
+                    ),
+
+                    const SizedBox(width: 13),
+
+                    // Question Title in Burgundy
+                    Expanded(
+                      child: Text(
+                        item.question,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF6E162B),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(width: 8),
+
+                    // Trailing Arrow (Up Chevron if expanded, Right Chevron if collapsed)
+                    AnimatedRotation(
+                      turns: isExpanded ? 0.0 : 0.0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        isExpanded
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.chevron_right_rounded,
+                        color: const Color(0xFF6E162B),
+                        size: 23,
+                      ),
+                    ),
+                  ],
                 ),
 
-                const SizedBox(width: 14),
+                // Expandable Answers Content
+                AnimatedCrossFade(
+                  firstChild: const SizedBox.shrink(),
+                  secondChild: Padding(
+                    padding: const EdgeInsets.only(top: 14, left: 16, right: 6, bottom: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: item.steps.asMap().entries.map((entry) {
+                        final stepIndex = entry.key + 1;
+                        final stepText = entry.value;
 
-                // Question Title
-                Expanded(
-                  child: Text(
-                    question,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF221F21),
-                      letterSpacing: -0.2,
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$stepIndex. ',
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF1E1E1E),
+                                  height: 1.45,
+                                ),
+                              ),
+                              Expanded(
+                                child: Text(
+                                  stepText,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF1E1E1E),
+                                    height: 1.45,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ),
-                ),
-
-                const SizedBox(width: 8),
-
-                // Trailing Chevron
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFF6E162B),
-                  size: 22,
+                  crossFadeState: isExpanded
+                      ? CrossFadeState.showSecond
+                      : CrossFadeState.showFirst,
+                  duration: const Duration(milliseconds: 250),
                 ),
               ],
             ),
