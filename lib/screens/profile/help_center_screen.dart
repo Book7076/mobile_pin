@@ -23,8 +23,8 @@ class _FaqItem {
 }
 
 class _HelpCenterScreenState extends State<HelpCenterScreen> {
-  // Index of the currently expanded FAQ card (2 is expanded to show Question 3 answer as requested)
-  int? _expandedIndex = 2;
+  // Index of the currently expanded FAQ card (3 is expanded to show Question 4 answer as requested)
+  int? _expandedIndex = 3;
 
   final List<_FaqItem> _faqList = const [
     _FaqItem(
@@ -60,12 +60,11 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     _FaqItem(
       icon: Icons.restaurant_rounded,
       question: 'เพิ่มหรือลบรายการโปรดอย่างไร?',
-      isNumbered: true,
+      isNumbered: false,
       content: [
-        'เข้าไปที่หน้ารายละเอียดของร้านอาหารที่ต้องการ',
-        'แตะที่ไอคอนบุ๊กมาร์กมุมขวาบนเพื่อบันทึกร้านเป็นรายการโปรด',
-        'เมื่อบันทึกแล้ว ไอคอนจะเปลี่ยนเป็นสีเลือดหมูทึบ',
-        'หากต้องการลบ ให้แตะที่ไอคอนบุ๊กมาร์กอีกครั้งและกดยืนยันการลบ',
+        'สามารถเพิ่มได้หลายวิธี\nกดเครื่องหมายบันทึกตรงมุมขวาบนได้ตั้งแต่\nขั้นตอนการปัด ขั้นตอนการสรุปผลร้านอาหาร\nทั้งหมดและขั้นตอนสุดท้ายที่เลือกร้านอาหาร',
+        'การลบรายการโปรด\nเข้าไปที่หน้า “รายการโปรด”\nเข้าตรงหน้ารายละเอียดร้านอาหารแต่ละร้าน\nกดเครื่องหมาย “บันทึก”\nแล้วกด “ยืนยัน”',
+        'การเพิ่มหรือลบรายการโปรดจะเสร็จสิ้นทันที',
       ],
     ),
     _FaqItem(
