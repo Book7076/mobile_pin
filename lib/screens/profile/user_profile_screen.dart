@@ -223,7 +223,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           child: Material(
             color: Colors.transparent,
             child: Container(
-              width: 282,
+              width: 280,
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
                 color: const Color(0xFFFAF4F5),
                 borderRadius: BorderRadius.circular(18),
@@ -241,6 +242,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Confirmation Question
                   const Padding(
@@ -264,17 +266,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   SizedBox(
                     height: 48,
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         // Left Button: ยกเลิก (Solid Burgundy Text)
                         Expanded(
                           child: InkWell(
-                            borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(18),
-                            ),
                             onTap: () => Navigator.of(dialogContext).pop(),
                             child: const Center(
                               child: Text(
                                 'ยกเลิก',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 16.0,
                                   fontWeight: FontWeight.w700,
@@ -289,16 +290,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         // Center Vertical Divider
                         Container(
                           width: 1.0,
-                          height: double.infinity,
                           color: const Color(0xFFDEC4C8),
                         ),
 
                         // Right Button: ยืนยัน (Dark Text)
                         Expanded(
                           child: InkWell(
-                            borderRadius: const BorderRadius.only(
-                              bottomRight: Radius.circular(18),
-                            ),
                             onTap: () async {
                               Navigator.of(dialogContext).pop();
                               try {
@@ -324,6 +321,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             child: const Center(
                               child: Text(
                                 'ยืนยัน',
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 16.0,
                                   fontWeight: FontWeight.w700,
