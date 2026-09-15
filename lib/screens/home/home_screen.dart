@@ -8,6 +8,7 @@ import '../profile/settings_screen.dart';
 import '../profile/help_center_screen.dart';
 import '../profile/report_problem_screen.dart';
 import '../restaurants/create_restaurant_screen.dart';
+import '../restaurants/open_restaurant_intro_screen.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 import 'discover_screen.dart';
 
@@ -1148,7 +1149,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const CreateRestaurantScreen(),
+                          builder: (_) => const OpenRestaurantIntroScreen(),
                         ),
                       );
                     },
