@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../../main.dart';
 import '../auth/login_screen.dart';
 import 'edit_user_profile_screen.dart';
+import 'edit_user_photo_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final bool showDeleteDialogOnInit;
@@ -21,6 +22,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   late String _email;
   late String _phone;
   final String _password = '********';
+  String? _profilePhotoUrl;
 
   @override
   void initState() {
@@ -64,6 +66,21 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         _name = result['name'] ?? _name;
         _email = result['email'] ?? _email;
         _phone = result['phone'] ?? _phone;
+      });
+    }
+  }
+
+  void _openEditPhotoScreen() async {
+    final result = await Navigator.of(context).push<String?>(
+      MaterialPageRoute(
+        builder: (_) => EditUserPhotoScreen(
+          currentPhotoUrl: _profilePhotoUrl,
+        ),
+      ),
+    );
+    if (mounted) {
+      setState(() {
+        _profilePhotoUrl = result;
       });
     }
   }
@@ -409,19 +426,38 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       clipBehavior: Clip.none,
                       children: [
                         // Large Circular Profile Avatar
-                        Container(
-                          width: 124,
-                          height: 124,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFF6E162B),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Center(
-                            child: Icon(
-                              Icons.person_rounded,
-                              color: Colors.white,
-                              size: 88,
+                        GestureDetector(
+                          onTap: _openEditPhotoScreen,
+                          child: Container(
+                            width: 124,
+                            height: 124,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF6E162B),
+                              shape: BoxShape.circle,
                             ),
+                            child: _profilePhotoUrl != null
+                                ? ClipOval(
+                                    child: Image.network(
+                                      _profilePhotoUrl!,
+                                      width: 124,
+                                      height: 124,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => const Center(
+                                        child: Icon(
+                                          Icons.person_rounded,
+                                          color: Colors.white,
+                                          size: 88,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : const Center(
+                                    child: Icon(
+                                      Icons.person_rounded,
+                                      color: Colors.white,
+                                      size: 88,
+                                    ),
+                                  ),
                           ),
                         ),
 
@@ -430,19 +466,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                           bottom: 0,
                           right: 0,
                           child: GestureDetector(
-                            onTap: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('แตะเพื่อเปลี่ยนรูปโปรไฟล์'),
-                                  backgroundColor: const Color(0xFF6E162B),
-                                  behavior: SnackBarBehavior.floating,
-                                  duration: const Duration(seconds: 1),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                ),
-                              );
-                            },
+                            onTap: _openEditPhotoScreen,
                             child: Container(
                               width: 34,
                               height: 34,
