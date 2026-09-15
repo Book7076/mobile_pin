@@ -6,6 +6,7 @@ import '../auth/login_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../profile/settings_screen.dart';
 import '../profile/help_center_screen.dart';
+import '../profile/report_problem_screen.dart';
 import '../restaurants/create_restaurant_screen.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 import 'discover_screen.dart';
@@ -1128,7 +1129,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   _buildProfileMenuCard(
                     icon: Icons.error_outline_rounded,
                     title: 'รายงานปัญหา',
-                    onTap: _showReportIssueDialog,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const ReportProblemScreen(),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
 
