@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../main.dart';
-import '../auth/login_screen.dart';
-import '../home/home_screen.dart';
-import '../admin/admin_dashboard.dart';
-import '../../widgets/meal_mate_logo.dart';
+import '../main.dart';
+import 'auth/login_screen.dart';
+import 'home/home_screen.dart';
+import 'admin/admin_dashboard.dart';
+import '../widgets/meal_mate_logo.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
