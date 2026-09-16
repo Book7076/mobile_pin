@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
+import '../../core/auth_session_manager.dart';
 import '../home/home_screen.dart';
 import '../admin/admin_dashboard.dart';
 import '../onboarding/onboarding_flow_screen.dart';
@@ -25,10 +27,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLogin = true;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  StreamSubscription<AuthState>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
+    _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
+      final session = data.session;
+      if (session != null && mounted) {
+        _handlePostAuthSuccess();
+      }
+    });
+
     // System status bar with light icons on dark burgundy header
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -43,6 +53,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   void dispose() {
+    _authSubscription?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -99,6 +110,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
 
+      AuthSessionManager.setProvider('email');
       if (mounted) {
         await _handlePostAuthSuccess();
       }
@@ -163,6 +175,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _handleSocialSignIn(OAuthProvider provider) async {
+    final providerName = provider == OAuthProvider.facebook ? 'facebook' : 'google';
+    AuthSessionManager.setProvider(providerName);
     setState(() => _isLoading = true);
     try {
       await supabase.auth.signInWithOAuth(

@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/auth_session_manager.dart';
+import '../../widgets/social_login_buttons.dart';
 
 class SettingsScreen extends StatefulWidget {
   final String email;
   final String phone;
+  final String? loginProvider;
+  final String? socialUserName;
 
   const SettingsScreen({
     super.key,
     this.email = 'Emma.carter@gmail.com',
     this.phone = '099-888-7777',
+    this.loginProvider,
+    this.socialUserName,
   });
 
   @override
@@ -23,10 +29,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _language = 'ภาษาไทย';
   final String _appVersion = 'v.1.1';
   final String _terms = 'ผู้ใช้งานทั่วไป';
+  late String _currentProvider;
+  late String _socialName;
 
   @override
   void initState() {
     super.initState();
+    _currentProvider = widget.loginProvider ?? AuthSessionManager.currentProvider;
+    _socialName = widget.socialUserName ?? AuthSessionManager.socialUserName;
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -296,6 +306,456 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildFacebookBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEBF3FF),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFC4DBFC), width: 1.1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 17,
+            height: 17,
+            decoration: const BoxDecoration(
+              color: Color(0xFF1877F2),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const SizedBox(
+              width: 10,
+              height: 10,
+              child: FittedBox(
+                child: SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CustomPaint(
+                    painter: FacebookLogoPainter(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'Facebook',
+            style: TextStyle(
+              fontSize: 12.8,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1877F2),
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGoogleBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE0E0E0), width: 1.1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 15,
+            height: 15,
+            child: FittedBox(
+              child: SizedBox(
+                width: 26,
+                height: 26,
+                child: CustomPaint(
+                  painter: GoogleLogoPainter(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Text(
+            'Google',
+            style: TextStyle(
+              fontSize: 12.8,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF3C4043),
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSocialAccountDetailsSheet(String provider) {
+    final isFacebook = provider.toLowerCase() == 'facebook';
+    final providerTitle = isFacebook ? 'Facebook' : 'Google';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalContext, setModalState) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 30),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Top Grab Handle
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4.5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2DCE0),
+                      borderRadius: BorderRadius.circular(3),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+
+                // Branded Icon Circle
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: BoxDecoration(
+                    color: isFacebook ? const Color(0xFF1877F2) : Colors.white,
+                    shape: BoxShape.circle,
+                    border: isFacebook
+                        ? null
+                        : Border.all(color: const Color(0xFFE3E3E3), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (isFacebook ? const Color(0xFF1877F2) : Colors.black)
+                            .withOpacity(0.12),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  alignment: Alignment.center,
+                  child: isFacebook
+                      ? const SizedBox(
+                          width: 38,
+                          height: 38,
+                          child: FittedBox(
+                            child: SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: CustomPaint(
+                                painter: FacebookLogoPainter(),
+                              ),
+                            ),
+                          ),
+                        )
+                      : const SizedBox(
+                          width: 34,
+                          height: 34,
+                          child: FittedBox(
+                            child: SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: CustomPaint(
+                                painter: GoogleLogoPainter(),
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+                const SizedBox(height: 14),
+
+                // Main Title
+                Text(
+                  'เข้าสู่ระบบด้วย $providerTitle',
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF221F21),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                // Verified status badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFC8E6C9)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.verified_rounded, size: 14, color: Color(0xFF2E7D32)),
+                      SizedBox(width: 4),
+                      Text(
+                        'บัญชีเชื่อมต่อและยืนยันแล้ว',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2E7D32),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Profile Info Box
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9F7F8),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFEFE8EB)),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'ชื่อบัญชีผู้ใช้',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: Color(0xFF7E777B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            _socialName,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF221F21),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Divider(height: 1, color: Color(0xFFEFE8EB)),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'อีเมลที่ผูกไว้',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: Color(0xFF7E777B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            widget.email,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF221F21),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Security Note
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFAF3F5),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFF3DDE2)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(top: 2),
+                        child: Icon(
+                          Icons.shield_outlined,
+                          size: 18,
+                          color: Color(0xFF6E162B),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'บัญชีของคุณได้รับการคุ้มครองความปลอดภัยโดย $providerTitle โดยตรง ไม่จำเป็นต้องใช้รหัสผ่านในการเข้าใช้งาน',
+                          style: const TextStyle(
+                            fontSize: 12.8,
+                            color: Color(0xFF5A4B4F),
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Optional Set Password Button (For hybrid auth support)
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF6E162B),
+                      side: const BorderSide(color: Color(0xFF6E162B), width: 1.2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.lock_outline_rounded, size: 18),
+                    label: const Text(
+                      'ตั้งรหัสผ่านสำหรับอีเมล',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                    ),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _showChangePasswordModal();
+                    },
+                  ),
+                ),
+
+                const SizedBox(height: 10),
+
+                // Close Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6E162B),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('เข้าใจแล้ว', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Demo / Test Mode Switcher
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F1F3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'ทดสอบโหมด: ',
+                        style: TextStyle(fontSize: 11.5, color: Color(0xFF7E777B), fontWeight: FontWeight.w600),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          AuthSessionManager.setProvider('facebook');
+                          setState(() {
+                            _currentProvider = 'facebook';
+                          });
+                          Navigator.of(ctx).pop();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          decoration: BoxDecoration(
+                            color: _currentProvider == 'facebook' ? const Color(0xFF1877F2) : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Facebook',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _currentProvider == 'facebook' ? Colors.white : const Color(0xFF555555),
+                            ),
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          AuthSessionManager.setProvider('google');
+                          setState(() {
+                            _currentProvider = 'google';
+                          });
+                          Navigator.of(ctx).pop();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          decoration: BoxDecoration(
+                            color: _currentProvider == 'google' ? const Color(0xFF3C4043) : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Google',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _currentProvider == 'google' ? Colors.white : const Color(0xFF555555),
+                            ),
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          AuthSessionManager.setProvider('email');
+                          setState(() {
+                            _currentProvider = 'email';
+                          });
+                          Navigator.of(ctx).pop();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          decoration: BoxDecoration(
+                            color: _currentProvider == 'email' ? const Color(0xFF6E162B) : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'รหัสผ่าน',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: _currentProvider == 'email' ? Colors.white : const Color(0xFF555555),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showTermsDialog() {
     showDialog(
       context: context,
@@ -431,7 +891,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   // ----------------------------------------
                   // Section 2: ความปลอดภัยของบัญชี
                   // ----------------------------------------
-                  _buildSectionHeader('ความปลอดภัยของบัญชี'),
+                  _buildSectionHeader(
+                    'ความปลอดภัยของบัญชี',
+                    onLongPress: () {
+                      _showQuickModeSwitcherSheet();
+                    },
+                  ),
                   const SizedBox(height: 10),
                   _buildCardContainer([
                     _buildSettingRow(
@@ -466,11 +931,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                     const Divider(height: 1, thickness: 1, color: Color(0xFFF7EBEF), indent: 16, endIndent: 16),
-                    _buildSettingRow(
-                      label: 'เปลี่ยนรหัสผ่าน',
-                      value: '********',
-                      onTap: _showChangePasswordModal,
-                    ),
+                    
+                    // Row 3: เข้าสู่ระบบด้วย / เปลี่ยนรหัสผ่าน (Dynamic based on social provider)
+                    if (_currentProvider == 'facebook')
+                      _buildSettingRow(
+                        label: 'เข้าสู่ระบบด้วย',
+                        valueWidget: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildFacebookBadge(),
+                                if (_socialName.isNotEmpty) ...[
+                                  const SizedBox(height: 2.5),
+                                  Text(
+                                    _socialName,
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF7E777B),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 20,
+                              color: Color(0xFFB0AAB0),
+                            ),
+                          ],
+                        ),
+                        onTap: () => _showSocialAccountDetailsSheet('facebook'),
+                      )
+                    else if (_currentProvider == 'google')
+                      _buildSettingRow(
+                        label: 'เข้าสู่ระบบด้วย',
+                        valueWidget: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildGoogleBadge(),
+                                if (_socialName.isNotEmpty) ...[
+                                  const SizedBox(height: 2.5),
+                                  Text(
+                                    _socialName,
+                                    style: const TextStyle(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF7E777B),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 20,
+                              color: Color(0xFFB0AAB0),
+                            ),
+                          ],
+                        ),
+                        onTap: () => _showSocialAccountDetailsSheet('google'),
+                      )
+                    else
+                      _buildSettingRow(
+                        label: 'เปลี่ยนรหัสผ่าน',
+                        value: '********',
+                        onTap: _showChangePasswordModal,
+                      ),
                   ]),
 
                   const SizedBox(height: 24),
@@ -520,14 +1056,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 15.5,
-        fontWeight: FontWeight.w800,
-        color: Color(0xFF6E162B),
-        letterSpacing: -0.2,
+  Widget _buildSectionHeader(String title, {VoidCallback? onLongPress}) {
+    return GestureDetector(
+      onLongPress: onLongPress,
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 15.5,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF6E162B),
+          letterSpacing: -0.2,
+        ),
+      ),
+    );
+  }
+
+  void _showQuickModeSwitcherSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'เลือกช่องทางเข้าสู่ระบบเพื่อทดสอบ',
+              style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800, color: Color(0xFF6E162B)),
+            ),
+            const SizedBox(height: 14),
+            ListTile(
+              leading: const Icon(Icons.facebook_rounded, color: Color(0xFF1877F2)),
+              title: const Text('เข้าสู่ระบบด้วย Facebook', style: TextStyle(fontWeight: FontWeight.w600)),
+              trailing: _currentProvider == 'facebook' ? const Icon(Icons.check_circle_rounded, color: Color(0xFF6E162B)) : null,
+              onTap: () {
+                AuthSessionManager.setProvider('facebook');
+                setState(() => _currentProvider = 'facebook');
+                Navigator.of(ctx).pop();
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.g_mobiledata_rounded, size: 30, color: Color(0xFFEA4335)),
+              title: const Text('เข้าสู่ระบบด้วย Google', style: TextStyle(fontWeight: FontWeight.w600)),
+              trailing: _currentProvider == 'google' ? const Icon(Icons.check_circle_rounded, color: Color(0xFF6E162B)) : null,
+              onTap: () {
+                AuthSessionManager.setProvider('google');
+                setState(() => _currentProvider = 'google');
+                Navigator.of(ctx).pop();
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.lock_rounded, color: Color(0xFF6E162B)),
+              title: const Text('เข้าสู่ระบบด้วย อีเมล/รหัสผ่าน', style: TextStyle(fontWeight: FontWeight.w600)),
+              trailing: _currentProvider == 'email' ? const Icon(Icons.check_circle_rounded, color: Color(0xFF6E162B)) : null,
+              onTap: () {
+                AuthSessionManager.setProvider('email');
+                setState(() => _currentProvider = 'email');
+                Navigator.of(ctx).pop();
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -557,7 +1151,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildSettingRow({
     required String label,
-    required String value,
+    String? value,
+    Widget? valueWidget,
     VoidCallback? onTap,
   }) {
     return InkWell(
@@ -579,16 +1174,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(width: 12),
             Flexible(
-              child: Text(
-                value,
-                textAlign: TextAlign.right,
-                style: const TextStyle(
-                  fontSize: 13.8,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF333333),
-                  letterSpacing: -0.2,
-                ),
-              ),
+              child: valueWidget ??
+                  Text(
+                    value ?? '',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                      fontSize: 13.8,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF333333),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
             ),
           ],
         ),

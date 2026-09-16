@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../main.dart';
+import '../../core/auth_session_manager.dart';
+import '../../widgets/social_login_buttons.dart';
 import '../auth/login_screen.dart';
 import 'edit_user_profile_screen.dart';
 import 'edit_user_photo_screen.dart';
@@ -23,11 +25,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   late String _phone;
   final String _password = '********';
   String? _profilePhotoUrl;
+  late String _currentProvider;
 
   @override
   void initState() {
     super.initState();
     final currentUser = supabase.auth.currentUser;
+    _currentProvider = AuthSessionManager.currentProvider;
     _name = 'Emma';
     _email = currentUser?.email ?? 'Emma.carter@gmail.com';
     _phone = '099-888-7777';
@@ -403,8 +407,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         _buildInfoRow('เบอร์โทรศัพท์', _phone),
                         _buildDivider(),
 
-                        // Row 4: รหัสผ่าน
-                        _buildInfoRow('รหัสผ่าน', _password),
+                        // Row 4: รหัสผ่าน / เข้าสู่ระบบด้วย
+                        if (_currentProvider == 'facebook')
+                          _buildInfoRow('เข้าสู่ระบบด้วย', '', valueWidget: _buildFacebookBadge())
+                        else if (_currentProvider == 'google')
+                          _buildInfoRow('เข้าสู่ระบบด้วย', '', valueWidget: _buildGoogleBadge())
+                        else
+                          _buildInfoRow('รหัสผ่าน', _password),
                       ],
                     ),
                   ),
@@ -476,7 +485,94 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildFacebookBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEBF3FF),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFC4DBFC), width: 1.1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 16,
+            height: 16,
+            decoration: const BoxDecoration(
+              color: Color(0xFF1877F2),
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const SizedBox(
+              width: 9.5,
+              height: 9.5,
+              child: FittedBox(
+                child: SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CustomPaint(
+                    painter: FacebookLogoPainter(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          const Text(
+            'Facebook',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF1877F2),
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGoogleBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE0E0E0), width: 1.1),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: FittedBox(
+              child: SizedBox(
+                width: 26,
+                height: 26,
+                child: CustomPaint(
+                  painter: GoogleLogoPainter(),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          const Text(
+            'Google',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF3C4043),
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {Widget? valueWidget}) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
       child: Row(
@@ -491,16 +587,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
           ),
           Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 13.5,
-                color: Color(0xFF221F21),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: valueWidget ??
+                Text(
+                  value,
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF221F21),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
           ),
         ],
       ),

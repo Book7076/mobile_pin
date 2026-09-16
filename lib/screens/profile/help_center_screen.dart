@@ -23,8 +23,8 @@ class _FaqItem {
 }
 
 class _HelpCenterScreenState extends State<HelpCenterScreen> {
-  // Index of the currently expanded FAQ card (4 is expanded to show Question 5 answer as requested)
-  int? _expandedIndex = 4;
+  // Initially null so only the 5 question headers are displayed on entry
+  int? _expandedIndex;
 
   final List<_FaqItem> _faqList = const [
     _FaqItem(
@@ -145,7 +145,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
           Expanded(
             child: SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 26),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -153,14 +153,14 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                   const Text(
                     'คำถามที่พบบ่อย',
                     style: TextStyle(
-                      fontSize: 17.5,
+                      fontSize: 16.5,
                       fontWeight: FontWeight.w800,
                       color: Color(0xFF1E1E1E),
                       letterSpacing: -0.2,
                     ),
                   ),
 
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 12),
 
                   // 5 Expandable FAQ Cards
                   ListView.separated(
@@ -173,7 +173,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                     },
                   ),
 
-                  const SizedBox(height: 30),
+                  const SizedBox(height: 24),
                 ],
               ),
             ),
@@ -260,63 +260,70 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                 AnimatedCrossFade(
                   firstChild: const SizedBox.shrink(),
                   secondChild: Padding(
-                    padding: const EdgeInsets.only(top: 14, left: 20, right: 6, bottom: 4),
-                    child: item.isNumbered
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: item.content.asMap().entries.map((entry) {
-                              final stepIndex = entry.key + 1;
-                              final stepText = entry.value;
+                    padding: const EdgeInsets.only(top: 12, left: 16, right: 6, bottom: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Divider(height: 1, thickness: 0.8, color: Color(0xFFF7EBEF)),
+                        const SizedBox(height: 12),
+                        item.isNumbered
+                            ? Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: item.content.asMap().entries.map((entry) {
+                                  final stepIndex = entry.key + 1;
+                                  final stepText = entry.value;
 
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      '$stepIndex. ',
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 6),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '$stepIndex. ',
+                                          style: const TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF6E162B),
+                                            height: 1.48,
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Text(
+                                            stepText,
+                                            style: const TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFF2B282A),
+                                              height: 1.48,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              )
+                            : Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: item.content.asMap().entries.map((entry) {
+                                  final isLast = entry.key == item.content.length - 1;
+                                  return Padding(
+                                    padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+                                    child: Text(
+                                      entry.value,
                                       style: const TextStyle(
                                         fontSize: 13.5,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF1E1E1E),
-                                        height: 1.48,
+                                        fontWeight: FontWeight.w500,
+                                        color: Color(0xFF2B282A),
+                                        height: 1.5,
+                                        letterSpacing: -0.1,
                                       ),
                                     ),
-                                    Expanded(
-                                      child: Text(
-                                        stepText,
-                                        style: const TextStyle(
-                                          fontSize: 13.5,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF1E1E1E),
-                                          height: 1.48,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: item.content.asMap().entries.map((entry) {
-                              final isLast = entry.key == item.content.length - 1;
-                              return Padding(
-                                padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
-                                child: Text(
-                                  entry.value,
-                                  style: const TextStyle(
-                                    fontSize: 13.5,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF1E1E1E),
-                                    height: 1.5,
-                                    letterSpacing: -0.1,
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
+                                  );
+                                }).toList(),
+                              ),
+                      ],
+                    ),
                   ),
                   crossFadeState: isExpanded
                       ? CrossFadeState.showSecond
