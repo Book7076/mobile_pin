@@ -34,7 +34,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Stack(
       children: [
         if (user == null)
-          const Center(child: Text('Not logged in'))
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.storefront_rounded, size: 64, color: Color(0xFF7C1431)),
+                const SizedBox(height: 12),
+                const Text(
+                  'แดชบอร์ดร้านค้า (ฝั่ง Owner)',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1E1E1E)),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const OwnerDashboardScreen(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF7C1431),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  icon: const Icon(Icons.dashboard_rounded),
+                  label: const Text(
+                    'เปิดแดชบอร์ดร้านค้า (Owner Dashboard)',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+          )
         else
           StreamBuilder<List<Map<String, dynamic>>>(
             stream: supabase
@@ -150,6 +183,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         title: const Text('Food Tinder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFFFF5252),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.storefront_rounded, color: Colors.white),
+            tooltip: 'แดชบอร์ดเจ้าของร้าน (Owner)',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const OwnerDashboardScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () async {
