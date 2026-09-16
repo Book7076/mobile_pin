@@ -90,3 +90,29 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- 4. Create a table for Reviews
+CREATE TABLE IF NOT EXISTS public.reviews (
+  id uuid default gen_random_uuid() primary key,
+  restaurant_id uuid references public.restaurants(id) on delete cascade,
+  user_id uuid references public.users(id),
+  user_name text not null,
+  user_avatar text,
+  rating integer not null check (rating >= 1 and rating <= 5),
+  comment text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Turn on Row Level Security (RLS) for reviews table
+ALTER TABLE public.reviews ENABLE ROW LEVEL SECURITY;
+
+-- Allow anyone to read reviews
+CREATE POLICY "Anyone can view reviews" 
+ON public.reviews FOR SELECT 
+USING (true);
+
+-- Allow authenticated users to insert reviews
+CREATE POLICY "Users can insert reviews" 
+ON public.reviews FOR INSERT 
+WITH CHECK (auth.uid() = user_id);
+

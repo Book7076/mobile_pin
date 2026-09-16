@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../main.dart';
 import '../auth/login_screen.dart';
 import '../restaurants/create_restaurant_screen.dart';
+import '../owner/owner_dashboard_screen.dart';
 import 'discover_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -51,7 +52,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               
               final restaurants = snapshot.data ?? [];
               if (restaurants.isEmpty) {
-                return const Center(child: Text('You have not opened any restaurants yet.'));
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('You have not opened any restaurants yet.'),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const OwnerDashboardScreen(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF7C1431),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.dashboard_rounded),
+                        label: const Text('ดูตัวอย่างหน้าแดชบอร์ด (Owner Dashboard)'),
+                      ),
+                    ],
+                  ),
+                );
               }
 
               return ListView.builder(
@@ -67,9 +93,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                   return Card(
                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     child: ListTile(
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => OwnerDashboardScreen(
+                              restaurantName: restaurant['name'] ?? 'The CHICKEN',
+                            ),
+                          ),
+                        );
+                      },
                       title: Text(restaurant['name'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(restaurant['address']),
+                      subtitle: Text(restaurant['address'] ?? ''),
                       trailing: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
