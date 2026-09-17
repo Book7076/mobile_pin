@@ -4,6 +4,11 @@ import '../../main.dart';
 import '../home/home_screen.dart';
 import 'edit_facilities_screen.dart';
 import 'add_menu_screen.dart';
+import 'owner_dashboard_screen.dart';
+import 'edit_shop_photo_screen.dart';
+import 'edit_shop_info_screen.dart';
+import 'edit_address_screen.dart';
+import 'edit_opening_hours_screen.dart';
 
 class ShopDetailsScreen extends StatefulWidget {
   final Map<String, dynamic>? shopData;
@@ -31,6 +36,9 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
   late String _phone;
   late String _email;
   late String _mapUrl;
+  double _lat = 18.7883;
+  double _lng = 98.9853;
+  String? _imageUrl;
 
   late Map<String, String> _openingHours;
   late List<String> _facilities;
@@ -83,18 +91,29 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
           ? data['mapUrl'].toString()
           : 'www.googlemap.com';
 
+      if (data['lat'] != null) {
+        _lat = (data['lat'] is num)
+            ? (data['lat'] as num).toDouble()
+            : (double.tryParse(data['lat'].toString()) ?? 18.7883);
+      }
+      if (data['lng'] != null) {
+        _lng = (data['lng'] is num)
+            ? (data['lng'] as num).toDouble()
+            : (double.tryParse(data['lng'].toString()) ?? 98.9853);
+      }
+
       // 3. Opening Hours
       if (data['openingHours'] is Map<String, String>) {
         _openingHours = Map<String, String>.from(data['openingHours']);
       } else {
         _openingHours = {
-          'อาทิตย์': '09.00 - 23.00',
-          'จันทร์': 'หยุดทำการ',
-          'อังคาร': '10.00 - 22.00',
-          'พุธ': '10.00 - 22.00',
-          'พฤหัสบดี': '10.00 - 22.00',
-          'ศุกร์': '10.00 - 22.00',
-          'เสาร์': '09.00 - 23.00',
+          'จันทร์': '09:00 - 23:00',
+          'อังคาร': '10:00 - 22:00',
+          'พุธ': '10:00 - 22:00',
+          'พฤหัสบดี': '10:00 - 22:00',
+          'ศุกร์': '10:00 - 22:00',
+          'เสาร์': '09:00 - 23:00',
+          'อาทิตย์': 'ปิดร้าน',
         };
       }
 
@@ -107,7 +126,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
           'มีอินเทอร์เน็ต',
           'มีห้องน้ำ',
           'เครื่องปรับอากาศ',
-          'เหมาะกับกลุ่ม',
+          'เหมาะสำหรับกลุ่ม',
         ];
       }
 
@@ -133,6 +152,13 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         _isSubmitted = data['isSubmitted'] == true || _menus.isNotEmpty;
       }
 
+      // 7. Image URL initialization
+      if (data.containsKey('imageUrl')) {
+        _imageUrl = data['imageUrl']?.toString();
+      } else {
+        _imageUrl = 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=500';
+      }
+
       _isInitialized = true;
     }
   }
@@ -142,290 +168,89 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     if (facility.contains('เน็ต') || facility.contains('wifi') || facility.contains('Wifi')) return Icons.wifi;
     if (facility.contains('ห้องน้ำ')) return Icons.wc;
     if (facility.contains('ปรับอากาศ') || facility.contains('แอร์')) return Icons.ac_unit;
-    if (facility.contains('กลุ่ม')) return Icons.people_alt_outlined;
-    if (facility.contains('จอดรถ')) return Icons.local_parking;
-    if (facility.contains('ส่งอาหาร')) return Icons.delivery_dining;
+    if (facility.contains('กลุ่ม')) return Icons.groups_outlined;
+    if (facility.contains('รถยนต์') || facility.contains('จอดรถ')) return Icons.directions_car;
+    if (facility.contains('จักรยานยนต์') || facility.contains('มอเตอร์')) return Icons.two_wheeler;
+    if (facility.contains('บัตรเครดิต')) return Icons.credit_card;
+    if (facility.contains('บัตรสวัสดิการ')) return Icons.card_membership;
+    if (facility.contains('เดลิเวอรี่') || facility.contains('ส่งอาหาร')) return Icons.delivery_dining;
+    if (facility.contains('เด็ก') && !facility.contains('เล่น')) return Icons.child_care;
+    if (facility.contains('สนามเด็กเล่น')) return Icons.toys;
+    if (facility.contains('Pet') || facility.contains('สัตว์')) return Icons.pets;
+    if (facility.contains('เพลง') || facility.contains('ดนตรี')) return Icons.music_note;
+    if (facility.contains('พิการ')) return Icons.accessible;
+    if (facility.contains('ถ่ายรูป')) return Icons.camera_alt;
     if (facility.contains('บัตร') || facility.contains('สแกน')) return Icons.payment;
     if (facility.contains('จอง')) return Icons.book_online;
-    if (facility.contains('ดนตรี')) return Icons.music_note;
     return Icons.check_circle_outline;
   }
 
-  // Edit Shop Name & Category Dialog
-  void _showEditShopInfoDialog() {
-    final nameCtrl = TextEditingController(text: _name);
-    final catCtrl = TextEditingController(text: _category);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text(
-          'แก้ไขข้อมูลร้าน',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+  // Open EditShopInfoScreen
+  Future<void> _openEditShopInfoScreen() async {
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => EditShopInfoScreen(
+          initialName: _name,
+          initialCategory: _category,
+          shopCode: _shopCode,
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'ชื่อร้าน',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: catCtrl,
-              decoration: const InputDecoration(
-                labelText: 'ประเภทอาหาร',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: maroonColor),
-            onPressed: () {
-              if (nameCtrl.text.trim().isNotEmpty) {
-                setState(() {
-                  _name = nameCtrl.text.trim();
-                  _category = catCtrl.text.trim();
-                });
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('บันทึก', style: TextStyle(color: Colors.white)),
-          ),
-        ],
       ),
     );
+
+    if (result != null && result['updated'] == true) {
+      setState(() {
+        _name = result['name'] as String;
+        _category = result['category'] as String;
+      });
+    }
   }
 
-  // Edit Address Dialog
-  void _showEditAddressDialog() {
-    final addressCtrl = TextEditingController(text: _address);
-    final mapCtrl = TextEditingController(text: _mapUrl);
-    final phoneCtrl = TextEditingController(text: _phone);
-    final emailCtrl = TextEditingController(text: _email);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'แก้ไขที่อยู่และการติดต่อ',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: addressCtrl,
-              decoration: const InputDecoration(
-                labelText: 'ที่อยู่ร้านอาหาร',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: mapCtrl,
-              decoration: const InputDecoration(
-                labelText: 'ลิงก์แผนที่ (Google Maps)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: phoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'เบอร์โทรศัพท์',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'อีเมล',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: maroonColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () {
-                  setState(() {
-                    _address = addressCtrl.text.trim();
-                    _mapUrl = mapCtrl.text.trim();
-                    _phone = phoneCtrl.text.trim();
-                    _email = emailCtrl.text.trim();
-                  });
-                  Navigator.pop(ctx);
-                },
-                child: const Text(
-                  'บันทึก',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-              ),
-            ),
-          ],
+  // Open EditAddressScreen
+  Future<void> _openEditAddressScreen() async {
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => EditAddressScreen(
+          initialAddress: _address,
+          initialMapUrl: _mapUrl,
+          initialPhone: _phone,
+          initialEmail: _email,
+          initialLat: _lat,
+          initialLng: _lng,
         ),
       ),
     );
+
+    if (result != null && result['updated'] == true) {
+      setState(() {
+        _address = result['address'] as String;
+        _mapUrl = result['mapUrl'] as String;
+        _phone = result['phone'] as String;
+        _email = result['email'] as String;
+        if (result['lat'] != null) {
+          _lat = (result['lat'] as num).toDouble();
+        }
+        if (result['lng'] != null) {
+          _lng = (result['lng'] as num).toDouble();
+        }
+      });
+    }
   }
 
-  // Edit Opening Hours Dialog
-  void _showEditHoursDialog() {
-    final days = _openingHours.keys.toList();
-    String selectedDay = days.first;
-    final timeCtrl = TextEditingController(text: _openingHours[selectedDay]);
-    bool isClosed = _openingHours[selectedDay] == 'หยุดทำการ';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 20,
-              right: 20,
-              top: 20,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'แก้ไขเวลาเปิด - ปิดร้าน',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(ctx),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: selectedDay,
-                  decoration: const InputDecoration(
-                    labelText: 'เลือกวัน',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: days.map((day) {
-                    return DropdownMenuItem(value: day, child: Text(day));
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setModalState(() {
-                        selectedDay = val;
-                        isClosed = _openingHours[val] == 'หยุดทำการ';
-                        timeCtrl.text = _openingHours[val] ?? '10.00 - 22.00';
-                      });
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('หยุดทำการในวันนี้'),
-                  value: isClosed,
-                  activeColor: maroonColor,
-                  onChanged: (val) {
-                    setModalState(() {
-                      isClosed = val;
-                      if (isClosed) {
-                        timeCtrl.text = 'หยุดทำการ';
-                      } else {
-                        timeCtrl.text = '10.00 - 22.00';
-                      }
-                    });
-                  },
-                ),
-                if (!isClosed) ...[
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: timeCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'เวลาเปิด - ปิด (เช่น 09.00 - 23.00)',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: maroonColor,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _openingHours[selectedDay] = isClosed ? 'หยุดทำการ' : timeCtrl.text.trim();
-                      });
-                      Navigator.pop(ctx);
-                    },
-                    child: const Text(
-                      'บันทึก',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+  // Open separate EditOpeningHoursScreen
+  Future<void> _openEditHoursScreen() async {
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => EditOpeningHoursScreen(
+          initialOpeningHours: _openingHours,
+        ),
       ),
     );
+
+    if (result != null && result['updated'] == true) {
+      setState(() {
+        _openingHours = Map<String, String>.from(result['openingHours']);
+      });
+    }
   }
 
   // Open separate EditFacilitiesScreen
@@ -439,6 +264,46 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     if (updated != null) {
       setState(() {
         _facilities = updated;
+      });
+    }
+  }
+
+  // Helper to package the current shop data map
+  Map<String, dynamic> _getCurrentShopData() {
+    return {
+      'id': _restaurantId,
+      'shopCode': _shopCode,
+      'name': _name,
+      'category': _category,
+      'address': _address,
+      'phone': _phone,
+      'email': _email,
+      'mapUrl': _mapUrl,
+      'lat': _lat,
+      'lng': _lng,
+      'openingHours': _openingHours,
+      'facilities': _facilities,
+      'menus': _menus,
+      'status': _status,
+      'isSubmitted': _isSubmitted,
+      'rejectionReason': _rejectionReason,
+      'imageUrl': _imageUrl,
+    };
+  }
+
+  // Open EditShopPhotoScreen
+  Future<void> _openEditPhotoScreen() async {
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => EditShopPhotoScreen(
+          currentImageUrl: _imageUrl,
+        ),
+      ),
+    );
+
+    if (result != null && result['updated'] == true) {
+      setState(() {
+        _imageUrl = result['imageUrl'] as String?;
       });
     }
   }
@@ -518,18 +383,22 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
             'phone': _phone,
             'email': _email,
             'menu': _menus.isNotEmpty ? _menus.map((m) => m['name']).join(', ') : null,
-            'lat': 18.7883, // default Chiang Mai lat/lng
-            'lng': 98.9853,
+            'lat': _lat,
+            'lng': _lng,
             'status': _status,
           }).select().single();
           _restaurantId = res['id']?.toString();
         } catch (_) {}
       }
 
-      // Navigate back to Shop Owner Dashboard (HomeScreen)
+      // Navigate to Owner Dashboard
+      final currentShopData = _getCurrentShopData();
+
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(
+            builder: (_) => OwnerDashboardScreen(shopData: currentShopData),
+          ),
           (route) => false,
         );
       }
@@ -958,10 +827,10 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
     final headerTitle = _isSubmitted ? 'ข้อมูลร้าน' : 'รายละเอียดร้านอาหาร';
 
     // Button text:
-    // If not submitted: "ถัดไป"
+    // If not submitted: "ต่อไป"
     // If submitted and rejected: "แก้ไขข้อมูลและส่งคำขอใหม่"
     // If submitted and pending/approved: "ตกลง"
-    String buttonText = 'ถัดไป';
+    String buttonText = 'ต่อไป';
     if (_isSubmitted) {
       if (_status == 'rejected') {
         buttonText = 'แก้ไขข้อมูลและส่งคำขอใหม่';
@@ -986,7 +855,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(_getCurrentShopData()),
         ),
       ),
       body: SafeArea(
@@ -1003,58 +872,41 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Shop Avatar with Camera Badge
-                        Stack(
-                          alignment: Alignment.bottomCenter,
-                          clipBehavior: Clip.none,
-                          children: [
-                            Container(
-                              width: 86,
-                              height: 86,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFFFF1F2),
-                                border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
-                              ),
-                              child: ClipOval(
-                                child: Image.network(
-                                  'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=300',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Text(
-                                            'THE',
-                                            style: TextStyle(
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.black54,
-                                            ),
-                                          ),
-                                          Text(
-                                            _name.toUpperCase(),
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              color: maroonColor,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
+                        // Shop Avatar with Camera Badge (Tapping opens EditShopPhotoScreen)
+                        GestureDetector(
+                          onTap: _openEditPhotoScreen,
+                          child: Stack(
+                            alignment: Alignment.bottomCenter,
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 86,
+                                height: 86,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFFFFF1F2),
+                                  border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                                ),
+                                child: ClipOval(
+                                  child: (_imageUrl != null && _imageUrl!.trim().isNotEmpty)
+                                      ? Image.network(
+                                          _imageUrl!,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return const CustomPaint(
+                                              size: Size(86, 86),
+                                              painter: AvatarPlaceholderPainter(),
+                                            );
+                                          },
+                                        )
+                                      : const CustomPaint(
+                                          size: Size(86, 86),
+                                          painter: AvatarPlaceholderPainter(),
+                                        ),
                                 ),
                               ),
-                            ),
-                            Positioned(
-                              bottom: -4,
-                              child: GestureDetector(
-                                onTap: _showEditShopInfoDialog,
+                              Positioned(
+                                bottom: -4,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                                   decoration: BoxDecoration(
@@ -1078,8 +930,8 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         const SizedBox(width: 20),
 
@@ -1103,7 +955,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                                   ),
                                   const SizedBox(width: 6),
                                   GestureDetector(
-                                    onTap: _showEditShopInfoDialog,
+                                    onTap: _openEditShopInfoScreen,
                                     child: Container(
                                       padding: const EdgeInsets.all(3),
                                       decoration: BoxDecoration(
@@ -1157,7 +1009,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: _showEditAddressDialog,
+                          onTap: _openEditAddressScreen,
                           child: const Text(
                             'แก้ไข',
                             style: TextStyle(
@@ -1266,7 +1118,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: _showEditHoursDialog,
+                          onTap: _openEditHoursScreen,
                           child: const Text(
                             'แก้ไข',
                             style: TextStyle(
@@ -1280,31 +1132,57 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Opening Hours Table
-                    ..._openingHours.entries.map((entry) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3.0),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              entry.key,
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                color: Color(0xFF4A4A4A),
+                    // Opening Hours Table (Aligned Two-Column Layout)
+                    ...(() {
+                      const orderedDays = [
+                        'จันทร์',
+                        'อังคาร',
+                        'พุธ',
+                        'พฤหัสบดี',
+                        'ศุกร์',
+                        'เสาร์',
+                        'อาทิตย์',
+                      ];
+                      final displayEntries = _openingHours.keys.any((k) => orderedDays.contains(k))
+                          ? orderedDays
+                              .where((d) => _openingHours.containsKey(d))
+                              .map((d) => MapEntry(d, _openingHours[d]!))
+                              .toList()
+                          : _openingHours.entries.toList();
+
+                      return displayEntries.map((entry) {
+                        final isClosed = entry.value == 'ปิดร้าน' || entry.value == 'หยุดทำการ';
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3.5),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 85,
+                                child: Text(
+                                  entry.key,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    color: Color(0xFF4A4A4A),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
                               ),
-                            ),
-                            Text(
-                              entry.value,
-                              style: const TextStyle(
-                                fontSize: 13.5,
-                                color: Color(0xFF4A4A4A),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  entry.value,
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    color: isClosed ? const Color(0xFFE11D48) : const Color(0xFF4A4A4A),
+                                    fontWeight: isClosed ? FontWeight.w600 : FontWeight.w500,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
+                            ],
+                          ),
+                        );
+                      });
+                    })(),
 
                     const Divider(color: Color(0xFFECECEC), thickness: 1, height: 32),
 
@@ -1335,35 +1213,62 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                     ),
                     const SizedBox(height: 10),
 
-                    // Facilities List
+                    // Facilities List (Ordered by standard 16-item list)
                     if (_facilities.isEmpty)
                       const Text(
                         'ไม่มีข้อมูลสิ่งอำนวยความสะดวก (กดแก้ไขเพื่อเพิ่ม)',
                         style: TextStyle(fontSize: 13, color: Colors.grey),
                       )
                     else
-                      ..._facilities.map((fac) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4.0),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _getIconForFacility(fac),
-                                color: maroonColor,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                fac,
-                                style: const TextStyle(
-                                  fontSize: 13.5,
-                                  color: Color(0xFF4A4A4A),
+                      ...(() {
+                        const standardOrder = [
+                          'มีปลั๊กไฟ',
+                          'มีอินเทอร์เน็ต',
+                          'ที่จอดรถยนต์',
+                          'รถจักรยานยนต์',
+                          'รับบัตรเครดิต',
+                          'เดลิเวอรี่',
+                          'เครื่องปรับอากาศ',
+                          'มีห้องน้ำ',
+                          'เหมาะสำหรับกลุ่ม',
+                          'เหมาะกับเด็ก',
+                          'Pet Friendly',
+                          'รับบัตรสวัสดิการ',
+                          'เพลงเพราะ',
+                          'พื้นที่สนามเด็กเล่น',
+                          'เหมาะกับผู้พิการ',
+                          'มุมถ่ายรูป',
+                        ];
+                        final displayList = standardOrder.where((f) => _facilities.contains(f)).toList();
+                        for (final f in _facilities) {
+                          if (!displayList.contains(f)) {
+                            displayList.add(f);
+                          }
+                        }
+
+                        return displayList.map((fac) {
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _getIconForFacility(fac),
+                                  color: maroonColor,
+                                  size: 18,
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
+                                const SizedBox(width: 12),
+                                Text(
+                                  fac,
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    color: Color(0xFF4A4A4A),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        });
+                      })(),
 
                     // --- 5. สถานะร้านค้า (Shown in "ข้อมูลร้าน" with 3 distinct visual states) ---
                     if (_isSubmitted) ...[
@@ -1411,8 +1316,11 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                     const SizedBox(height: 8),
                     TextButton(
                       onPressed: () {
+                        final currentShopData = _getCurrentShopData();
                         Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const HomeScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => OwnerDashboardScreen(shopData: currentShopData),
+                          ),
                           (route) => false,
                         );
                       },

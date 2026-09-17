@@ -6,14 +6,21 @@ import '../restaurants/create_restaurant_screen.dart';
 import 'discover_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({super.key});
+  final int initialIndex;
+  const HomeScreen({super.key, this.initialIndex = 0});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _currentIndex = 0;
+  late int _currentIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+  }
 
   Widget _buildBody() {
     switch (_currentIndex) {
@@ -22,10 +29,65 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       case 1:
         return _buildMyRestaurants();
       case 2:
-        return const Center(child: Text('Profile Settings'));
+        return _buildProfileTab();
       default:
         return const SizedBox();
     }
+  }
+
+  Widget _buildProfileTab() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.account_circle,
+              size: 90,
+              color: Color(0xFF670E14),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'โปรไฟล์ของฉัน',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'จัดการข้อมูลส่วนตัวและเปิดร้านค้าของคุณ',
+              style: TextStyle(fontSize: 14, color: Colors.black54),
+            ),
+            const SizedBox(height: 28),
+            ElevatedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pushNamed('/shop-registration');
+              },
+              icon: const Icon(Icons.storefront, color: Colors.white),
+              label: const Text(
+                'เปิดร้านของฉัน',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF670E14),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                elevation: 2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildMyRestaurants() {
