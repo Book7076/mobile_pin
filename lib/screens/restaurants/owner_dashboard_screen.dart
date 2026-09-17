@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../home/home_screen.dart';
 import 'shop_details_screen.dart';
 import 'edit_shop_photo_screen.dart';
+import 'menu_management_screen.dart';
 
 class OwnerDashboardScreen extends StatefulWidget {
   final Map<String, dynamic>? shopData;
@@ -181,7 +182,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       ),
                       const SizedBox(width: 14),
 
-                      // 2. เมนูอาหาร (Menu Management Placeholder)
+                      // 2. เมนูอาหาร (Menu Management Screen)
                       Expanded(
                         child: _buildMenuCard(
                           title: 'เมนูอาหาร',
@@ -190,7 +191,24 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             color: maroonColor,
                             size: 38,
                           ),
-                          onTap: () => _navigateTo('เมนูอาหาร', namedRoute: '/menu-management'),
+                          onTap: () async {
+                            final initialMenus = (_shopData['menus'] as List?)
+                                ?.map((e) => Map<String, dynamic>.from(e as Map))
+                                .toList();
+                            final updatedMenus = await Navigator.of(context).push<List<Map<String, dynamic>>>(
+                              MaterialPageRoute(
+                                builder: (_) => MenuManagementScreen(
+                                  shopData: _shopData,
+                                  initialMenus: initialMenus,
+                                ),
+                              ),
+                            );
+                            if (updatedMenus != null) {
+                              setState(() {
+                                _shopData['menus'] = updatedMenus;
+                              });
+                            }
+                          },
                         ),
                       ),
                       const SizedBox(width: 14),

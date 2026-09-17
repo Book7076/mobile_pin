@@ -8,6 +8,7 @@ import 'screens/restaurants/shop_registration_screen.dart';
 import 'screens/restaurants/shop_details_screen.dart';
 import 'screens/restaurants/add_menu_screen.dart';
 import 'screens/restaurants/owner_dashboard_screen.dart';
+import 'screens/restaurants/menu_management_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,7 +53,7 @@ class MyApp extends StatelessWidget {
         '/add-menu': (context) => const AddMenuScreen(),
         '/owner-dashboard': (context) => const OwnerDashboardScreen(),
         '/owner-statistics': (context) => const OwnerPlaceholderScreen(title: 'สถิติ'),
-        '/menu-management': (context) => const OwnerPlaceholderScreen(title: 'เมนูอาหาร'),
+        '/menu-management': (context) => const MenuManagementScreen(),
         '/owner-messages': (context) => const OwnerPlaceholderScreen(title: 'ข้อความ'),
         '/owner-reviews': (context) => const OwnerPlaceholderScreen(title: 'รีวิว'),
         '/owner-support': (context) => const OwnerPlaceholderScreen(title: 'ศูนย์ช่วยเหลือติดต่อฝ่ายบริการลูกค้า'),

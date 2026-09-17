@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'edit_menu_photo_screen.dart';
 
 class AddMenuScreen extends StatefulWidget {
   final Map<String, dynamic>? shopData;
+  final Map<String, dynamic>? initialMenu;
+  final bool isEditing;
 
   const AddMenuScreen({
     super.key,
     this.shopData,
+    this.initialMenu,
+    this.isEditing = false,
   });
 
   @override
@@ -13,18 +18,20 @@ class AddMenuScreen extends StatefulWidget {
 }
 
 class _AddMenuScreenState extends State<AddMenuScreen> {
-  static const Color maroonColor = Color(0xFF82152B);
+  static const Color maroonColor = Color(0xFF7A1428);
+  static const Color cardBorderColor = Color(0xFFE5E7EB);
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descController = TextEditingController();
-  final TextEditingController _priceController = TextEditingController(text: '45');
+  final TextEditingController _priceController = TextEditingController(text: '79');
   final TextEditingController _customCategoryController = TextEditingController();
 
   String _selectedCategory = 'อาหารจานเดียว';
-  String _selectedImageUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300';
+  String? _selectedImageUrl;
   bool _isRecommended = false;
   bool _isHidden = false;
+  bool _isCategoryExpanded = true;
 
   final List<String> _categories = [
     'อาหารจานเดียว',
@@ -34,13 +41,34 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
     'อื่นๆ',
   ];
 
-  final List<Map<String, String>> _sampleImages = [
-    {'name': 'สลัด/อาหารจานเดียว', 'url': 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'},
-    {'name': 'ไก่ทอด', 'url': 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=300'},
-    {'name': 'ต้มยำ/ซุป', 'url': 'https://images.unsplash.com/photo-1548946526-f69e2424cf45?w=300'},
-    {'name': 'ของหวาน/เค้ก', 'url': 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=300'},
-    {'name': 'เครื่องดื่ม/กาแฟ', 'url': 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=300'},
-  ];
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialMenu != null) {
+      _nameController.text = widget.initialMenu!['name']?.toString() ?? '';
+      _descController.text = widget.initialMenu!['description']?.toString() ?? '';
+      final p = widget.initialMenu!['price'];
+      if (p != null) {
+        _priceController.text = (p is num) ? p.toInt().toString() : p.toString();
+      }
+      _selectedImageUrl = widget.initialMenu!['imageUrl']?.toString();
+      _isRecommended = widget.initialMenu!['isRecommended'] == true;
+      _isHidden = widget.initialMenu!['isHidden'] == true;
+      final cat = widget.initialMenu!['category']?.toString() ?? 'อาหารจานเดียว';
+      if (_categories.contains(cat)) {
+        _selectedCategory = cat;
+      } else {
+        _selectedCategory = 'อื่นๆ';
+        _customCategoryController.text = cat;
+      }
+    } else {
+      // Default for new menu
+      _selectedImageUrl = null;
+      _priceController.text = '';
+      _isRecommended = false;
+      _isHidden = false;
+    }
+  }
 
   @override
   void dispose() {
@@ -51,117 +79,83 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
     super.dispose();
   }
 
-  void _showImagePickerSheet() {
-    final urlController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 20,
-          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+  // Navigate to Edit Menu Photo Screen matching Reference media_3
+  Future<void> _openEditPhotoScreen() async {
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
+      MaterialPageRoute(
+        builder: (_) => EditMenuPhotoScreen(
+          currentImageUrl: _selectedImageUrl,
+          isEditing: widget.isEditing,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'เลือกรูปอาหาร',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+    );
+
+    if (result != null && result['saved'] == true) {
+      setState(() {
+        _selectedImageUrl = result['imageUrl'] as String?;
+      });
+    }
+  }
+
+  // Dialog to enter / edit price (digits only, > 0)
+  void _showPriceDialog() {
+    final controller = TextEditingController(text: _priceController.text);
+    String? errorText;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text(
+            'ระบุราคาอาหาร (บาท)',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Colors.black87),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: 'ราคา (บาท)',
+                  suffixText: 'บาท',
+                  errorText: errorText,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: const BorderSide(color: maroonColor, width: 1.5),
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'เลือกจากภาพตัวอย่าง:',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              height: 80,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: _sampleImages.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  final item = _sampleImages[index];
-                  final isCurrent = _selectedImageUrl == item['url'];
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedImageUrl = item['url']!;
-                      });
-                      Navigator.pop(ctx);
-                    },
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isCurrent ? maroonColor : Colors.grey.shade300,
-                          width: isCurrent ? 2.5 : 1,
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Image.network(
-                          item['url']!,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  );
-                },
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('ยกเลิก', style: TextStyle(color: Colors.black54)),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'หรือใส่ลิงก์รูปภาพ (URL):',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.black87),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: urlController,
-              decoration: InputDecoration(
-                hintText: 'https://example.com/food.jpg',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: maroonColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              height: 44,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: maroonColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                onPressed: () {
-                  if (urlController.text.trim().isNotEmpty) {
-                    setState(() {
-                      _selectedImageUrl = urlController.text.trim();
-                    });
-                  }
-                  Navigator.pop(ctx);
-                },
-                child: const Text('ใช้รูปนี้', style: TextStyle(color: Colors.white)),
-              ),
+              onPressed: () {
+                final text = controller.text.trim();
+                final val = double.tryParse(text);
+                if (val == null || val <= 0) {
+                  setDialogState(() {
+                    errorText = 'ราคาต้องมากกว่า 0 บาท';
+                  });
+                  return;
+                }
+                setState(() {
+                  _priceController.text = (val % 1 == 0) ? val.toInt().toString() : val.toString();
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text('ตกลง', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -169,60 +163,89 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
     );
   }
 
-  void _showPriceDialog() {
-    final controller = TextEditingController(text: _priceController.text);
-    showDialog(
+  // Delete menu confirmation dialog from Edit Menu screen
+  Future<void> _confirmDeleteMenu() async {
+    final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ระบุราคาอาหาร (บาท)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'ราคา',
-            suffixText: '฿',
-            border: OutlineInputBorder(),
-          ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'ต้องการลบเมนูนี้หรือไม่?',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
         ),
+        content: Text(
+          'ต้องการลบเมนู "${_nameController.text.trim()}" ออกจากร้านของคุณหรือไม่? เมื่อลบแล้วจะไม่สามารถกู้คืนได้',
+          style: const TextStyle(fontSize: 14, color: Colors.black54),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text(
+              'ยกเลิก',
+              style: TextStyle(color: Colors.black87, fontSize: 15, fontWeight: FontWeight.w500),
+            ),
+          ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: maroonColor),
-            onPressed: () {
-              setState(() {
-                _priceController.text = controller.text.trim();
-              });
-              Navigator.pop(ctx);
-            },
-            child: const Text('ตกลง', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: maroonColor,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text(
+              'ลบ',
+              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
     );
+
+    if (confirmed == true) {
+      Navigator.of(context).pop({
+        'deleted': true,
+        'id': widget.initialMenu?['id'],
+      });
+    }
   }
 
+  // Save Menu (Commit temporary state)
   void _saveMenu() {
-    if (_formKey.currentState!.validate()) {
-      final name = _nameController.text.trim();
-      final price = double.tryParse(_priceController.text.trim()) ?? 0.0;
-      final desc = _descController.text.trim();
-      final category = _selectedCategory == 'อื่นๆ'
-          ? (_customCategoryController.text.trim().isNotEmpty ? _customCategoryController.text.trim() : 'อื่นๆ')
-          : _selectedCategory;
-
-      final newMenu = {
-        'id': 'menu_${DateTime.now().millisecondsSinceEpoch}',
-        'name': name,
-        'price': price,
-        'description': desc,
-        'category': category,
-        'imageUrl': _selectedImageUrl,
-        'isRecommended': _isRecommended,
-        'isHidden': _isHidden,
-      };
-
-      Navigator.of(context).pop(newMenu);
+    if (!_formKey.currentState!.validate()) {
+      return;
     }
+
+    final price = double.tryParse(_priceController.text.trim());
+    if (price == null || price <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาระบุราคาอาหารที่มากกว่า 0 บาท'),
+          backgroundColor: maroonColor,
+        ),
+      );
+      _showPriceDialog();
+      return;
+    }
+
+    final name = _nameController.text.trim();
+    final desc = _descController.text.trim();
+    final category = _selectedCategory == 'อื่นๆ'
+        ? (_customCategoryController.text.trim().isNotEmpty ? _customCategoryController.text.trim() : 'อื่นๆ')
+        : _selectedCategory;
+
+    final menu = {
+      'id': widget.initialMenu?['id'] ?? 'menu_${DateTime.now().millisecondsSinceEpoch}',
+      'name': name,
+      'price': price,
+      'description': desc,
+      'category': category,
+      'imageUrl': _selectedImageUrl,
+      'isRecommended': _isRecommended,
+      'isHidden': _isHidden,
+    };
+
+    Navigator.of(context).pop(menu);
   }
 
   Widget _buildToggle({
@@ -238,14 +261,14 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
             onTap: () => onChanged(!value),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 44,
+              width: 46,
               height: 24,
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 3),
               decoration: BoxDecoration(
                 color: value ? maroonColor : Colors.white,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: value ? maroonColor : const Color(0xFF6B1D2F),
+                  color: maroonColor,
                   width: 2,
                 ),
               ),
@@ -256,7 +279,7 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
                   height: 16,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: value ? Colors.white : const Color(0xFF6B1D2F),
+                    color: value ? Colors.white : maroonColor,
                   ),
                 ),
               ),
@@ -278,23 +301,35 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final String pageTitle = widget.isEditing ? 'แก้ไขเมนูอาหาร' : 'เพิ่มเมนูอาหาร';
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text(
-          'เพิ่มเมนูอาหาร',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
         backgroundColor: maroonColor,
         elevation: 0,
-        centerTitle: false,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 19),
-          onPressed: () => Navigator.of(context).pop(),
+        automaticallyImplyLeading: false,
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 20,
+              ),
+              onPressed: () => Navigator.of(context).pop(), // Discard temporary state
+            ),
+            Text(
+              pageTitle,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -308,76 +343,91 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
               ),
             ),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top: Image Upload Circle + Price Box
+                // --- 1. Food Photo + Price Row (matching Reference media_1 & media_2) ---
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Circle Food Image with Camera Badge
+                    // Circular Food Image with overlay [📷 แก้ไข] Pill
                     Stack(
+                      clipBehavior: Clip.none,
                       alignment: Alignment.bottomRight,
                       children: [
                         GestureDetector(
-                          onTap: _showImagePickerSheet,
+                          onTap: _openEditPhotoScreen,
                           child: Container(
                             width: 104,
                             height: 104,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: const Color(0xFFE5E7EB),
-                              border: Border.all(color: const Color(0xFFD1D5DB), width: 1.5),
+                              color: const Color(0xFFD9D9D9),
+                              border: Border.all(color: const Color(0xFFE5E7EB), width: 1.5),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.06),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
                             ),
                             child: ClipOval(
-                              child: _selectedImageUrl.isNotEmpty
+                              child: (_selectedImageUrl != null && _selectedImageUrl!.trim().isNotEmpty)
                                   ? Image.network(
-                                      _selectedImageUrl,
+                                      _selectedImageUrl!,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Icon(
-                                        Icons.add,
-                                        size: 40,
-                                        color: maroonColor,
+                                      errorBuilder: (_, __, ___) => const Center(
+                                        child: Icon(Icons.add, size: 40, color: maroonColor),
                                       ),
                                     )
-                                  : const Icon(
-                                      Icons.add,
-                                      size: 40,
-                                      color: maroonColor,
+                                  : const Center(
+                                      child: Icon(Icons.add, size: 40, color: maroonColor),
                                     ),
                             ),
                           ),
                         ),
+
+                        // [📷 แก้ไข] pill badge
                         Positioned(
-                          bottom: 2,
-                          right: 2,
+                          bottom: -2,
+                          right: -4,
                           child: GestureDetector(
-                            onTap: _showImagePickerSheet,
+                            onTap: _openEditPhotoScreen,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.55),
-                                borderRadius: BorderRadius.circular(10),
+                                color: const Color(0xFFFBF1F2),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFF3D5DA), width: 1),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: const [
-                                  Icon(Icons.camera_alt, color: Colors.white, size: 10),
-                                  SizedBox(width: 3),
+                                  Icon(Icons.camera_alt_outlined, color: maroonColor, size: 12),
+                                  SizedBox(width: 4),
                                   Text(
                                     'แก้ไข',
                                     style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 9.5,
-                                      fontWeight: FontWeight.w500,
+                                      color: maroonColor,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 ],
@@ -387,54 +437,71 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(width: 24),
 
-                    // Price Input Box
-                    Row(
+                    const SizedBox(width: 28),
+
+                    // Price Section: "ราคา" + [ 79 บาท ] [ ✏️ ]
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        GestureDetector(
-                          onTap: _showPriceDialog,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE5E7EB),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              _priceController.text.isEmpty
-                                  ? 'ระบุราคา ฿'
-                                  : '${_priceController.text} ฿',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
+                        const Text(
+                          'ราคา',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: _showPriceDialog,
-                          child: Container(
-                            padding: const EdgeInsets.all(5),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: Colors.grey.shade400),
-                              borderRadius: BorderRadius.circular(4),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: _showPriceDialog,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE5E7EB),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  _priceController.text.isEmpty
+                                      ? 'ระบุราคา'
+                                      : '${_priceController.text} บาท',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.edit_note,
-                              size: 18,
-                              color: Colors.black87,
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: _showPriceDialog,
+                              child: Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: const Icon(
+                                  Icons.edit_note,
+                                  size: 19,
+                                  color: Colors.black87,
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
 
-                // ชื่อเมนู
+                const SizedBox(height: 28),
+
+                // --- 2. ชื่อเมนู (Menu Name) ---
                 const Text(
                   'ชื่อเมนู',
                   style: TextStyle(
@@ -446,6 +513,13 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
                 const SizedBox(height: 6),
                 TextFormField(
                   controller: _nameController,
+                  maxLength: 60,
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'กรุณากรอกชื่อเมนูอาหาร';
+                    }
+                    return null;
+                  },
                   decoration: InputDecoration(
                     hintText: 'กรุณากรอกชื่อเมนูอาหาร',
                     hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
@@ -465,12 +539,11 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
                       borderSide: const BorderSide(color: maroonColor, width: 1.5),
                     ),
                   ),
-                  validator: (value) =>
-                      value == null || value.trim().isEmpty ? 'กรุณากรอกชื่อเมนู' : null,
                 ),
-                const SizedBox(height: 18),
 
-                // คำอธิบาย
+                const SizedBox(height: 14),
+
+                // --- 3. คำอธิบาย (Description - Optional, Multiline, Max 200) ---
                 const Text(
                   'คำอธิบาย',
                   style: TextStyle(
@@ -483,8 +556,9 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
                 TextFormField(
                   controller: _descController,
                   maxLines: 4,
+                  maxLength: 200,
                   decoration: InputDecoration(
-                    hintText: 'กรุณากรอกคำอธิบายเกี่ยวกับเมนูอาหารนี้...',
+                    hintText: 'คำอธิบายเมนูอาหาร (ไม่บังคับ)',
                     hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
                     filled: true,
                     fillColor: Colors.white,
@@ -503,85 +577,102 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
 
-                // ประเภท (Dropdown / Selection List)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text(
-                      'ประเภท',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
+                const SizedBox(height: 14),
+
+                // --- 4. ประเภท (Dropdown / Expandable List) ---
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isCategoryExpanded = !_isCategoryExpanded;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'ประเภท',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        Icon(
+                          _isCategoryExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                          color: Colors.black87,
+                          size: 26,
+                        ),
+                      ],
                     ),
-                    Icon(
-                      Icons.keyboard_arrow_down,
-                      color: Colors.black87,
-                      size: 24,
+                  ),
+                ),
+                const Divider(color: Color(0xFFE5E7EB), thickness: 1),
+
+                // Categories list (Expandable)
+                if (_isCategoryExpanded) ...[
+                  const SizedBox(height: 4),
+                  ..._categories.map((cat) {
+                    final isSelected = _selectedCategory == cat;
+                    return InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedCategory = cat;
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                        child: Text(
+                          cat,
+                          style: TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            color: isSelected ? maroonColor : const Color(0xFF374151),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+
+                  if (_selectedCategory == 'อื่นๆ') ...[
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: _customCategoryController,
+                      decoration: InputDecoration(
+                        hintText: 'อื่นๆ โปรดระบุ',
+                        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                        filled: true,
+                        fillColor: Colors.white,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: maroonColor, width: 1.2),
+                        ),
+                      ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 6),
-                const Divider(color: Color(0xFFE5E7EB), thickness: 1),
-                const SizedBox(height: 4),
-
-                // Categories list
-                ..._categories.map((cat) {
-                  final isSelected = _selectedCategory == cat;
-                  return InkWell(
-                    onTap: () {
-                      setState(() {
-                        _selectedCategory = cat;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6.0),
-                      child: Row(
-                        children: [
-                          Icon(
-                            isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-                            size: 18,
-                            color: isSelected ? maroonColor : Colors.grey.shade400,
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            cat,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected ? maroonColor : const Color(0xFF374151),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }),
-
-                if (_selectedCategory == 'อื่นๆ') ...[
-                  const SizedBox(height: 6),
-                  TextFormField(
-                    controller: _customCategoryController,
-                    decoration: InputDecoration(
-                      hintText: 'อื่นๆโปรดระบุ',
-                      hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFD1D5DB)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: maroonColor, width: 1.2),
+                ] else ...[
+                  // When collapsed, show selected category
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+                    child: Text(
+                      _selectedCategory == 'อื่นๆ' && _customCategoryController.text.trim().isNotEmpty
+                          ? _customCategoryController.text.trim()
+                          : _selectedCategory,
+                      style: const TextStyle(
+                        fontSize: 14.5,
+                        color: Colors.black87,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
@@ -591,14 +682,13 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
                 const Divider(color: Color(0xFFE5E7EB), thickness: 1),
                 const SizedBox(height: 12),
 
-                // Toggles: เมนูแนะนำ / ซ่อน
+                // --- 5. Toggles: เมนูแนะนำ / ซ่อน ---
                 _buildToggle(
                   title: 'เมนูแนะนำ',
                   value: _isRecommended,
                   onChanged: (val) {
                     setState(() {
                       _isRecommended = val;
-                      if (val) _isHidden = false;
                     });
                   },
                 ),
@@ -609,11 +699,31 @@ class _AddMenuScreenState extends State<AddMenuScreen> {
                   onChanged: (val) {
                     setState(() {
                       _isHidden = val;
-                      if (val) _isRecommended = false;
                     });
                   },
                 ),
-                const SizedBox(height: 30),
+
+                const SizedBox(height: 28),
+
+                // --- 6. ลบเมนู (Delete Menu Button - Only on Edit Mode) ---
+                if (widget.isEditing) ...[
+                  const Divider(color: Color(0xFFE5E7EB), thickness: 1),
+                  const SizedBox(height: 16),
+                  Center(
+                    child: TextButton(
+                      onPressed: _confirmDeleteMenu,
+                      child: const Text(
+                        'ลบเมนู',
+                        style: TextStyle(
+                          color: maroonColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                ],
               ],
             ),
           ),
