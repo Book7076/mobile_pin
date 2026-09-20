@@ -8,7 +8,9 @@ import '../../core/auth_session_manager.dart';
 import '../home/home_screen.dart';
 import '../admin/admin_dashboard.dart';
 import '../onboarding/onboarding_flow_screen.dart';
-import '../../widgets/social_login_buttons.dart';
+import '../../widgets/meal_mate_logo.dart';
+import '../../widgets/social_login_button.dart';
+import '../admin/admin_login_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -213,7 +215,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     const Color textColor = Color(0xFF202020);
 
     final double screenHeight = MediaQuery.of(context).size.height;
-    final double headerHeight = screenHeight * 0.28;
+    final double headerHeight = screenHeight * 0.32;
 
     return Scaffold(
       backgroundColor: burgundy,
@@ -232,29 +234,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
+                    const MealMateLogo(
+                      size: 65,
+                      textSize: 26,
+                      showText: true,
+                    ),
+                    const SizedBox(height: 6),
                     Text(
                       _isLogin ? 'เข้าสู่ระบบ' : 'สมัครสมาชิก',
                       textAlign: TextAlign.center,
                       style: const TextStyle(
-                        fontSize: 30,
+                        fontSize: 22,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
                         letterSpacing: -0.5,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 4),
                     Text(
                       _isLogin
                           ? 'โปรดลงชื่อเข้าใช้บัญชีที่มีอยู่'
                           : 'กรอกข้อมูลเพื่อสร้างบัญชีผู้ใช้ใหม่',
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 14.5,
+                        fontSize: 13,
                         color: Colors.white.withOpacity(0.85),
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -506,11 +513,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Center(
                         child: GestureDetector(
                           onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterScreen(),
-                              ),
-                            );
+                            setState(() {
+                              _isLogin = !_isLogin;
+                            });
                           },
                           child: RichText(
                             text: TextSpan(
@@ -522,7 +527,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 TextSpan(
                                   text: _isLogin
                                       ? 'ยังไม่มีบัญชีใช่ไหม? '
-                                      : 'มีบัญชีอยู่แล้วใช่ไหม? ',
+                                      : 'มีบัญชีอยู่แล้ว? ',
                                   style: const TextStyle(
                                     color: Color(0xFF7A7578),
                                     fontWeight: FontWeight.w400,
@@ -558,12 +563,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 18),
 
                       // Social Login Buttons (Facebook & Google)
-                      SocialLoginButtons(
-                        isLoading: _isLoading,
-                        onFacebookTap: () =>
-                            _handleSocialSignIn(OAuthProvider.facebook),
-                        onGoogleTap: () =>
-                            _handleSocialSignIn(OAuthProvider.google),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SocialLoginButton.facebook(
+                            onTap: () =>
+                                _handleSocialSignIn(OAuthProvider.facebook),
+                          ),
+                          const SizedBox(width: 24),
+                          SocialLoginButton.google(
+                            onTap: () =>
+                                _handleSocialSignIn(OAuthProvider.google),
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Admin Portal Button
+                      Center(
+                        child: TextButton.icon(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const AdminLoginScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.security_rounded, size: 18, color: burgundy),
+                          label: const Text(
+                            'เข้าสู่ระบบสำหรับแอดมิน (Admin Portal)',
+                            style: TextStyle(
+                              color: burgundy,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                        ),
                       ),
 
                       const SizedBox(height: 16),
