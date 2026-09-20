@@ -11,6 +11,7 @@ class MealMateLogo extends StatefulWidget {
   final Color primaryColor;
   final Color ringColor;
   final Color iconColor;
+  final double? size;
 
   const MealMateLogo({
     super.key,
@@ -22,6 +23,7 @@ class MealMateLogo extends StatefulWidget {
     this.primaryColor = const Color(0xFF70182E),
     this.ringColor = Colors.white,
     this.iconColor = Colors.white,
+    this.size,
   });
 
   @override
@@ -84,6 +86,9 @@ class _MealMateLogoState extends State<MealMateLogo>
 
   @override
   Widget build(BuildContext context) {
+    final effectiveWidth = widget.size != null ? widget.size! * 1.8 : widget.width;
+    final effectiveHeight = widget.size != null ? widget.size! * 1.0 : widget.height;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -92,7 +97,7 @@ class _MealMateLogoState extends State<MealMateLogo>
           animation: _pulseController,
           builder: (context, child) {
             return CustomPaint(
-              size: Size(widget.width, widget.height),
+              size: Size(effectiveWidth, effectiveHeight),
               painter: MealMateLogoPainter(
                 ringColor: widget.ringColor,
                 iconColor: widget.iconColor,

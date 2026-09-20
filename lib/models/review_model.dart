@@ -1,0 +1,58 @@
+﻿class ReviewModel {
+  final String id;
+  final String restaurantId;
+  final String userId;
+  final String userName;
+  final String? userAvatar;
+  final double rating;
+  final String comment;
+  final List<String> imageUrls;
+  final DateTime createdAt;
+
+  ReviewModel({
+    required this.id,
+    required this.restaurantId,
+    required this.userId,
+    required this.userName,
+    this.userAvatar,
+    required this.rating,
+    required this.comment,
+    this.imageUrls = const [],
+    required this.createdAt,
+  });
+
+  factory ReviewModel.fromJson(Map<String, dynamic> json) {
+    List<String> images = [];
+    if (json['image_urls'] != null && json['image_urls'] is List) {
+      images = (json['image_urls'] as List).map((e) => e.toString()).toList();
+    }
+
+    return ReviewModel(
+      id: json['id']?.toString() ?? '',
+      restaurantId: json['restaurant_id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      userName: json['user_name']?.toString() ?? 'ผู้ใช้งาน',
+      userAvatar: json['user_avatar']?.toString(),
+      rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
+      comment: json['comment']?.toString() ?? '',
+      imageUrls: images,
+      createdAt: json['created_at'] != null 
+          ? DateTime.tryParse(json['created_at'].toString()) ?? DateTime.now() 
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'restaurant_id': restaurantId,
+      'user_id': userId,
+      'user_name': userName,
+      'user_avatar': userAvatar,
+      'rating': rating,
+      'comment': comment,
+      'image_urls': imageUrls,
+      'created_at': createdAt.toIso8601String(),
+    };
+  }
+}

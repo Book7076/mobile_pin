@@ -10,6 +10,9 @@ import '../profile/report_problem_screen.dart';
 import '../restaurants/open_restaurant_intro_screen.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 import '../owner/owner_dashboard_screen.dart';
+import '../flow/category_selection_screen.dart';
+import '../flow/food_swipe_screen.dart';
+import '../flow/selected_restaurants_screen.dart';
 import '../../models/favorite_manager.dart';
 import 'discover_screen.dart';
 
@@ -373,12 +376,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: InkWell(
               onTap: () {
                 Navigator.of(context).push(
-                  PageRouteBuilder(
-                    pageBuilder: (context, anim, secAnim) =>
-                        const DiscoverScreen(),
-                    transitionsBuilder: (context, anim, secAnim, child) =>
-                        FadeTransition(opacity: anim, child: child),
-                    transitionDuration: const Duration(milliseconds: 300),
+                  MaterialPageRoute(
+                    builder: (_) => const CategorySelectionScreen(isStandalone: true),
                   ),
                 );
               },

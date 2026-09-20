@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/constants.dart';
 import 'screens/splash_screen.dart';
+import 'screens/flow/category_selection_screen.dart';
 import 'screens/restaurants/shop_registration_screen.dart';
 import 'screens/restaurants/shop_details_screen.dart';
 import 'screens/restaurants/add_menu_screen.dart';
@@ -49,15 +50,16 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF70182E), // MealMate signature wine red
-          primary: const Color(0xFF70182E),
-          secondary: const Color(0xFF9E2A47),
+          seedColor: AppConstants.burgundyPrimary,
+          primary: AppConstants.burgundyPrimary,
+          secondary: AppConstants.burgundyLight,
         ),
         useMaterial3: true,
-        fontFamily: 'Roboto',
+        fontFamily: 'Kanit',
       ),
       home: const SplashScreen(),
       routes: {
+        '/category-selection': (context) => const CategorySelectionScreen(isStandalone: false),
         '/shop-registration': (context) => const ShopRegistrationScreen(),
         '/shop-details': (context) => const ShopDetailsScreen(),
         '/add-menu': (context) => const AddMenuScreen(),
