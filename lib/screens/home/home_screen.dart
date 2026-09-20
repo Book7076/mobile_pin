@@ -9,6 +9,7 @@ import '../profile/help_center_screen.dart';
 import '../profile/report_problem_screen.dart';
 import '../restaurants/open_restaurant_intro_screen.dart';
 import '../restaurants/restaurant_detail_screen.dart';
+import '../owner/owner_dashboard_screen.dart';
 import '../../models/favorite_manager.dart';
 import 'discover_screen.dart';
 
@@ -1124,7 +1125,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 5. เปิดร้านอาหาร
+                  // 5. แดชบอร์ดเจ้าของร้าน
+                  _buildProfileMenuCard(
+                    icon: Icons.dashboard_customize_outlined,
+                    title: 'แดชบอร์ดเจ้าของร้าน (Owner Dashboard)',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const OwnerDashboardScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // 6. เปิดร้านอาหาร
                   _buildProfileMenuCard(
                     icon: Icons.storefront_outlined,
                     title: 'เปิดร้านอาหาร',
