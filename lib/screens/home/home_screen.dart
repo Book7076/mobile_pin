@@ -14,7 +14,12 @@ import 'discover_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final int initialTab;
-  const HomeScreen({super.key, this.initialTab = 0});
+  final int? initialIndex;
+  const HomeScreen({
+    super.key,
+    this.initialTab = 0,
+    this.initialIndex,
+  });
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
@@ -112,7 +117,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _currentTab = widget.initialTab;
+    _currentTab = widget.initialIndex ?? widget.initialTab;
     _searchFocusNode.addListener(() {
       if (mounted) {
         setState(() {
