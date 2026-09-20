@@ -11,7 +11,6 @@ import '../onboarding/onboarding_flow_screen.dart';
 import '../../widgets/meal_mate_logo.dart';
 import '../../widgets/social_login_button.dart';
 import '../admin/admin_login_screen.dart';
-import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -34,12 +33,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
-      final session = data.session;
-      if (session != null && mounted) {
-        _handlePostAuthSuccess();
-      }
-    });
+    try {
+      _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
+        final session = data.session;
+        if (session != null && mounted) {
+          _handlePostAuthSuccess();
+        }
+      });
+    } catch (_) {
+      // Safe fallback when running in tests or offline without initialized Supabase
+    }
 
     // System status bar with light icons on dark burgundy header
     SystemChrome.setSystemUIOverlayStyle(
@@ -510,40 +513,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const SizedBox(height: 22),
 
                       // Register / Login Switch Link
-                      Center(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _isLogin = !_isLogin;
-                            });
-                          },
-                          child: RichText(
-                            text: TextSpan(
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _isLogin
+                                ? 'ยังไม่มีบัญชีใช่ไหม? '
+                                : 'มีบัญชีอยู่แล้ว? ',
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14.5,
+                              color: Color(0xFF7A7578),
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isLogin = !_isLogin;
+                              });
+                            },
+                            child: Text(
+                              _isLogin ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ',
                               style: const TextStyle(
                                 fontFamily: 'Roboto',
                                 fontSize: 14.5,
+                                color: burgundy,
+                                fontWeight: FontWeight.w700,
                               ),
-                              children: [
-                                TextSpan(
-                                  text: _isLogin
-                                      ? 'ยังไม่มีบัญชีใช่ไหม? '
-                                      : 'มีบัญชีอยู่แล้ว? ',
-                                  style: const TextStyle(
-                                    color: Color(0xFF7A7578),
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: _isLogin ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ',
-                                  style: const TextStyle(
-                                    color: burgundy,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
                             ),
                           ),
-                        ),
+                        ],
                       ),
 
                       const SizedBox(height: 18),

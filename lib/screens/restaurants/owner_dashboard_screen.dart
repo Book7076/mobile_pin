@@ -49,6 +49,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => OwnerPlaceholderScreen(title: title)),
         );
+        return null;
       });
       return;
     }
@@ -70,9 +71,6 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     // Dynamic restaurant information from previous flow
-    final String shopName = _shopData['name']?.toString().isNotEmpty == true
-        ? _shopData['name'].toString()
-        : 'THE CHICKEN';
 
     final String? imageUrl = (_shopData['imageUrl'] != null && _shopData['imageUrl'].toString().trim().isNotEmpty)
         ? _shopData['imageUrl'].toString()
@@ -341,6 +339,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }

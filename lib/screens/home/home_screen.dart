@@ -11,10 +11,7 @@ import '../restaurants/open_restaurant_intro_screen.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 import '../owner/owner_dashboard_screen.dart';
 import '../flow/category_selection_screen.dart';
-import '../flow/food_swipe_screen.dart';
-import '../flow/selected_restaurants_screen.dart';
 import '../../models/favorite_manager.dart';
-import 'discover_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final int initialTab;

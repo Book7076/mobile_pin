@@ -177,12 +177,12 @@ class RestaurantDetailScreen extends ConsumerWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         titleSpacing: 0,
-        title: const Text(
-          'รายละเอียดร้านอาหาร',
-          style: TextStyle(
+        title: Text(
+          rank != null ? 'รายละเอียดร้านค้า' : 'รายละเอียดร้านอาหาร',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
             color: AppConstants.burgundyPrimary,
-            fontSize: 20,
-            fontWeight: FontWeight.w800,
           ),
         ),
         bottom: PreferredSize(
@@ -191,11 +191,28 @@ class RestaurantDetailScreen extends ConsumerWidget {
         ),
       ),
       body: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (rank != null) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF9EEF2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'อันดับที่ $rank',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppConstants.burgundyPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             // 1. Restaurant Header Card
             _buildRestaurantHeaderCard(context, ref, restaurant, isFav),
 

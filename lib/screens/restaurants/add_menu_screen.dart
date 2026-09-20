@@ -19,7 +19,6 @@ class AddMenuScreen extends StatefulWidget {
 
 class _AddMenuScreenState extends State<AddMenuScreen> {
   static const Color maroonColor = Color(0xFF7A1428);
-  static const Color cardBorderColor = Color(0xFFE5E7EB);
 
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
