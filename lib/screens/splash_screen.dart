@@ -99,13 +99,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       if (session != null) {
         final userData = await supabase
             .from('users')
-            .select('role')
+            .select('user_type')
             .eq('id', session.user.id)
             .maybeSingle();
 
         if (!mounted) return;
 
-        if (userData != null && userData['role'] == 'admin') {
+        final userType = (userData?['user_type'] ?? userData?['role'])?.toString().toLowerCase();
+        if (userData != null && userType == 'admin') {
           _navigateTo(const AdminDashboard());
         } else {
           _navigateTo(const HomeScreen());

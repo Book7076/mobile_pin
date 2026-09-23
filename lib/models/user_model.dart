@@ -1,4 +1,4 @@
-﻿class UserModel {
+class UserModel {
   final String id;
   final String email;
   final String name;
@@ -21,9 +21,10 @@
     this.ownedRestaurantId,
   });
 
-  bool get isOwner => role == 'owner';
-  bool get isAdmin => role == 'admin';
-  bool get isRegularUser => role == 'user';
+  bool get isOwner => role.toLowerCase() == 'owner';
+  bool get isAdmin => role.toLowerCase() == 'admin';
+  bool get isCustomer => role.toLowerCase() == 'customer' || role.toLowerCase() == 'user';
+  bool get isRegularUser => isCustomer;
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     List<String> prefs = [];
@@ -36,7 +37,7 @@
       email: json['email']?.toString() ?? '',
       name: json['name']?.toString() ?? (json['email']?.toString().split('@').first ?? 'ผู้ใช้งาน'),
       phone: json['phone']?.toString() ?? '',
-      role: json['role']?.toString() ?? 'user',
+      role: json['user_type']?.toString() ?? json['role']?.toString() ?? 'customer',
       swipeCount: (json['swipe_count'] as num?)?.toInt() ?? 0,
       avatarUrl: json['avatar_url']?.toString(),
       dietaryPreferences: prefs,
@@ -44,12 +45,15 @@
     );
   }
 
+  String get userType => role;
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,
       'email': email,
       'name': name,
       'phone': phone,
+      'user_type': role,
       'role': role,
       'swipe_count': swipeCount,
       'avatar_url': avatarUrl,

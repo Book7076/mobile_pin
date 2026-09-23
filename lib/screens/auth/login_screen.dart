@@ -146,12 +146,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       try {
         final userData = await supabase
             .from('users')
-            .select('role')
+            .select('user_type')
             .eq('id', user.id)
             .maybeSingle();
 
         if (userData != null) {
-          role = userData['role'] as String?;
+          role = (userData['user_type'] ?? userData['role'])?.toString();
         }
       } catch (_) {
         // Continue with default role if profile table isn't ready

@@ -84,7 +84,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       height: avatarDiameter,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFFFFF6EB),
+                        color: Colors.white,
                         border: Border.all(color: Colors.white, width: 4.5),
                         boxShadow: [
                           BoxShadow(
@@ -299,7 +299,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   /// โลโก้ไก่ทอด "The CHICKEN" แบบเดียวกับในภาพ
   Widget _buildDefaultChickenLogo() {
     return Container(
-      color: const Color(0xFFFFF8EE),
+      color: Colors.white,
       child: Stack(
         alignment: Alignment.center,
         children: [

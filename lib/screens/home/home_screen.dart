@@ -12,6 +12,7 @@ import '../restaurants/restaurant_detail_screen.dart';
 import '../owner/owner_dashboard_screen.dart';
 import '../flow/category_selection_screen.dart';
 import '../../models/favorite_manager.dart';
+import '../../providers/auth_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   final int initialTab;
@@ -32,6 +33,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final FocusNode _searchFocusNode = FocusNode();
   String _searchQuery = '';
   bool _isSearchFocused = false;
+  String? _currentUserType;
+
+  bool get _isOwner {
+    final riverpodRole = ref.watch(authProvider)?.role?.trim().toLowerCase();
+    if (riverpodRole == 'owner') return true;
+    return _currentUserType?.trim().toLowerCase() == 'owner';
+  }
 
   // Favorites Tab Search Controller & Data
   final TextEditingController _favoriteSearchController = TextEditingController();
@@ -125,6 +133,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
     _currentTab = widget.initialIndex ?? widget.initialTab;
+    _fetchUserType();
     _searchFocusNode.addListener(() {
       if (mounted) {
         setState(() {
@@ -157,6 +166,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     _favoriteSearchController.dispose();
     _favoriteFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchUserType() async {
+    try {
+      final user = supabase.auth.currentUser;
+      if (user != null) {
+        final metaType = user.userMetadata?['user_type'] ??
+            user.userMetadata?['role'] ??
+            user.appMetadata['user_type'] ??
+            user.appMetadata['role'];
+        if (metaType != null && mounted) {
+          setState(() {
+            _currentUserType = metaType.toString().toLowerCase();
+          });
+        }
+
+        final userData = await supabase
+            .from('users')
+            .select('user_type')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (userData != null) {
+          final dbType = (userData['user_type'] ?? userData['role'])
+              ?.toString()
+              .toLowerCase();
+          if (dbType != null && mounted) {
+            setState(() {
+              _currentUserType = dbType;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Note: User type fetch skipped or table unavailable: $e");
+    }
   }
 
   @override
@@ -1189,28 +1234,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 5. แดชบอร์ดเจ้าของร้าน
+                  // 5. เปิดร้านอาหาร / แดชบอร์ดเจ้าของร้าน (เช็คตาม user_type / role)
                   _buildProfileMenuCard(
-                    icon: Icons.dashboard_customize_outlined,
-                    title: 'แดชบอร์ดเจ้าของร้าน (Owner Dashboard)',
+                    icon: _isOwner
+                        ? Icons.dashboard_customize_outlined
+                        : Icons.storefront_outlined,
+                    title: _isOwner ? 'แดชบอร์ดเจ้าของร้าน' : 'เปิดร้านอาหาร',
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const OwnerDashboardScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 6. เปิดร้านอาหาร
-                  _buildProfileMenuCard(
-                    icon: Icons.storefront_outlined,
-                    title: 'เปิดร้านอาหาร',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const OpenRestaurantIntroScreen(),
+                          builder: (_) => _isOwner
+                              ? const OwnerDashboardScreen()
+                              : const OpenRestaurantIntroScreen(),
                         ),
                       );
                     },
@@ -1237,7 +1272,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       height: 54,
       decoration: BoxDecoration(
-        color: const Color(0xFFFCF7F8),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: const Color(0xFF6E162B),
@@ -1294,7 +1329,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       height: 46,
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color(0xFFFCF7F8),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: const Color(0xFF6E162B),
@@ -1334,7 +1369,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: Container(
               width: 275,
               decoration: BoxDecoration(
-                color: const Color(0xFFF7EAEC),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(
                   color: const Color(0xFFD4ADB5),

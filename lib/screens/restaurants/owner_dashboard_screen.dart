@@ -123,7 +123,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     height: 190,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFFFBF4E8), // Warm beige ring matching reference
+                      color: Colors.white,
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withOpacity(0.12),

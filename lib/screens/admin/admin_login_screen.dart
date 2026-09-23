@@ -56,14 +56,15 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         );
 
         if (response.user != null) {
-          // ตรวจสอบ role ในตาราง users
+          // ตรวจสอบ user_type ในตาราง users
           final userData = await supabase
               .from('users')
-              .select('role')
+              .select('user_type')
               .eq('id', response.user!.id)
               .maybeSingle();
 
-          if (userData != null && userData['role'] == 'admin') {
+          final userType = (userData?['user_type'] ?? userData?['role'])?.toString().toLowerCase();
+          if (userData != null && userType == 'admin') {
             if (mounted) _navigateToDashboard();
             return;
           } else {

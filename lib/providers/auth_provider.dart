@@ -1,4 +1,4 @@
-﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../main.dart';
 import '../core/mock_data.dart';
 import '../models/user_model.dart';
@@ -29,7 +29,7 @@ class AuthStateNotifier extends StateNotifier<UserModel?> {
         id: id,
         email: email,
         name: email.split('@').first,
-        role: 'user',
+        role: 'customer',
         swipeCount: 0,
       );
     }
@@ -79,7 +79,7 @@ class AuthStateNotifier extends StateNotifier<UserModel?> {
         id: 'usr_${DateTime.now().millisecondsSinceEpoch}',
         email: email,
         name: email.split('@').first,
-        role: email.contains('owner') ? 'owner' : (email.contains('admin') ? 'admin' : 'user'),
+        role: email.contains('owner') ? 'owner' : (email.contains('admin') ? 'admin' : 'customer'),
       );
       return true;
     }

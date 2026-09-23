@@ -124,7 +124,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           await supabase.from('users').upsert({
             'id': user.id,
             'email': email,
-            'role': 'user',
+            'user_type': 'customer',
             'first_name': firstName,
             'last_name': lastName,
             'citizen_id': citizenId,
