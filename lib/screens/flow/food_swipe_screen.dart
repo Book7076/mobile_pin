@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
+import '../../models/favorite_manager.dart';
 import '../../models/restaurant_model.dart';
 import '../../providers/restaurant_provider.dart';
+import '../../widgets/meal_mate_logo.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 import 'finish_transition_screen.dart';
 
@@ -246,79 +248,16 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
     );
   }
 
-  /// MealMate Official Logo with Overlapping Cutlery Circles
+  /// MealMate Official Logo matching LoginScreen styling with vector rings, fork, spoon & heart
   Widget _buildMealMateLogo() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: 48,
-          width: 80,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Left Circle (Fork)
-              Positioned(
-                left: 10,
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2.2),
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.restaurant, color: Colors.white, size: 18),
-                  ),
-                ),
-              ),
-
-              // Right Circle (Spoon)
-              Positioned(
-                right: 10,
-                child: Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 2.2),
-                  ),
-                  child: const Center(
-                    child: Icon(Icons.dining_rounded, color: Colors.white, size: 18),
-                  ),
-                ),
-              ),
-
-              // Center Heart in overlap
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.all(2),
-                  decoration: const BoxDecoration(
-                    color: AppConstants.burgundyPrimary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.favorite_rounded,
-                    color: Colors.white,
-                    size: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 2),
-        const Text(
-          'MealMate',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.w900,
-            fontStyle: FontStyle.italic,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
+    return const MealMateLogo(
+      size: 42,
+      textSize: 22,
+      textSpacing: 2,
+      showText: true,
+      animateHeart: false,
+      ringColor: Colors.white,
+      iconColor: Colors.white,
     );
   }
 
@@ -424,7 +363,8 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
     required bool isInteractive,
     required Size screenSize,
   }) {
-    final isFav = restaurant.isFavorite;
+    final isFav =
+        restaurant.isFavorite || FavoriteManager.isFavorite(restaurant.name);
 
     return Center(
       child: Container(
@@ -462,61 +402,87 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
                           size: 64, color: Colors.white70),
                     ),
 
-              // Flag / Favorite Button (Top-Right)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: Material(
+              // Bookmark / Favorite Button (Top-Right) - only on top interactive card
+              if (isInteractive)
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: Material(
                   color: Colors.white,
                   shape: const CircleBorder(),
                   elevation: 4,
                   child: InkWell(
-                    key: isInteractive ? const ValueKey('swipe_flag_button') : null,
+                    key: isInteractive
+                        ? const ValueKey('swipe_flag_button')
+                        : null,
                     customBorder: const CircleBorder(),
                     onTap: isInteractive
                         ? () {
                             HapticFeedback.lightImpact();
-                      ref
-                          .read(restaurantsProvider.notifier)
-                          .toggleFavorite(restaurant.id);
-                      final newFav = !isFav;
-                      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              Icon(
-                                newFav
-                                    ? Icons.flag_rounded
-                                    : Icons.outlined_flag_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  newFav
-                                      ? 'เพิ่ม "${restaurant.name}" เข้าสู่รายการโปรดแล้ว'
-                                      : 'นำ "${restaurant.name}" ออกจากรายการโปรดแล้ว',
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                            final newFav = !isFav;
+                            ref
+                                .read(restaurantsProvider.notifier)
+                                .toggleFavorite(restaurant.id);
+
+                            if (newFav) {
+                              FavoriteManager.addFavorite({
+                                'name': restaurant.name,
+                                'category': _formatCategoryLabel(restaurant),
+                                'price': restaurant.priceRange,
+                                'rating': restaurant.rating,
+                                'image': restaurant.imageUrls.isNotEmpty
+                                    ? restaurant.imageUrls.first
+                                    : 'assets/images/rawtruckr.jpg',
+                                'isAsset': false,
+                                'isBookmarked': true,
+                                'isFavorite': true,
+                              });
+                            } else {
+                              FavoriteManager.removeFavorite(restaurant.name);
+                            }
+
+                            setState(() {});
+
+                            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    Icon(
+                                      newFav
+                                          ? Icons.bookmark_rounded
+                                          : Icons.bookmark_outline_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        newFav
+                                            ? 'บันทึก "${restaurant.name}" เข้าสู่รายการโปรดแล้ว'
+                                            : 'นำ "${restaurant.name}" ออกจากรายการโปรดแล้ว',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  ],
                                 ),
+                                backgroundColor: AppConstants.burgundyPrimary,
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                duration: const Duration(milliseconds: 1800),
                               ),
-                            ],
-                          ),
-                          backgroundColor: AppConstants.burgundyPrimary,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          duration: const Duration(milliseconds: 1800),
-                        ),
-                      );
-                    }
-                  : null,
+                            );
+                          }
+                        : null,
                     child: Padding(
                       padding: const EdgeInsets.all(10),
                       child: Icon(
-                        isFav ? Icons.flag_rounded : Icons.outlined_flag_rounded,
+                        isFav
+                            ? Icons.bookmark_rounded
+                            : Icons.bookmark_outline_rounded,
                         color: AppConstants.burgundyPrimary,
                         size: 24,
                       ),

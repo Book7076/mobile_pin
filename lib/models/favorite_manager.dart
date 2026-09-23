@@ -4,7 +4,7 @@ class FavoriteManager {
     {
       'name': 'RawTruckr',
       'category': 'อาหารเกาหลี',
-      'price': '฿฿ 150-350 บาท',
+      'price': '฿ 150-350 บาท',
       'rating': 4.4,
       'image': 'assets/images/rawtruckr.jpg',
       'isAsset': true,
@@ -13,7 +13,7 @@ class FavoriteManager {
     {
       'name': 'ครัวปันเจียง',
       'category': 'อาหารไทย/อาหารตามสั่ง',
-      'price': '฿฿ 60-90 บาท',
+      'price': '฿ 60-90 บาท',
       'rating': 4.7,
       'image': 'assets/images/krua_pan_jiang.jpg',
       'isAsset': true,
@@ -22,7 +22,7 @@ class FavoriteManager {
     {
       'name': 'ก๋วยเตี๋ยวเรือขั้นเทพ',
       'category': 'อาหารไทย/ก๋วยเตี๋ยว',
-      'price': '฿฿ 50-80 บาท',
+      'price': '฿ 50-80 บาท',
       'rating': 4.3,
       'image': 'assets/images/boat_noodles.jpg',
       'isAsset': true,
@@ -31,7 +31,7 @@ class FavoriteManager {
     {
       'name': 'TEDS Coffee & Eatery',
       'category': 'ร้านกาแฟ/ขนมหวาน',
-      'price': '฿฿ 60-150 บาท',
+      'price': '฿ 60-150 บาท',
       'rating': 4.9,
       'image': 'assets/images/teds_coffee.jpg',
       'isAsset': true,
@@ -41,20 +41,25 @@ class FavoriteManager {
 
   /// Add restaurant to favorites list
   static void addFavorite(Map<String, dynamic> restaurant) {
-    if (!favorites.any((r) => r['name'] == restaurant['name'])) {
+    final name = (restaurant['name'] as String?)?.trim().toLowerCase() ?? '';
+    if (name.isEmpty) return;
+    if (!favorites.any((r) => (r['name'] as String).trim().toLowerCase() == name)) {
       final copy = Map<String, dynamic>.from(restaurant);
       copy['isBookmarked'] = true;
+      copy['isFavorite'] = true;
       favorites.insert(0, copy);
     }
   }
 
   /// Remove restaurant from favorites list by name
   static void removeFavorite(String name) {
-    favorites.removeWhere((r) => r['name'] == name);
+    final clean = name.trim().toLowerCase();
+    favorites.removeWhere((r) => (r['name'] as String).trim().toLowerCase() == clean);
   }
 
   /// Check if a restaurant is already bookmarked
   static bool isFavorite(String name) {
-    return favorites.any((r) => r['name'] == name);
+    final clean = name.trim().toLowerCase();
+    return favorites.any((r) => (r['name'] as String).trim().toLowerCase() == clean);
   }
 }

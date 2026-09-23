@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
+import '../../models/filter_criteria_model.dart';
 import '../../providers/restaurant_provider.dart';
 import 'budget_selection_screen.dart';
 
@@ -31,11 +32,14 @@ class _CategorySelectionScreenState
   @override
   void initState() {
     super.initState();
-    // Initialize with previously selected categories if any
-    final existingCriteria = ref.read(filterCriteriaProvider);
-    _selectedIds = Set<String>.from(
-      existingCriteria.selectedCategories.where((id) => id != 'all'),
-    );
+    // Always reset categories to empty on initial entry
+    _selectedIds = <String>{};
+    // Reset criteria in provider so no previous session's categories or budget linger
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(filterCriteriaProvider.notifier).state = FilterCriteriaModel();
+      }
+    });
   }
 
   void _toggleCategory(String id) {
@@ -90,6 +94,28 @@ class _CategorySelectionScreenState
                 onPressed: () => Navigator.of(context).pop(),
               )
             : null,
+        actions: [
+          if (_selectedIds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    _selectedIds.clear();
+                  });
+                },
+                child: const Text(
+                  'รีเซ็ต',
+                  style: TextStyle(
+                    color: AppConstants.burgundyPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         child: Column(

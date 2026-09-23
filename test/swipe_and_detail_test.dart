@@ -271,4 +271,50 @@ void main() {
     expect(find.text('ร้านที่ใช่'), findsOneWidget);
     expect(find.text('โดนใจคุณ'), findsOneWidget);
   });
+
+  testWidgets('RestaurantDetailScreen bookmark button starts solid when favorited, toggles to outline and back', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.75;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final container = ProviderContainer();
+
+    // RawTruckr is in FavoriteManager
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: RestaurantDetailScreen(
+            restaurantData: {
+              'name': 'RawTruckr',
+              'category': 'อาหารเกาหลี',
+              'isBookmarked': true,
+              'image': 'assets/images/rawtruckr.jpg',
+            },
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. Initially solid / filled (Icons.bookmark_rounded) like Image 2
+    expect(find.byIcon(Icons.bookmark_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.bookmark_border_rounded), findsNothing);
+
+    // 2. Tap to unfavorite ("กดออก")
+    await tester.tap(find.byKey(const Key('restaurant_detail_bookmark_button')));
+    await tester.pumpAndSettle();
+
+    // Now white with red border outline (Icons.bookmark_border_rounded) like Image 3
+    expect(find.byIcon(Icons.bookmark_border_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.bookmark_rounded), findsNothing);
+
+    // 3. Tap again to re-favorite
+    await tester.tap(find.byKey(const Key('restaurant_detail_bookmark_button')));
+    await tester.pumpAndSettle();
+
+    // Back to solid / filled (Icons.bookmark_rounded)
+    expect(find.byIcon(Icons.bookmark_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.bookmark_border_rounded), findsNothing);
+  });
 }

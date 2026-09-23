@@ -47,6 +47,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     {
       'name': 'ข้าวซอยแม่สาย',
       'category': 'ประเภท: อาหารไทย, ก๋วยเตี๋ยว',
+      'price': '฿ 50-80 บาท',
       'rating': 4.7,
       'image': 'assets/images/khao_soi.jpg',
       'isAsset': true,
@@ -56,6 +57,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     {
       'name': 'โกเผือกโกดำ',
       'category': 'ประเภท: อาหารไทย, อาหารเช้า',
+      'price': '฿ 40-70 บาท',
       'rating': 4.7,
       'image': 'assets/images/go_puek.jpg',
       'isAsset': true,
@@ -65,6 +67,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     {
       'name': 'ข้าวมันไก่นันทาราม',
       'category': 'ประเภท: อาหารไทย',
+      'price': '฿ 50-80 บาท',
       'rating': 4.8,
       'image': 'assets/images/khao_man_gai.jpg',
       'isAsset': true,
@@ -75,6 +78,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     {
       'name': 'สุกี้ตี๋น้อย (Suki Teenoi)',
       'category': 'ประเภท: ชาบู, สุกี้, บุฟเฟต์',
+      'price': '฿ 219-276 บาท',
       'rating': 4.8,
       'image': 'assets/images/shabu_teenoi.jpg',
       'isAsset': true,
@@ -84,6 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     {
       'name': 'Mo-Mo-Paradise',
       'category': 'ประเภท: ชาบู, สุกี้ยากี้ญี่ปุ่น',
+      'price': '฿ 599-799 บาท',
       'rating': 4.9,
       'image': 'assets/images/shabu_momo.jpg',
       'isAsset': true,
@@ -93,6 +98,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     {
       'name': 'Shabushi (ชาบูชิ)',
       'category': 'ประเภท: ชาบู, บุฟเฟต์สายพาน',
+      'price': '฿ 399-499 บาท',
       'rating': 4.7,
       'image': 'assets/images/shabushi.jpg',
       'isAsset': true,
@@ -107,7 +113,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       'isAsset': true,
       'isFavorite': false,
       'isBookmarked': false,
-      'price': '฿฿ 89-109 บาท',
+      'price': '฿ 89-109 บาท',
       'address': '84/2 ม.14 ถ.สุเทพ ต.สุเทพ อ.เมือง เมืองเชียงใหม่ เชียงใหม่',
       'phone': '0951409878',
       'mapUrl': 'www.googlemap.com',
@@ -216,8 +222,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             (r['tags'] as List<String>?)?.contains('breakfast') == true ||
             (r['tags'] as List<String>?)?.contains('chicken rice') == true;
       }
-      final name = (r['name'] as String).toLowerCase();
-      final cat = (r['category'] as String).toLowerCase();
+      final name = (r['name']?.toString() ?? '').toLowerCase();
+      final cat = (r['category']?.toString() ?? '').toLowerCase();
       final tags = (r['tags'] as List<String>?)?.map((t) => t.toLowerCase()).toList() ?? [];
       return name.contains(query) ||
           cat.contains(query) ||
@@ -532,23 +538,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: SizedBox(
             width: 76,
             height: 76,
-            child: restaurant['isAsset'] == true
-                ? Image.asset(
-                    restaurant['image'] as String,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      color: const Color(0xFFEFECEF),
-                      child: const Icon(
-                        Icons.restaurant_rounded,
-                        color: Color(0xFF6E162B),
-                        size: 32,
-                      ),
+            child: () {
+              final imgStr = restaurant['image']?.toString() ?? '';
+              final isAsset = restaurant['isAsset'] == true || imgStr.startsWith('assets/');
+              if (isAsset && imgStr.isNotEmpty) {
+                return Image.asset(
+                  imgStr,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: const Color(0xFFEFECEF),
+                    child: const Icon(
+                      Icons.restaurant_rounded,
+                      color: Color(0xFF6E162B),
+                      size: 32,
                     ),
-                  )
-                : Image.network(
-                    restaurant['image'] as String,
-                    fit: BoxFit.cover,
                   ),
+                );
+              } else if (imgStr.isNotEmpty) {
+                return Image.network(
+                  imgStr,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    color: const Color(0xFFEFECEF),
+                    child: const Icon(
+                      Icons.restaurant_rounded,
+                      color: Color(0xFF6E162B),
+                      size: 32,
+                    ),
+                  ),
+                );
+              } else {
+                return Container(
+                  color: const Color(0xFFEFECEF),
+                  child: const Icon(
+                    Icons.restaurant_rounded,
+                    color: Color(0xFF6E162B),
+                    size: 32,
+                  ),
+                );
+              }
+            }(),
           ),
         ),
 
@@ -560,7 +589,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                restaurant['name'] as String,
+                restaurant['name']?.toString() ?? 'ร้านอาหาร',
                 style: const TextStyle(
                   fontSize: 16.5,
                   fontWeight: FontWeight.w800,
@@ -570,7 +599,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 5),
               Text(
-                restaurant['category'] as String,
+                restaurant['category']?.toString() ?? 'อาหารทั่วไป',
                 style: const TextStyle(
                   fontSize: 13.5,
                   color: Color(0xFF6B6568),
@@ -686,8 +715,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final query = _favoriteSearchQuery.trim().toLowerCase();
     final list = _favoriteRestaurants.where((r) {
       if (query.isEmpty) return true;
-      final name = (r['name'] as String).toLowerCase();
-      final cat = (r['category'] as String).toLowerCase();
+      final name = (r['name']?.toString() ?? '').toLowerCase();
+      final cat = (r['category']?.toString() ?? '').toLowerCase();
       return name.contains(query) || cat.contains(query);
     }).toList();
 
@@ -848,6 +877,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  String _formatPrice(dynamic raw) {
+    String str = raw?.toString().trim() ?? '฿ 100-300 บาท';
+    while (str.startsWith('฿฿')) {
+      str = str.substring(1).trimLeft();
+    }
+    if (!str.startsWith('฿')) {
+      str = '฿ $str';
+    }
+    return str;
+  }
+
   Widget _buildFavoriteCard(Map<String, dynamic> item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -877,6 +917,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 if (isBookmarked != null) {
                   item['isBookmarked'] = isBookmarked;
                   item['isFavorite'] = isBookmarked;
+                  if (!isBookmarked) {
+                    FavoriteManager.removeFavorite(item['name']?.toString() ?? '');
+                  } else {
+                    FavoriteManager.addFavorite(item);
+                  }
                 }
               });
             }
@@ -892,23 +937,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: SizedBox(
                     width: 86,
                     height: 86,
-                    child: item['isAsset'] == true
-                        ? Image.asset(
-                            item['image'] as String,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Container(
-                              color: const Color(0xFFEFECEF),
-                              child: const Icon(
-                                Icons.restaurant_rounded,
-                                color: Color(0xFF6E162B),
-                                size: 34,
-                              ),
+                    child: () {
+                      final imageStr = item['image']?.toString() ?? '';
+                      final isAsset = item['isAsset'] == true || imageStr.startsWith('assets/');
+                      if (isAsset && imageStr.isNotEmpty) {
+                        return Image.asset(
+                          imageStr,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: const Color(0xFFEFECEF),
+                            child: const Icon(
+                              Icons.restaurant_rounded,
+                              color: Color(0xFF6E162B),
+                              size: 34,
                             ),
-                          )
-                        : Image.network(
-                            item['image'] as String,
-                            fit: BoxFit.cover,
                           ),
+                        );
+                      } else if (imageStr.isNotEmpty) {
+                        return Image.network(
+                          imageStr,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            color: const Color(0xFFEFECEF),
+                            child: const Icon(
+                              Icons.restaurant_rounded,
+                              color: Color(0xFF6E162B),
+                              size: 34,
+                            ),
+                          ),
+                        );
+                      } else {
+                        return Container(
+                          color: const Color(0xFFEFECEF),
+                          child: const Icon(
+                            Icons.restaurant_rounded,
+                            color: Color(0xFF6E162B),
+                            size: 34,
+                          ),
+                        );
+                      }
+                    }(),
                   ),
                 ),
 
@@ -926,7 +994,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              item['name'] as String,
+                              item['name']?.toString() ?? 'ร้านอาหาร',
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
@@ -947,7 +1015,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                       // Category
                       Text(
-                        item['category'] as String,
+                        item['category']?.toString() ?? 'อาหารทั่วไป',
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF6B6568),
@@ -959,7 +1027,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                       // Price Range
                       Text(
-                        item['price'] as String,
+                        _formatPrice(item['price']),
                         style: const TextStyle(
                           fontSize: 13,
                           color: Color(0xFF6B6568),
@@ -982,7 +1050,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                '${item['rating']}',
+                                '${item['rating'] ?? '4.5'}',
                                 style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w700,

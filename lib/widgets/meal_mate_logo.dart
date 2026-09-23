@@ -8,6 +8,7 @@ class MealMateLogo extends StatefulWidget {
   final bool showText;
   final bool animateHeart;
   final double textSize;
+  final double? textSpacing;
   final Color primaryColor;
   final Color ringColor;
   final Color iconColor;
@@ -20,6 +21,7 @@ class MealMateLogo extends StatefulWidget {
     this.showText = true,
     this.animateHeart = true,
     this.textSize = 36,
+    this.textSpacing,
     this.primaryColor = const Color(0xFF70182E),
     this.ringColor = Colors.white,
     this.iconColor = Colors.white,
@@ -107,7 +109,7 @@ class _MealMateLogoState extends State<MealMateLogo>
           },
         ),
         if (widget.showText) ...[
-          const SizedBox(height: 28),
+          SizedBox(height: widget.textSpacing ?? 28),
           Text(
             'MealMate',
             textAlign: TextAlign.center,

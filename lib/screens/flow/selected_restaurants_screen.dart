@@ -320,10 +320,9 @@ class _SelectedRestaurantsScreenState
   }
 
   String _formatPriceLabel(RestaurantModel restaurant) {
-    if (restaurant.priceRange.startsWith('฿฿')) {
-      return restaurant.priceRange;
-    }
-    return '฿฿ ${restaurant.priceRange}';
+    String p = restaurant.priceRange.trim();
+    p = p.replaceAll(RegExp(r'^฿+\s*'), '').trim();
+    return '฿ $p';
   }
 
   List<RestaurantModel> _getDefaultMockupRestaurants(

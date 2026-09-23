@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pin_mobile/screens/auth/login_screen.dart';
+import 'package:pin_mobile/screens/auth/register_screen.dart';
 import 'package:pin_mobile/widgets/meal_mate_logo.dart';
 import 'package:pin_mobile/widgets/social_login_button.dart';
 
@@ -36,9 +37,13 @@ void main() {
 
     // Verify Social Login Buttons
     expect(find.byType(SocialLoginButton), findsNWidgets(2));
+
+    // Verify removed header subtitles and admin portal button
+    expect(find.text('โปรดลงชื่อเข้าใช้บัญชีที่มีอยู่'), findsNothing);
+    expect(find.text('เข้าสู่ระบบสำหรับแอดมิน (Admin Portal)'), findsNothing);
   });
 
-  testWidgets('Tapping switch button toggles between Login and Sign Up modes', (WidgetTester tester) async {
+  testWidgets('Tapping สมัครสมาชิก opens RegisterScreen with all 6 fields and back button', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
@@ -47,16 +52,82 @@ void main() {
       ),
     );
 
-    // Initially Login mode
+    // Initially on LoginScreen
+    expect(find.byType(LoginScreen), findsOneWidget);
     expect(find.text('ยังไม่มีบัญชีใช่ไหม? '), findsOneWidget);
-    expect(find.widgetWithText(ElevatedButton, 'เข้าสู่ระบบ'), findsOneWidget);
 
-    // Tap switch to register
+    // Tap "สมัครสมาชิก"
     await tester.tap(find.text('สมัครสมาชิก'));
+    await tester.pumpAndSettle();
+
+    // Now on RegisterScreen
+    expect(find.byType(RegisterScreen), findsOneWidget);
+
+    // Verify Header Texts
+    expect(find.text('สมัครสมาชิก'), findsNWidgets(2)); // Title and submit button
+    expect(find.text('สมัครสมาชิกเพื่อเริ่มต้นใช้งาน'), findsOneWidget);
+
+    // Verify Back Button "<"
+    expect(find.byKey(const Key('register_back_button')), findsOneWidget);
+    expect(find.byIcon(Icons.arrow_back_ios_new), findsOneWidget);
+
+    // Verify Input Labels and Hints
+    expect(find.text('ชื่อ'), findsOneWidget);
+    expect(find.text('ชื่อจริง'), findsOneWidget);
+    expect(find.text('นามสกุล'), findsNWidgets(2)); // Label and hint are both 'นามสกุล'
+    expect(find.text('เลขบัตรประชาชน'), findsOneWidget);
+    expect(find.text('กรุณากรอกเลขบัตรประชาชน'), findsOneWidget);
+    expect(find.text('อีเมล'), findsOneWidget);
+    expect(find.text('กรุณากรอกอีเมล'), findsOneWidget);
+    expect(find.text('รหัสผ่าน'), findsOneWidget);
+    expect(find.text('กรุณากรอกรหัสผ่าน'), findsOneWidget);
+    expect(find.text('ยืนยันรหัสผ่าน'), findsOneWidget);
+    expect(find.text('กรุณากรอกเพื่อยืนยันรหัสผ่าน'), findsOneWidget);
+
+    // Verify Tapping "<" returns back to LoginScreen
+    await tester.tap(find.byKey(const Key('register_back_button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Verified returned to LoginScreen
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(RegisterScreen), findsNothing);
+  });
+
+  testWidgets('Submitting registration returns to LoginScreen', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: LoginScreen(),
+        ),
+      ),
+    );
+
+    // Tap "สมัครสมาชิก" to open RegisterScreen
+    await tester.tap(find.text('สมัครสมาชิก'));
+    await tester.pumpAndSettle();
+    expect(find.byType(RegisterScreen), findsOneWidget);
+
+    // Fill all 6 form fields
+    await tester.enterText(find.descendant(of: find.byKey(const Key('first_name_field')), matching: find.byType(TextField)), 'สมชาย');
+    await tester.enterText(find.descendant(of: find.byKey(const Key('last_name_field')), matching: find.byType(TextField)), 'ใจดี');
+    await tester.enterText(find.descendant(of: find.byKey(const Key('citizen_id_field')), matching: find.byType(TextField)), '1234567890123');
+    await tester.enterText(find.descendant(of: find.byKey(const Key('email_field')), matching: find.byType(TextField)), 'test@test.com');
+    await tester.enterText(find.descendant(of: find.byKey(const Key('password_field')), matching: find.byType(TextField)), '123456');
+    await tester.enterText(find.descendant(of: find.byKey(const Key('confirm_password_field')), matching: find.byType(TextField)), '123456');
     await tester.pump();
 
-    // Now in Register mode
-    expect(find.text('มีบัญชีอยู่แล้ว? '), findsOneWidget);
-    expect(find.widgetWithText(ElevatedButton, 'สมัครสมาชิก'), findsOneWidget);
+    // Ensure submit button is visible before tapping
+    await tester.ensureVisible(find.byKey(const Key('register_submit_button')));
+    await tester.pump();
+
+    // Tap submit button
+    await tester.tap(find.byKey(const Key('register_submit_button')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+
+    // Successfully returned to LoginScreen
+    expect(find.byType(LoginScreen), findsOneWidget);
+    expect(find.byType(RegisterScreen), findsNothing);
   });
 }

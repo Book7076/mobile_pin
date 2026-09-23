@@ -131,6 +131,10 @@ void main() {
       expect(find.text('TEDS Coffee & Eatery'), findsOneWidget);
       expect(find.text('ข้าวซอยแม่สาย'), findsOneWidget);
 
+      // Verify single ฿ symbol in price label (no ฿฿)
+      expect(find.textContaining('฿฿'), findsNothing);
+      expect(find.text('฿ 60-90 บาท'), findsOneWidget);
+
       // 1. Test upper-right arrow (>) navigation to details
       final arrowFinder = find.byKey(const ValueKey('card_arrow_0'));
       expect(arrowFinder, findsOneWidget);

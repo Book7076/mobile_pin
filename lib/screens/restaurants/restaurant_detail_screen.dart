@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants.dart';
+import '../../models/favorite_manager.dart';
 import '../../models/restaurant_model.dart';
 import '../../models/review_model.dart';
 import '../../providers/restaurant_provider.dart';
@@ -15,7 +16,7 @@ import '../../providers/restaurant_provider.dart';
 /// - สิ่งอำนวยความสะดวก: 4 feature cards (เหมาะกับกลุ่ม, เครื่องปรับอากาศ, รถจักรยานยนต์, มีห้องน้ำ)
 /// - เมนูอาหาร: Square dishes (บุฟเฟต์ ฿249, กุ้งดอง, etc.)
 /// - รีวิวร้านอาหาร: Star rating + Review cards (UserA, UserB) + Write review button
-class RestaurantDetailScreen extends ConsumerWidget {
+class RestaurantDetailScreen extends ConsumerStatefulWidget {
   final String? restaurantId;
   final Map<String, dynamic>? restaurantData;
   final int? rank;
@@ -45,6 +46,111 @@ class RestaurantDetailScreen extends ConsumerWidget {
     this.signatureDishes,
   });
 
+  @override
+  ConsumerState<RestaurantDetailScreen> createState() =>
+      _RestaurantDetailScreenState();
+}
+
+class _RestaurantDetailScreenState
+    extends ConsumerState<RestaurantDetailScreen> {
+  bool? _isBookmarked;
+
+  @override
+  void initState() {
+    super.initState();
+    _initBookmarkState();
+  }
+
+  void _initBookmarkState() {
+    final effectiveName = widget.name ??
+        widget.restaurantData?['name']?.toString() ??
+        '';
+
+    bool initialFav = false;
+    if (widget.restaurantData != null) {
+      if (widget.restaurantData!['isBookmarked'] == true ||
+          widget.restaurantData!['isFavorite'] == true) {
+        initialFav = true;
+      }
+    }
+    if (!initialFav && effectiveName.isNotEmpty) {
+      initialFav = FavoriteManager.isFavorite(effectiveName);
+    }
+    if (!initialFav && widget.restaurantId != null) {
+      try {
+        final list = ref.read(restaurantsProvider);
+        final match = list.where((r) => r.id == widget.restaurantId);
+        if (match.isNotEmpty && match.first.isFavorite) {
+          initialFav = true;
+        }
+      } catch (_) {}
+    }
+    _isBookmarked = initialFav;
+  }
+
+  void _toggleBookmark(RestaurantModel restaurant) {
+    HapticFeedback.lightImpact();
+    final newFav = !(_isBookmarked ?? false);
+    setState(() {
+      _isBookmarked = newFav;
+    });
+
+    final name = restaurant.name;
+    if (newFav) {
+      final favItem = widget.restaurantData != null
+          ? Map<String, dynamic>.from(widget.restaurantData!)
+          : <String, dynamic>{};
+      favItem['name'] = favItem['name'] ?? restaurant.name;
+      favItem['category'] = favItem['category'] ??
+          (restaurant.categories.isNotEmpty
+              ? _getCategorySubtitle(restaurant)
+              : 'อาหารทั่วไป');
+      favItem['price'] = favItem['price'] ?? restaurant.priceRange ?? '฿ 100-300 บาท';
+      favItem['rating'] = favItem['rating'] ?? restaurant.rating;
+      favItem['image'] = favItem['image'] ??
+          (restaurant.imageUrls.isNotEmpty
+              ? restaurant.imageUrls.first
+              : 'assets/images/rawtruckr.jpg');
+      favItem['isAsset'] = favItem['isAsset'] ??
+          (favItem['image']?.toString().startsWith('assets/') ?? false);
+      favItem['isBookmarked'] = true;
+      favItem['isFavorite'] = true;
+      FavoriteManager.addFavorite(favItem);
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('บันทึก "$name" ลงในรายการโปรดแล้ว'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: AppConstants.burgundyPrimary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    } else {
+      FavoriteManager.removeFavorite(name);
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('นำ "$name" ออกจากรายการโปรดแล้ว'),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF4A4447),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+      );
+    }
+
+    if (restaurant.id.isNotEmpty) {
+      ref.read(restaurantsProvider.notifier).toggleFavorite(restaurant.id);
+    }
+  }
+
   Future<void> _openMap(String address, double lat, double lng) async {
     final googleMapsUrl = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
@@ -68,21 +174,21 @@ class RestaurantDetailScreen extends ConsumerWidget {
 
   RestaurantModel _createFallbackModel() {
     final effectiveName =
-        name ?? restaurantData?['name']?.toString() ?? 'ร้านอาหารยอดนิยม';
+        widget.name ?? widget.restaurantData?['name']?.toString() ?? 'ร้านอาหารยอดนิยม';
     final effectiveCategory =
-        category ?? restaurantData?['category']?.toString() ?? 'อาหารทั่วไป';
-    final effectiveImage = imageUrl ?? restaurantData?['image']?.toString();
-    final effectiveAddress = address ??
-        restaurantData?['address']?.toString() ??
+        widget.category ?? widget.restaurantData?['category']?.toString() ?? 'อาหารทั่วไป';
+    final effectiveImage = widget.imageUrl ?? widget.restaurantData?['image']?.toString();
+    final effectiveAddress = widget.address ??
+        widget.restaurantData?['address']?.toString() ??
         '123 ถนนสุขุมวิท กรุงเทพมหานคร';
     final effectivePhone =
-        phone ?? restaurantData?['phone']?.toString() ?? '081-234-5678';
-    final effectiveHours = openingHours ??
-        restaurantData?['open_hours']?.toString() ??
+        widget.phone ?? widget.restaurantData?['phone']?.toString() ?? '081-234-5678';
+    final effectiveHours = widget.openingHours ??
+        widget.restaurantData?['open_hours']?.toString() ??
         '10:00 - 21:00 น.';
-    final effectiveDishes = (signatureDishes != null &&
-            signatureDishes!.isNotEmpty)
-        ? signatureDishes!
+    final effectiveDishes = (widget.signatureDishes != null &&
+            widget.signatureDishes!.isNotEmpty)
+        ? widget.signatureDishes!
             .map((d) => SignatureDish(name: d, price: 150))
             .toList()
         : [SignatureDish(name: 'เมนูซิกเนเจอร์', price: 150)];
@@ -104,11 +210,11 @@ class RestaurantDetailScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final restaurants = ref.watch(restaurantsProvider);
     RestaurantModel restaurant;
-    final lookupId = restaurantId ?? restaurantData?['id']?.toString();
-    final lookupName = name ?? restaurantData?['name']?.toString();
+    final lookupId = widget.restaurantId ?? widget.restaurantData?['id']?.toString();
+    final lookupName = widget.name ?? widget.restaurantData?['name']?.toString();
 
     if (lookupId != null && lookupId.isNotEmpty) {
       restaurant = restaurants.firstWhere(
@@ -137,11 +243,12 @@ class RestaurantDetailScreen extends ConsumerWidget {
       return Scaffold(
         appBar: AppBar(
           leading: IconButton(
+            key: const Key('restaurant_detail_back_button'),
             icon: const Icon(
               Icons.arrow_back_ios_new_rounded,
               color: AppConstants.burgundyPrimary,
             ),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(context).pop(_isBookmarked),
           ),
           title: const Text(
             'รายละเอียดร้านอาหาร',
@@ -160,64 +267,71 @@ class RestaurantDetailScreen extends ConsumerWidget {
     final reviews = ref
         .watch(reviewsProvider.notifier)
         .getReviewsForRestaurant(restaurant.id);
-    final isFav = restaurant.isFavorite;
+    final isFav = _isBookmarked ?? restaurant.isFavorite;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.of(context).pop(_isBookmarked);
+      },
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: AppConstants.burgundyPrimary,
-            size: 20,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            key: const Key('restaurant_detail_back_button'),
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: AppConstants.burgundyPrimary,
+              size: 20,
+            ),
+            onPressed: () => Navigator.of(context).pop(_isBookmarked),
           ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        titleSpacing: 0,
-        title: Text(
-          rank != null ? 'รายละเอียดร้านค้า' : 'รายละเอียดร้านอาหาร',
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppConstants.burgundyPrimary,
+          titleSpacing: 0,
+          title: Text(
+            widget.rank != null ? 'รายละเอียดร้านค้า' : 'รายละเอียดร้านอาหาร',
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppConstants.burgundyPrimary,
+            ),
+          ),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Container(color: const Color(0xFFF1F5F9), height: 1),
           ),
         ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: const Color(0xFFF1F5F9), height: 1),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (rank != null) ...[
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF9EEF2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  'อันดับที่ $rank',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppConstants.burgundyPrimary,
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (widget.rank != null) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9EEF2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'อันดับที่ ${widget.rank}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppConstants.burgundyPrimary,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-            ],
-            // 1. Restaurant Header Card
-            _buildRestaurantHeaderCard(context, ref, restaurant, isFav),
+                const SizedBox(height: 12),
+              ],
+              // 1. Restaurant Header Card
+              _buildRestaurantHeaderCard(context, restaurant, isFav),
 
-            const SizedBox(height: 16),
-            const Divider(color: Color(0xFFE2E8F0), thickness: 0.8),
+              const SizedBox(height: 16),
+              const Divider(color: Color(0xFFE2E8F0), thickness: 0.8),
             const SizedBox(height: 16),
 
             // 2. ที่อยู่ ช่องทางติดต่อ
@@ -249,22 +363,27 @@ class RestaurantDetailScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // 6. รีวิวร้านอาหาร
-            _buildReviewsSection(context, ref, restaurant, reviews),
+            _buildReviewsSection(context, restaurant, reviews),
 
             const SizedBox(height: 40),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// 1. Top Restaurant Header Card matching Mockup
   Widget _buildRestaurantHeaderCard(
     BuildContext context,
-    WidgetRef ref,
     RestaurantModel restaurant,
     bool isFav,
   ) {
+    final localImage = widget.restaurantData?['image']?.toString();
+    final effectiveImage = (localImage != null && localImage.isNotEmpty)
+        ? localImage
+        : (restaurant.imageUrls.isNotEmpty ? restaurant.imageUrls.first : null);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -284,18 +403,30 @@ class RestaurantDetailScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            child: restaurant.imageUrls.isNotEmpty
-                ? Image.network(
-                    restaurant.imageUrls.first,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => const Center(
-                      child: Icon(
-                        Icons.restaurant,
-                        color: Color(0xFFCBD5E1),
-                        size: 36,
-                      ),
-                    ),
-                  )
+            child: (effectiveImage != null && effectiveImage.isNotEmpty)
+                ? (effectiveImage.startsWith('assets/')
+                    ? Image.asset(
+                        effectiveImage,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Center(
+                          child: Icon(
+                            Icons.restaurant,
+                            color: Color(0xFFCBD5E1),
+                            size: 36,
+                          ),
+                        ),
+                      )
+                    : Image.network(
+                        effectiveImage,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Center(
+                          child: Icon(
+                            Icons.restaurant,
+                            color: Color(0xFFCBD5E1),
+                            size: 36,
+                          ),
+                        ),
+                      ))
                 : const Center(
                     child: Icon(
                       Icons.restaurant,
@@ -337,21 +468,27 @@ class RestaurantDetailScreen extends ConsumerWidget {
           ),
         ),
 
-        // Bookmark Icon Button
+        // Bookmark Icon Button (Solid burgundy when saved, white with red border when unbookmarked)
         IconButton(
+          key: const Key('restaurant_detail_bookmark_button'),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
-          icon: Icon(
-            isFav ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-            color: AppConstants.burgundyPrimary,
-            size: 30,
+          splashRadius: 24,
+          icon: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            transitionBuilder: (child, animation) => ScaleTransition(
+              scale: animation,
+              child: child,
+            ),
+            child: Icon(
+              isFav ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+              key: ValueKey<bool>(isFav),
+              color: AppConstants.burgundyPrimary,
+              size: 32,
+            ),
           ),
-          onPressed: () {
-            HapticFeedback.lightImpact();
-            ref
-                .read(restaurantsProvider.notifier)
-                .toggleFavorite(restaurant.id);
-          },
+          onPressed: () => _toggleBookmark(restaurant),
+          tooltip: isFav ? 'ลบออกจากรายการโปรด' : 'บันทึกในรายการโปรด',
         ),
       ],
     );
@@ -740,7 +877,6 @@ class RestaurantDetailScreen extends ConsumerWidget {
   /// 6. รีวิวร้านอาหาร
   Widget _buildReviewsSection(
     BuildContext context,
-    WidgetRef ref,
     RestaurantModel restaurant,
     List<ReviewModel> reviews,
   ) {

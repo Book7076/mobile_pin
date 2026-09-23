@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/constants.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/flow/category_selection_screen.dart';
 import 'screens/restaurants/shop_registration_screen.dart';
@@ -68,6 +69,7 @@ class MyApp extends StatelessWidget {
       home: const SplashScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
+        '/register': (context) => const RegisterScreen(),
         '/home': (context) => const HomeScreen(),
         '/category-selection': (context) => const CategorySelectionScreen(isStandalone: false),
         '/shop-registration': (context) => const ShopRegistrationScreen(),

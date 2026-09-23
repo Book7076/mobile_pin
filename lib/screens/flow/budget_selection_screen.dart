@@ -40,10 +40,15 @@ class _BudgetSelectionScreenState extends ConsumerState<BudgetSelectionScreen> {
   @override
   void initState() {
     super.initState();
-    final existingCriteria = ref.read(filterCriteriaProvider);
-    if (existingCriteria.maxBudget != null) {
-      _currentBudget = existingCriteria.maxBudget!.clamp(_minBudget, _maxBudget);
-    }
+    // Always reset budget to initial default mockup value (฿ 50) when entering afresh
+    _currentBudget = 50.0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final currentCriteria = ref.read(filterCriteriaProvider);
+        ref.read(filterCriteriaProvider.notifier).state =
+            currentCriteria.copyWith(clearBudget: true);
+      }
+    });
   }
 
   void _onSliderChanged(double value) {
@@ -118,6 +123,28 @@ class _BudgetSelectionScreenState extends ConsumerState<BudgetSelectionScreen> {
           ),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        actions: [
+          if (_currentBudget != 50.0)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton(
+                onPressed: () {
+                  HapticFeedback.lightImpact();
+                  setState(() {
+                    _currentBudget = 50.0;
+                  });
+                },
+                child: const Text(
+                  'รีเซ็ต',
+                  style: TextStyle(
+                    color: AppConstants.burgundyPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         child: Column(

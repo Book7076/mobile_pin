@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pin_mobile/screens/flow/category_selection_screen.dart';
 import 'package:pin_mobile/screens/flow/budget_selection_screen.dart';
+import 'package:pin_mobile/providers/restaurant_provider.dart';
+import 'package:pin_mobile/models/filter_criteria_model.dart';
 
 // 1x1 transparent PNG data for mocking network images in tests
 final List<int> _kTransparentImage = [
@@ -163,5 +165,87 @@ void main() {
 
     // Verify Next button "ถัดไป" exists
     expect(find.text('ถัดไป'), findsOneWidget);
+  });
+
+  testWidgets('CategorySelectionScreen always resets categories to empty when entered anew',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final container = ProviderContainer();
+    // Simulate previous session with stored criteria
+    container.read(filterCriteriaProvider.notifier).state = FilterCriteriaModel(
+      selectedCategories: ['japanese', 'chinese', 'shabu_hotpot'],
+      maxBudget: 300,
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: CategorySelectionScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify that NO checkmark badges are shown upon entering anew
+    expect(find.byIcon(Icons.check_rounded), findsNothing);
+
+    // Tap a category
+    await tester.tap(find.text('อาหารญี่ปุ่น'));
+    await tester.pumpAndSettle();
+    expect(find.byIcon(Icons.check_rounded), findsOneWidget);
+
+    // Tap the "รีเซ็ต" button
+    expect(find.text('รีเซ็ต'), findsOneWidget);
+    await tester.tap(find.text('รีเซ็ต'));
+    await tester.pumpAndSettle();
+
+    // Checkmark should be gone
+    expect(find.byIcon(Icons.check_rounded), findsNothing);
+  });
+
+  testWidgets('BudgetSelectionScreen always resets budget to 50 when entered anew',
+      (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.5;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final container = ProviderContainer();
+    // Simulate previous session with stored maxBudget = 500
+    container.read(filterCriteriaProvider.notifier).state = FilterCriteriaModel(
+      selectedCategories: ['thai'],
+      maxBudget: 500,
+    );
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(
+          home: BudgetSelectionScreen(selectedCategories: ['thai']),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify budget resets to ฿ 50 despite provider previously having 500
+    expect(find.text('฿ 50'), findsWidgets);
+
+    // Select 300
+    await tester.tap(find.text('฿300'));
+    await tester.pumpAndSettle();
+    expect(find.text('฿ 300'), findsOneWidget);
+
+    // Tap "รีเซ็ต"
+    expect(find.text('รีเซ็ต'), findsOneWidget);
+    await tester.tap(find.text('รีเซ็ต'));
+    await tester.pumpAndSettle();
+
+    // Reset back to ฿ 50
+    expect(find.text('฿ 50'), findsWidgets);
   });
 }

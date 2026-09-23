@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/auth_session_manager.dart';
+import '../../core/social_link_manager.dart';
 import '../../widgets/social_login_buttons.dart';
+import 'social_connect_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   final String email;
@@ -932,81 +934,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const Divider(height: 1, thickness: 1, color: Color(0xFFF7EBEF), indent: 16, endIndent: 16),
                     
-                    // Row 3: เข้าสู่ระบบด้วย / เปลี่ยนรหัสผ่าน (Dynamic based on social provider)
-                    if (_currentProvider == 'facebook')
-                      _buildSettingRow(
-                        label: 'เข้าสู่ระบบด้วย',
-                        valueWidget: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildFacebookBadge(),
-                                if (_socialName.isNotEmpty) ...[
-                                  const SizedBox(height: 2.5),
-                                  Text(
-                                    _socialName,
-                                    style: const TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF7E777B),
-                                    ),
-                                  ),
-                                ],
-                              ],
+                    // Row 3: เชื่อมต่อ facebook google
+                    _buildSettingRow(
+                      key: const Key('settings_social_connect_row'),
+                      label: 'เชื่อมต่อ facebook google',
+                      valueWidget: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (SocialLinkManager.isFacebookLinked)
+                            _buildFacebookBadge()
+                          else if (SocialLinkManager.isGoogleLinked)
+                            _buildGoogleBadge()
+                          else
+                            const Text(
+                              'ยังไม่เชื่อมต่อ',
+                              style: TextStyle(
+                                fontSize: 13.8,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF7E777B),
+                                letterSpacing: -0.2,
+                              ),
                             ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.chevron_right_rounded,
-                              size: 20,
-                              color: Color(0xFFB0AAB0),
-                            ),
-                          ],
-                        ),
-                        onTap: () => _showSocialAccountDetailsSheet('facebook'),
-                      )
-                    else if (_currentProvider == 'google')
-                      _buildSettingRow(
-                        label: 'เข้าสู่ระบบด้วย',
-                        valueWidget: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildGoogleBadge(),
-                                if (_socialName.isNotEmpty) ...[
-                                  const SizedBox(height: 2.5),
-                                  Text(
-                                    _socialName,
-                                    style: const TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w500,
-                                      color: Color(0xFF7E777B),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                            const SizedBox(width: 4),
-                            const Icon(
-                              Icons.chevron_right_rounded,
-                              size: 20,
-                              color: Color(0xFFB0AAB0),
-                            ),
-                          ],
-                        ),
-                        onTap: () => _showSocialAccountDetailsSheet('google'),
-                      )
-                    else
-                      _buildSettingRow(
-                        label: 'เปลี่ยนรหัสผ่าน',
-                        value: '********',
-                        onTap: _showChangePasswordModal,
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            size: 20,
+                            color: Color(0xFFB0AAB0),
+                          ),
+                        ],
                       ),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => SocialConnectScreen(
+                              email: widget.email,
+                            ),
+                          ),
+                        ).then((_) {
+                          setState(() {});
+                        });
+                      },
+                    ),
                   ]),
 
                   const SizedBox(height: 24),
@@ -1150,12 +1118,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSettingRow({
+    Key? key,
     required String label,
     String? value,
     Widget? valueWidget,
     VoidCallback? onTap,
   }) {
     return InkWell(
+      key: key,
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: Padding(
