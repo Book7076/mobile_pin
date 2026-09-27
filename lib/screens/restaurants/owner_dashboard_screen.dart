@@ -60,12 +60,16 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   }
 
   void _onBackToUserProfile() {
-    Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => const HomeScreen(initialIndex: 2),
-      ),
-      (route) => false,
-    );
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const HomeScreen(initialIndex: 2),
+        ),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -78,7 +82,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         _onBackToUserProfile();
       },
@@ -256,24 +260,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
                   const SizedBox(height: 14),
 
-                  // Row 2: ข้อความ, รีวิว, (ว่าง 1 ช่องเพื่อรักษา Grid 3 คอลัมน์)
+                  // Row 2: รีวิว, (ว่าง 2 ช่องเพื่อรักษา Grid 3 คอลัมน์)
                   Row(
                     children: [
-                      // 4. ข้อความ (Messages Placeholder)
-                      Expanded(
-                        child: _buildMenuCard(
-                          title: 'ข้อความ',
-                          iconWidget: const Icon(
-                            Icons.sms,
-                            color: maroonColor,
-                            size: 36,
-                          ),
-                          onTap: () => _navigateTo('ข้อความ', namedRoute: '/owner-messages'),
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-
-                      // 5. รีวิว (Reviews Placeholder)
+                      // รีวิว (Reviews Placeholder)
                       Expanded(
                         child: _buildMenuCard(
                           title: 'รีวิว',
@@ -287,7 +277,11 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       ),
                       const SizedBox(width: 14),
 
-                      // Empty slot to balance 3-column layout
+                      // Empty slots to balance 3-column layout
+                      const Expanded(
+                        child: SizedBox(),
+                      ),
+                      const SizedBox(width: 14),
                       const Expanded(
                         child: SizedBox(),
                       ),

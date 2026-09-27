@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import '../home/home_screen.dart';
 import 'owner_stats_screen.dart';
 import 'owner_menu_screen.dart';
 import 'owner_restaurant_info_screen.dart';
-import 'owner_messages_screen.dart';
 import 'owner_reviews_screen.dart';
 import 'owner_help_center_screen.dart';
 
@@ -26,47 +26,45 @@ class OwnerDashboardScreen extends StatefulWidget {
 }
 
 class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
+  void _handleBack() {
+    if (Navigator.canPop(context)) {
+      Navigator.pop(context);
+    } else {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const HomeScreen(initialIndex: 2),
+        ),
+        (route) => false,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final topBarHeight = screenSize.height * 0.22;
     const avatarDiameter = 190.0;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // พื้นหลังด้านบนสีแดงเลือดหมูเข้ม
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: topBarHeight,
-            child: Container(
-              color: kOwnerPrimaryColor,
-              child: SafeArea(
-                bottom: false,
-                child: Align(
-                  alignment: Alignment.topLeft,
-                  child: Padding(
-                    padding: const EdgeInsets.only(left: 8.0, top: 4.0),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.chevron_left_rounded,
-                        color: Colors.white,
-                        size: 36,
-                      ),
-                      onPressed: () {
-                        if (Navigator.canPop(context)) {
-                          Navigator.pop(context);
-                        }
-                      },
-                    ),
-                  ),
-                ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: Stack(
+          children: [
+            // พื้นหลังด้านบนสีแดงเลือดหมูเข้ม
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: topBarHeight,
+              child: Container(
+                color: kOwnerPrimaryColor,
               ),
             ),
-          ),
 
           // เนื้อหาหลักที่เลื่อนได้ (กันล้นหน้าจอทุกขนาด)
           SafeArea(
@@ -153,20 +151,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
                         const SizedBox(height: 16),
 
-                        // แถวที่ 2: ข้อความ, รีวิว
+                        // แถวที่ 2: รีวิว (ว่าง 2 ช่องเพื่อรักษา Grid 3 คอลัมน์)
                         Row(
                           children: [
-                            Expanded(
-                              child: _buildMenuCard(
-                                title: 'ข้อความ',
-                                icon: const _MessageBubbleIcon(color: kOwnerPrimaryColor, size: 46),
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const OwnerMessagesScreen()),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
                             Expanded(
                               child: _buildMenuCard(
                                 title: 'รีวิว',
@@ -179,6 +166,8 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                             ),
                             const SizedBox(width: 14),
                             // ช่องว่างเพื่อให้คอลัมน์ขนาดเท่ากันตรงเป๊ะ
+                            const Expanded(child: SizedBox()),
+                            const SizedBox(width: 14),
                             const Expanded(child: SizedBox()),
                           ],
                         ),
@@ -233,10 +222,35 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
               ),
             ),
           ),
+
+          // ปุ่มย้อนกลับด้านบนซ้าย (วางไว้ชั้นบนสุดของ Stack เพื่อให้แตะกดได้ 100% ไม่ถูก ScrollView ทับ)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 8.0, top: 4.0),
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.chevron_left_rounded,
+                      color: Colors.white,
+                      size: 36,
+                    ),
+                    onPressed: _handleBack,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// การ์ดเมนูสี่เหลี่ยมสีขาว ขอบมน เงาละมุน
   Widget _buildMenuCard({
@@ -543,69 +557,7 @@ class _StoreInfoPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// 4. ไอคอน ข้อความ (กล่องสนทนาทึบพร้อมจุด 3 จุด)
-class _MessageBubbleIcon extends StatelessWidget {
-  final Color color;
-  final double size;
-
-  const _MessageBubbleIcon({required this.color, required this.size});
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(size, size),
-      painter: _MessageBubblePainter(color: color),
-    );
-  }
-}
-
-class _MessageBubblePainter extends CustomPainter {
-  final Color color;
-  _MessageBubblePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final fillPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final dotPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    final w = size.width;
-    final h = size.height;
-
-    // ตัวกล่องข้อความโค้งมนพร้อมหางสนทนา
-    final rrect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(w * 0.15, h * 0.20, w * 0.70, h * 0.52),
-      const Radius.circular(8),
-    );
-    final bubblePath = Path()..addRRect(rrect);
-
-    // หางชี้ลงด้านซ้ายล่าง
-    final tailPath = Path()
-      ..moveTo(w * 0.15, h * 0.60)
-      ..lineTo(w * 0.15, h * 0.84)
-      ..lineTo(w * 0.38, h * 0.72)
-      ..close();
-
-    canvas.drawPath(bubblePath, fillPaint);
-    canvas.drawPath(tailPath, fillPaint);
-
-    // จุด 3 จุดสีขาวในกล่อง
-    final dotRadius = w * 0.045;
-    final centerY = h * 0.46;
-    canvas.drawCircle(Offset(w * 0.34, centerY), dotRadius, dotPaint);
-    canvas.drawCircle(Offset(w * 0.50, centerY), dotRadius, dotPaint);
-    canvas.drawCircle(Offset(w * 0.66, centerY), dotRadius, dotPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-/// 5. ไอคอน รีวิว (ใบหน้ายิ้มกลมพร้อมดวงตาและรอยยิ้ม)
+/// 4. ไอคอน รีวิว (ใบหน้ายิ้มกลมพร้อมดวงตาและรอยยิ้ม)
 class _ReviewSmileIcon extends StatelessWidget {
   final Color color;
   final double size;
