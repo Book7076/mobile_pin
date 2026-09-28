@@ -10,6 +10,7 @@ import '../profile/report_problem_screen.dart';
 import '../restaurants/open_restaurant_intro_screen.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 import '../owner/owner_dashboard_screen.dart';
+import '../owner/select_restaurant_screen.dart';
 import '../flow/category_selection_screen.dart';
 import '../../models/favorite_manager.dart';
 import '../../providers/auth_provider.dart';
@@ -1244,7 +1245,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => _isOwner
-                              ? const OwnerDashboardScreen()
+                              ? const SelectRestaurantScreen()
                               : const OpenRestaurantIntroScreen(),
                         ),
                       );

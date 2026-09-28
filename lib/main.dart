@@ -17,6 +17,7 @@ import 'screens/owner/owner_stats_screen.dart';
 import 'screens/owner/owner_messages_screen.dart';
 import 'screens/owner/owner_reviews_screen.dart';
 import 'screens/owner/owner_help_center_screen.dart';
+import 'screens/owner/select_restaurant_screen.dart';
 import 'screens/admin/admin_dashboard.dart';
 import 'screens/admin/admin_login_screen.dart';
 
@@ -75,7 +76,8 @@ class MyApp extends StatelessWidget {
         '/shop-registration': (context) => const ShopRegistrationScreen(),
         '/shop-details': (context) => const ShopDetailsScreen(),
         '/add-menu': (context) => const AddMenuScreen(),
-        '/owner-dashboard': (context) => const OwnerDashboardScreen(),
+        '/owner-dashboard': (context) => const SelectRestaurantScreen(),
+        '/select-restaurant': (context) => const SelectRestaurantScreen(),
         '/owner-statistics': (context) => const OwnerStatsScreen(),
         '/menu-management': (context) => const MenuManagementScreen(),
         '/owner-messages': (context) => const OwnerMessagesScreen(),

@@ -13,11 +13,13 @@ const Color kOwnerButtonGrey = Color(0xFFD6D0D3);
 
 class OwnerDashboardScreen extends StatefulWidget {
   final String restaurantName;
+  final String? restaurantCategory;
   final String? restaurantImageUrl;
 
   const OwnerDashboardScreen({
     super.key,
     this.restaurantName = 'The CHICKEN',
+    this.restaurantCategory,
     this.restaurantImageUrl,
   });
 
@@ -75,7 +77,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                   // เว้นระยะจากขอบบนให้ตรงกับขอบล่างของแถบสี
                   SizedBox(height: topBarHeight - MediaQuery.of(context).padding.top - (avatarDiameter / 2)),
 
-                  // รูปโปรไฟล์ร้านค้าทรงกลมตรงกลาง (The CHICKEN)
+                  // รูปโปรไฟล์ร้านค้าทรงกลมตรงกลาง
                   Center(
                     child: Container(
                       width: avatarDiameter,
@@ -93,18 +95,38 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                         ],
                       ),
                       child: ClipOval(
-                        child: widget.restaurantImageUrl != null && widget.restaurantImageUrl!.isNotEmpty
-                            ? Image.network(
-                                widget.restaurantImageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => _buildDefaultChickenLogo(),
-                              )
-                            : _buildDefaultChickenLogo(),
+                        child: _buildRestaurantAvatar(),
                       ),
                     ),
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 12),
+
+                  // แสดงชื่อร้านอาหารที่เลือก
+                  Text(
+                    widget.restaurantName,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: kOwnerPrimaryColor,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  if (widget.restaurantCategory != null && widget.restaurantCategory!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.restaurantCategory!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 20),
 
                   // ตารางเมนูกดเลือก 5 เมนู
                   Padding(
@@ -306,6 +328,81 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// รูปภาพโปรไฟล์ของร้านอาหารที่เลือก
+  Widget _buildRestaurantAvatar() {
+    if (widget.restaurantImageUrl != null && widget.restaurantImageUrl!.isNotEmpty) {
+      if (widget.restaurantImageUrl!.startsWith('assets/')) {
+        return Image.asset(
+          widget.restaurantImageUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackAvatar(),
+        );
+      }
+      return Image.network(
+        widget.restaurantImageUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildFallbackAvatar(),
+      );
+    }
+    return _buildFallbackAvatar();
+  }
+
+  Widget _buildFallbackAvatar() {
+    final nameUpper = widget.restaurantName.toUpperCase();
+    if (nameUpper.contains('CHICKEN')) {
+      return _buildDefaultChickenLogo();
+    }
+    if (nameUpper.contains('WANJOI')) {
+      return _buildDefaultWanjoiLogo();
+    }
+    return Container(
+      color: const Color(0xFFF9ECEF),
+      child: const Center(
+        child: Icon(
+          Icons.storefront_rounded,
+          color: kOwnerPrimaryColor,
+          size: 64,
+        ),
+      ),
+    );
+  }
+
+  /// โลโก้ของร้าน "WANJOI" (บิงซู / เบเกอรี่)
+  Widget _buildDefaultWanjoiLogo() {
+    return Container(
+      color: const Color(0xFF2E2421),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Image.network(
+            'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=500&auto=format&fit=crop&q=80',
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (_, __, ___) => Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.bakery_dining_rounded, size: 60, color: Colors.orange[200]),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'WANJOI',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
