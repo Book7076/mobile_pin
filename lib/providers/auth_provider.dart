@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../main.dart';
 import '../core/mock_data.dart';
@@ -21,17 +22,57 @@ class AuthStateNotifier extends StateNotifier<UserModel?> {
   }
 
   Future<void> _loadSupabaseUser(String id, String email) async {
+    final user = supabase.auth.currentUser;
+    final meta = user?.userMetadata;
+    final authPhone = (user?.phone != null && user!.phone!.isNotEmpty)
+        ? user.phone!
+        : (meta?['phone']?.toString() ?? '');
+
+    final metaFirst = (meta?['first_name'] ?? meta?['fname'])?.toString().trim() ?? '';
+    final metaLast = (meta?['last_name'] ?? meta?['lname'])?.toString().trim() ?? '';
+    final fullName = [metaFirst, metaLast].where((s) => s.isNotEmpty).join(' ');
+
     try {
-      final response = await supabase.from('users').select().eq('id', id).single();
-      state = UserModel.fromJson(response);
-    } catch (_) {
-      state = UserModel(
-        id: id,
-        email: email,
-        name: email.split('@').first,
-        role: 'customer',
-        swipeCount: 0,
-      );
+      var response = await supabase.from('users').select().eq('id', id).maybeSingle();
+      if (response == null && email.isNotEmpty) {
+        response = await supabase.from('users').select().eq('email', email).maybeSingle();
+      }
+      if (response != null) {
+        final merged = Map<String, dynamic>.from(response);
+        if ((merged['phone'] == null || merged['phone'].toString().trim().isEmpty) && authPhone.isNotEmpty) {
+          merged['phone'] = authPhone;
+        }
+        if ((merged['first_name'] == null || merged['first_name'].toString().trim().isEmpty) && metaFirst.isNotEmpty) {
+          merged['first_name'] = metaFirst;
+        }
+        if ((merged['last_name'] == null || merged['last_name'].toString().trim().isEmpty) && metaLast.isNotEmpty) {
+          merged['last_name'] = metaLast;
+        }
+        state = UserModel.fromJson(merged);
+        return;
+      }
+    } catch (e) {
+      debugPrint('Error loading user from users table: $e');
+    }
+
+    state = UserModel(
+      id: id,
+      email: email,
+      name: fullName.isNotEmpty ? fullName : email.split('@').first,
+      phone: authPhone,
+      role: 'customer',
+      swipeCount: 0,
+    );
+  }
+
+  void setUserFromMap(Map<String, dynamic> data) {
+    state = UserModel.fromJson(data);
+  }
+
+  Future<void> refreshUser() async {
+    final user = supabase.auth.currentUser;
+    if (user != null) {
+      await _loadSupabaseUser(user.id, user.email ?? '');
     }
   }
 

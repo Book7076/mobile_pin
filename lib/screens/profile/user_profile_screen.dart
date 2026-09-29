@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
 import '../../core/auth_session_manager.dart';
 import '../../widgets/social_login_buttons.dart';
+import '../../providers/auth_provider.dart';
 import '../auth/login_screen.dart';
 import 'edit_user_profile_screen.dart';
 import 'edit_user_photo_screen.dart';
 
-class UserProfileScreen extends StatefulWidget {
+class UserProfileScreen extends ConsumerStatefulWidget {
   final bool showDeleteDialogOnInit;
 
   const UserProfileScreen({
@@ -16,10 +19,10 @@ class UserProfileScreen extends StatefulWidget {
   });
 
   @override
-  State<UserProfileScreen> createState() => _UserProfileScreenState();
+  ConsumerState<UserProfileScreen> createState() => _UserProfileScreenState();
 }
 
-class _UserProfileScreenState extends State<UserProfileScreen> {
+class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   late String _name;
   late String _email;
   late String _phone;
@@ -32,9 +35,30 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     super.initState();
     final currentUser = supabase.auth.currentUser;
     _currentProvider = AuthSessionManager.currentProvider;
-    _name = 'Emma';
-    _email = currentUser?.email ?? 'Emma.carter@gmail.com';
-    _phone = '099-888-7777';
+
+    final authUser = ref.read(authProvider);
+    final metaFirst = (currentUser?.userMetadata?['first_name'] ?? currentUser?.userMetadata?['fname'])?.toString().trim() ?? '';
+    final metaLast = (currentUser?.userMetadata?['last_name'] ?? currentUser?.userMetadata?['lname'])?.toString().trim() ?? '';
+    final metaFullName = [metaFirst, metaLast].where((s) => s.isNotEmpty).join(' ');
+
+    if (authUser?.name.isNotEmpty == true && authUser!.name != 'ผู้ใช้งาน' && !authUser.name.contains('@')) {
+      _name = authUser.name;
+    } else if (metaFullName.isNotEmpty) {
+      _name = metaFullName;
+    } else {
+      final emailPrefix = currentUser?.email?.split('@').first ?? 'ผู้ใช้งาน';
+      if (emailPrefix.contains('.')) {
+        _name = emailPrefix.split('.').map((p) => p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '').join(' ');
+      } else {
+        _name = emailPrefix;
+      }
+    }
+
+    _email = currentUser?.email ?? (authUser?.email.isNotEmpty == true ? authUser!.email : '');
+    final authPhone = (authUser?.phone.isNotEmpty == true)
+        ? authUser!.phone
+        : (currentUser?.phone ?? (currentUser?.userMetadata?['phone']?.toString() ?? ''));
+    _phone = authPhone.trim().isNotEmpty ? _formatPhoneNumber(authPhone) : '-';
 
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -46,6 +70,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       ),
     );
 
+    // เช็ค id จากตาราง users แล้วดึง phone และ Fname Lname มาแสดง
+    _loadUserFromUsersTable();
+
     if (widget.showDeleteDialogOnInit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -55,22 +82,179 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
+  Future<void> _loadUserFromUsersTable() async {
+    final currentUser = supabase.auth.currentUser;
+    final userId = currentUser?.id ?? ref.read(authProvider)?.id;
+
+    if (userId == null || userId.isEmpty) {
+      return;
+    }
+
+    try {
+      // 1. เช็ค id ของคนที่ล็อกอินว่าตรงกับแถวไหนในตาราง users
+      var data = await supabase
+          .from('users')
+          .select('id, email, phone, first_name, last_name')
+          .eq('id', userId)
+          .maybeSingle();
+
+      if (data == null && currentUser?.email != null && currentUser!.email!.isNotEmpty) {
+        data = await supabase
+            .from('users')
+            .select('id, email, phone, first_name, last_name')
+            .eq('email', currentUser.email!)
+            .maybeSingle();
+      }
+
+      final userRow = data;
+      // ดึงค่า phone: จากตาราง users ก่อน ถ้าไม่มีให้ดึงจาก Supabase Auth
+      var rawPhone = userRow?['phone']?.toString().trim();
+      if (rawPhone == null || rawPhone.isEmpty) {
+        rawPhone = currentUser?.phone?.trim();
+      }
+      if (rawPhone == null || rawPhone.isEmpty) {
+        rawPhone = currentUser?.userMetadata?['phone']?.toString().trim();
+      }
+
+      // ดึงค่า first_name และ last_name จากตาราง users หรือ fallback จาก Auth userMetadata
+      var rawFirstName = (userRow?['first_name'] ?? userRow?['fname'])?.toString().trim() ?? '';
+      var rawLastName = (userRow?['last_name'] ?? userRow?['lname'])?.toString().trim() ?? '';
+
+      if (rawFirstName.isEmpty) {
+        rawFirstName = (currentUser?.userMetadata?['first_name'] ?? currentUser?.userMetadata?['fname'])?.toString().trim() ?? '';
+      }
+      if (rawLastName.isEmpty) {
+        rawLastName = (currentUser?.userMetadata?['last_name'] ?? currentUser?.userMetadata?['lname'])?.toString().trim() ?? '';
+      }
+
+      // Format เป็น "Fname Lname"
+      final combinedName = [rawFirstName, rawLastName].where((s) => s.isNotEmpty).join(' ');
+
+      String resolvedName;
+      if (combinedName.isNotEmpty) {
+        resolvedName = combinedName;
+      } else if (userRow?['name'] != null && userRow!['name'].toString().trim().isNotEmpty) {
+        resolvedName = userRow['name'].toString().trim();
+      } else {
+        final emailPrefix = currentUser?.email?.split('@').first ?? 'ผู้ใช้งาน';
+        if (emailPrefix.contains('.')) {
+          resolvedName = emailPrefix.split('.').map((p) => p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '').join(' ');
+        } else {
+          resolvedName = emailPrefix;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _phone = (rawPhone != null && rawPhone.isNotEmpty)
+              ? _formatPhoneNumber(rawPhone)
+              : '-';
+          _name = resolvedName;
+          _email = userRow?['email']?.toString() ?? (currentUser?.email ?? _email);
+        });
+
+        if (userRow != null) {
+          final mergedData = Map<String, dynamic>.from(userRow);
+          if (rawPhone != null && rawPhone.isNotEmpty) {
+            mergedData['phone'] = rawPhone;
+          }
+          if (rawFirstName.isNotEmpty) {
+            mergedData['first_name'] = rawFirstName;
+          }
+          if (rawLastName.isNotEmpty) {
+            mergedData['last_name'] = rawLastName;
+          }
+          ref.read(authProvider.notifier).setUserFromMap(mergedData);
+        }
+      }
+    } catch (_) {}
+  }
+
+  String _formatPhoneNumber(String raw) {
+    var clean = raw.replaceAll(RegExp(r'[-\s]'), '');
+    if (clean.startsWith('+66')) {
+      clean = '0${clean.substring(3)}';
+    } else if (clean.startsWith('66') && clean.length >= 11) {
+      clean = '0${clean.substring(2)}';
+    }
+    if (clean.length == 10) {
+      return '${clean.substring(0, 3)}-${clean.substring(3, 6)}-${clean.substring(6)}';
+    } else if (clean.length == 9) {
+      return '${clean.substring(0, 2)}-${clean.substring(2, 5)}-${clean.substring(5)}';
+    }
+    return raw;
+  }
+
   void _openEditProfileScreen() async {
+    final authUser = ref.read(authProvider);
+    final currentPhone = _phone != '-' ? _phone : (authUser?.phone.isNotEmpty == true ? _formatPhoneNumber(authUser!.phone) : '');
+    final currentName = _name != 'ผู้ใช้งาน' ? _name : (authUser?.name.isNotEmpty == true ? authUser!.name : _name);
+    final currentEmail = _email.isNotEmpty ? _email : (authUser?.email.isNotEmpty == true ? authUser!.email : _email);
+
     final result = await Navigator.of(context).push<Map<String, String>>(
       MaterialPageRoute(
         builder: (_) => EditUserProfileScreen(
-          initialName: _name,
-          initialEmail: _email,
-          initialPhone: _phone,
+          initialName: currentName,
+          initialEmail: currentEmail,
+          initialPhone: currentPhone == '-' ? '' : currentPhone,
         ),
       ),
     );
     if (result != null && mounted) {
+      final phoneInput = result['phone']?.trim() ?? '';
+      final updatedPhone = phoneInput.isNotEmpty
+          ? _formatPhoneNumber(phoneInput)
+          : '-';
+      final updatedName = result['name'] ?? _name;
+      final updatedEmail = result['email'] ?? _email;
+
       setState(() {
-        _name = result['name'] ?? _name;
-        _email = result['email'] ?? _email;
-        _phone = result['phone'] ?? _phone;
+        _name = updatedName;
+        _email = updatedEmail;
+        _phone = updatedPhone;
       });
+
+      try {
+        final currentUser = supabase.auth.currentUser;
+        final userId = currentUser?.id ?? ref.read(authProvider)?.id;
+        final cleanPhone = updatedPhone == '-' ? '' : updatedPhone.replaceAll(RegExp(r'[-\s]'), '');
+
+        final nameParts = updatedName.trim().split(RegExp(r'\s+'));
+        final firstName = nameParts.isNotEmpty ? nameParts.first : '';
+        final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+        // 1. Update Supabase 'users' table by user.id
+        if (userId != null && userId.isNotEmpty) {
+          await supabase.from('users').update({
+            'phone': cleanPhone,
+            'first_name': firstName,
+            'last_name': lastName,
+          }).eq('id', userId);
+        }
+
+        // 2. Update Supabase Auth user metadata
+        if (currentUser != null) {
+          await supabase.auth.updateUser(
+            UserAttributes(
+              data: {
+                'phone': cleanPhone,
+                'first_name': firstName,
+                'last_name': lastName,
+                'name': updatedName,
+              },
+            ),
+          );
+        }
+
+        // 3. Update AuthProvider
+        ref.read(authProvider.notifier).updateProfile(
+          name: updatedName,
+          phone: cleanPhone,
+          dietaryPreferences: ref.read(authProvider)?.dietaryPreferences ?? [],
+        );
+      } catch (_) {
+        // Fallback / ignore offline errors
+      }
     }
   }
 
@@ -222,6 +406,30 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authUser = ref.watch(authProvider);
+    final currentUser = supabase.auth.currentUser;
+    final fallbackAuthPhone = (currentUser?.phone != null && currentUser!.phone!.isNotEmpty)
+        ? currentUser.phone!
+        : (currentUser?.userMetadata?['phone']?.toString() ?? '');
+
+    final metaFirst = (currentUser?.userMetadata?['first_name'] ?? currentUser?.userMetadata?['fname'])?.toString().trim() ?? '';
+    final metaLast = (currentUser?.userMetadata?['last_name'] ?? currentUser?.userMetadata?['lname'])?.toString().trim() ?? '';
+    final metaFullName = [metaFirst, metaLast].where((s) => s.isNotEmpty).join(' ');
+
+    final effectivePhone = (_phone != '-')
+        ? _phone
+        : (authUser?.phone.isNotEmpty == true
+            ? _formatPhoneNumber(authUser!.phone)
+            : (fallbackAuthPhone.isNotEmpty ? _formatPhoneNumber(fallbackAuthPhone) : '-'));
+    final effectiveName = (_name != 'ผู้ใช้งาน' && !_name.contains('@'))
+        ? _name
+        : (authUser?.name.isNotEmpty == true && authUser!.name != 'ผู้ใช้งาน' && !authUser.name.contains('@')
+            ? authUser.name
+            : (metaFullName.isNotEmpty ? metaFullName : _name));
+    final effectiveEmail = _email.isNotEmpty
+        ? _email
+        : (authUser?.email.isNotEmpty == true ? authUser!.email : (currentUser?.email ?? ''));
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
@@ -395,16 +603,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     ),
                     child: Column(
                       children: [
-                        // Row 1: ชื่อ -นามสกุล
-                        _buildInfoRow('ชื่อ -นามสกุล', _name),
+                        // Row 1: ชื่อ - นามสกุล
+                        _buildInfoRow('ชื่อ - นามสกุล', effectiveName),
                         _buildDivider(),
 
                         // Row 2: อีเมล
-                        _buildInfoRow('อีเมล', _email),
+                        _buildInfoRow('อีเมล', effectiveEmail),
                         _buildDivider(),
 
                         // Row 3: เบอร์โทรศัพท์
-                        _buildInfoRow('เบอร์โทรศัพท์', _phone),
+                        _buildInfoRow('เบอร์โทรศัพท์', effectivePhone),
                         _buildDivider(),
 
                         // Row 4: รหัสผ่าน / เข้าสู่ระบบด้วย

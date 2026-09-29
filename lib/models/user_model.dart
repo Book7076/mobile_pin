@@ -32,10 +32,29 @@ class UserModel {
       prefs = (json['dietary_preferences'] as List).map((e) => e.toString()).toList();
     }
 
+    final fName = (json['first_name'] ?? json['fname'])?.toString().trim() ?? '';
+    final lName = (json['last_name'] ?? json['lname'])?.toString().trim() ?? '';
+    final combinedFnameLname = [fName, lName].where((s) => s.isNotEmpty).join(' ');
+
+    String resolvedName = combinedFnameLname.isNotEmpty
+        ? combinedFnameLname
+        : (json['name']?.toString().trim() ?? '');
+    if (resolvedName.isEmpty) {
+      final emailPrefix = json['email']?.toString().split('@').first ?? 'ผู้ใช้งาน';
+      if (emailPrefix.contains('.')) {
+        resolvedName = emailPrefix
+            .split('.')
+            .map((p) => p.isNotEmpty ? '${p[0].toUpperCase()}${p.substring(1)}' : '')
+            .join(' ');
+      } else {
+        resolvedName = emailPrefix;
+      }
+    }
+
     return UserModel(
       id: json['id']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
-      name: json['name']?.toString() ?? (json['email']?.toString().split('@').first ?? 'ผู้ใช้งาน'),
+      name: resolvedName,
       phone: json['phone']?.toString() ?? '',
       role: json['user_type']?.toString() ?? json['role']?.toString() ?? 'customer',
       swipeCount: (json['swipe_count'] as num?)?.toInt() ?? 0,

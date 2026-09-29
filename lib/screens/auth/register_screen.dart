@@ -9,9 +9,10 @@ import 'login_screen.dart';
 /// 1. ชื่อ (ชื่อจริง)
 /// 2. นามสกุล (นามสกุล)
 /// 3. เลขบัตรประชาชน (กรุณากรอกเลขบัตรประชาชน)
-/// 4. อีเมล (กรุณากรอกอีเมล)
-/// 5. รหัสผ่าน (กรุณากรอกรหัสผ่าน)
-/// 6. ยืนยันรหัสผ่าน (กรุณากรอกเพื่อยืนยันรหัสผ่าน)
+/// 4. เบอร์โทรศัพท์ (กรุณากรอกเบอร์โทรศัพท์)
+/// 5. อีเมล (กรุณากรอกอีเมล)
+/// 6. รหัสผ่าน (กรุณากรอกรหัสผ่าน)
+/// 7. ยืนยันรหัสผ่าน (กรุณากรอกเพื่อยืนยันรหัสผ่าน)
 /// With top back arrow "<" returning to login screen,
 /// and returning to login screen upon successful sign up.
 class RegisterScreen extends StatefulWidget {
@@ -25,6 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _citizenIdController = TextEditingController();
+  final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -50,6 +52,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _citizenIdController.dispose();
+    _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -60,6 +63,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
     final citizenId = _citizenIdController.text.trim();
+    final phone = _phoneController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
@@ -82,6 +86,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (citizenId.length != 13) {
       _showMessage('เลขบัตรประชาชนต้องมี 13 หลัก');
+      return;
+    }
+
+    if (phone.isEmpty) {
+      _showMessage('กรุณากรอกเบอร์โทรศัพท์');
+      return;
+    }
+
+    if (phone.length < 9 || !RegExp(r'^0[0-9]{8,9}$').hasMatch(phone)) {
+      _showMessage('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง');
       return;
     }
 
@@ -115,6 +129,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'first_name': firstName,
           'last_name': lastName,
           'citizen_id': citizenId,
+          'phone': phone,
         },
       );
 
@@ -128,6 +143,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             'first_name': firstName,
             'last_name': lastName,
             'citizen_id': citizenId,
+            'phone': phone,
             'swipe_count': 0,
           });
         } catch (_) {
@@ -349,7 +365,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         const SizedBox(height: 14),
 
-                        // 4. อีเมล
+                        // 4. เบอร์โทรศัพท์
+                        _buildInputLabel('เบอร์โทรศัพท์'),
+                        const SizedBox(height: 6),
+                        _buildTextField(
+                          fieldKey: const Key('phone_field'),
+                          controller: _phoneController,
+                          hintText: 'กรุณากรอกเบอร์โทรศัพท์',
+                          inputBg: inputBg,
+                          hintColor: hintColor,
+                          textColor: textColor,
+                          keyboardType: TextInputType.phone,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(10),
+                          ],
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // 5. อีเมล
                         _buildInputLabel('อีเมล'),
                         const SizedBox(height: 6),
                         _buildTextField(
@@ -364,7 +399,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         const SizedBox(height: 14),
 
-                        // 5. รหัสผ่าน
+                        // 6. รหัสผ่าน
                         _buildInputLabel('รหัสผ่าน'),
                         const SizedBox(height: 6),
                         _buildTextField(
@@ -379,7 +414,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         const SizedBox(height: 14),
 
-                        // 6. ยืนยันรหัสผ่าน
+                        // 7. ยืนยันรหัสผ่าน
                         _buildInputLabel('ยืนยันรหัสผ่าน'),
                         const SizedBox(height: 6),
                         _buildTextField(

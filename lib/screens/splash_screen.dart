@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../main.dart';
+import '../providers/auth_provider.dart';
 import 'auth/login_screen.dart';
 import 'home/home_screen.dart';
 import 'admin/admin_dashboard.dart';
@@ -97,13 +98,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     try {
       final session = supabase.auth.currentSession;
       if (session != null) {
-        final userData = await supabase
+        var userData = await supabase
             .from('users')
-            .select('user_type')
+            .select()
             .eq('id', session.user.id)
             .maybeSingle();
 
+        if (userData == null && session.user.email != null && session.user.email!.isNotEmpty) {
+          userData = await supabase
+              .from('users')
+              .select()
+              .eq('email', session.user.email!)
+              .maybeSingle();
+        }
+
         if (!mounted) return;
+
+        if (userData != null) {
+          ref.read(authProvider.notifier).setUserFromMap(userData);
+        } else {
+          await ref.read(authProvider.notifier).refreshUser();
+        }
 
         final userType = (userData?['user_type'] ?? userData?['role'])?.toString().toLowerCase();
         if (userData != null && userType == 'admin') {

@@ -10,6 +10,7 @@ import '../admin/admin_dashboard.dart';
 import '../onboarding/onboarding_flow_screen.dart';
 import '../../widgets/meal_mate_logo.dart';
 import '../../widgets/social_login_button.dart';
+import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -144,17 +145,46 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (user != null) {
       try {
-        final userData = await supabase
+        // เช็ค id ว่าตรงกับแถวไหนในตาราง users แล้วดึงข้อมูลรวมถึง phone และ first_name, last_name
+        var userData = await supabase
             .from('users')
-            .select('user_type')
+            .select('id, email, phone, first_name, last_name, user_type, role')
             .eq('id', user.id)
             .maybeSingle();
 
+        if (userData == null && user.email != null && user.email!.isNotEmpty) {
+          userData = await supabase
+              .from('users')
+              .select('id, email, phone, first_name, last_name, user_type, role')
+              .eq('email', user.email!)
+              .maybeSingle();
+        }
+
         if (userData != null) {
           role = (userData['user_type'] ?? userData['role'])?.toString();
+          final authPhone = (user.phone != null && user.phone!.isNotEmpty)
+              ? user.phone!
+              : (user.userMetadata?['phone']?.toString() ?? '');
+          final metaFirst = (user.userMetadata?['first_name'] ?? user.userMetadata?['fname'])?.toString().trim() ?? '';
+          final metaLast = (user.userMetadata?['last_name'] ?? user.userMetadata?['lname'])?.toString().trim() ?? '';
+          final mergedData = Map<String, dynamic>.from(userData);
+          if ((mergedData['phone'] == null || mergedData['phone'].toString().trim().isEmpty) && authPhone.isNotEmpty) {
+            mergedData['phone'] = authPhone;
+          }
+          if ((mergedData['first_name'] == null || mergedData['first_name'].toString().trim().isEmpty) && metaFirst.isNotEmpty) {
+            mergedData['first_name'] = metaFirst;
+          }
+          if ((mergedData['last_name'] == null || mergedData['last_name'].toString().trim().isEmpty) && metaLast.isNotEmpty) {
+            mergedData['last_name'] = metaLast;
+          }
+          ref.read(authProvider.notifier).setUserFromMap(mergedData);
+        } else {
+          await ref.read(authProvider.notifier).refreshUser();
         }
       } catch (_) {
-        // Continue with default role if profile table isn't ready
+        try {
+          await ref.read(authProvider.notifier).refreshUser();
+        } catch (_) {}
       }
     }
 

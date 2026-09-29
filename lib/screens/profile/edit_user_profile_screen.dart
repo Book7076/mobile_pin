@@ -30,7 +30,7 @@ class _EditUserProfileScreenState extends State<EditUserProfileScreen> {
     super.initState();
     _nameController = TextEditingController(text: widget.initialName);
     _emailController = TextEditingController(text: widget.initialEmail);
-    _phoneController = TextEditingController(text: widget.initialPhone);
+    _phoneController = TextEditingController(text: widget.initialPhone == '-' ? '' : widget.initialPhone);
     _passwordController = TextEditingController(text: '********');
 
     SystemChrome.setSystemUIOverlayStyle(
@@ -77,7 +77,7 @@ class _EditUserProfileScreenState extends State<EditUserProfileScreen> {
           updatedData: {
             'name': name,
             'email': email.isNotEmpty ? email : widget.initialEmail,
-            'phone': phone.isNotEmpty ? phone : widget.initialPhone,
+            'phone': phone.isNotEmpty ? phone : (widget.initialPhone == '-' ? '' : widget.initialPhone),
           },
         ),
       ),

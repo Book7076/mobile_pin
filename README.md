@@ -1,4 +1,4 @@
-# pin_mobile_kuy
+# pin_mobile
 
 A new Flutter project.
 
