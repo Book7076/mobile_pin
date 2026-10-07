@@ -1,231 +1,1273 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../models/operating_hours_model.dart';
+import 'owner_edit_amenities_screen.dart';
 
 const Color kOwnerPrimaryColor = Color(0xFF7C1431);
+const Color kOwnerTealColor = Color(0xFF00BFA5);
+
+/// โมเดลช่วยจัดเก็บเวลาเปิด-ปิดแต่ละวันสำหรับหน้าจอแสดงผล
+class DayScheduleItem {
+  final int dayOfWeek; // 1=จันทร์ ... 7=อาทิตย์
+  final String dayName;
+  String openTime;
+  String closeTime;
+  bool isClosed;
+
+  DayScheduleItem({
+    required this.dayOfWeek,
+    required this.dayName,
+    required this.openTime,
+    required this.closeTime,
+    required this.isClosed,
+  });
+
+  String get displayTime {
+    if (isClosed) return 'หยุดทำการ';
+    String clean(String t) {
+      final parts = t.split(':');
+      if (parts.length >= 2) return '${parts[0].padLeft(2, '0')}.${parts[1].padLeft(2, '0')}';
+      return t.replaceAll(':', '.');
+    }
+    return '${clean(openTime)} - ${clean(closeTime)}';
+  }
+}
 
 class OwnerRestaurantInfoScreen extends StatefulWidget {
-  const OwnerRestaurantInfoScreen({super.key});
+  final String? restaurantId;
+  final String restaurantName;
+  final String? restaurantCategory;
+  final String? restaurantImageUrl;
+
+  const OwnerRestaurantInfoScreen({
+    super.key,
+    this.restaurantId,
+    this.restaurantName = 'THE CHICKEN',
+    this.restaurantCategory,
+    this.restaurantImageUrl,
+  });
 
   @override
   State<OwnerRestaurantInfoScreen> createState() => _OwnerRestaurantInfoScreenState();
 }
 
 class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
-  final _nameController = TextEditingController(text: 'The CHICKEN');
-  final _categoryController = TextEditingController(text: 'ไก่ทอดและอาหารเกาหลี');
-  final _addressController = TextEditingController(text: '123/45 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพฯ 10110');
-  final _phoneController = TextEditingController(text: '081-234-5678');
-  final _hoursController = TextEditingController(text: '10:00 - 21:30 น. (เปิดทุกวัน)');
+  late String _name;
+  late String _category;
+  late String _storeCode;
+  late String _address;
+  late String _mapsUrl;
+  late String _phone;
+  late String _email;
+  String? _currentImageUrl;
+  String _status = 'approved';
+  bool _isLoading = false;
 
-  bool _isEditing = false;
+  // รายการวันทั้ง 7 วัน เรียงตาม mockup: อาทิตย์, จันทร์, อังคาร, พุธ, พฤหัสบดี, ศุกร์, เสาร์
+  late List<DayScheduleItem> _schedules;
+
+  // สิ่งอำนวยความสะดวก
+  List<String> _amenities = [
+    'มีปลั๊กไฟ',
+    'มีอินเทอร์เน็ต',
+    'มีห้องน้ำ',
+    'เครื่องปรับอากาศ',
+    'เหมาะกับกลุ่ม',
+  ];
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    _categoryController.dispose();
-    _addressController.dispose();
-    _phoneController.dispose();
-    _hoursController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _name = widget.restaurantName;
+    _category = widget.restaurantCategory ?? 'อาหารตามสั่ง';
+    _storeCode = _generateStoreCode(widget.restaurantId);
+    _address = '31/D ตำบลสุเทพ ซอยวัดอุโมงค์ หลังมอ';
+    _mapsUrl = 'www.googlemap.com';
+    _phone = '0991234567';
+    _email = 'ITLOVER@GMAIL.COM';
+    _currentImageUrl = widget.restaurantImageUrl;
+
+    // เริ่มต้นเวลาเปิดปิดตาม Mockup
+    _initDefaultSchedules();
+
+    _loadRestaurantDetails();
+  }
+
+  String _generateStoreCode(String? id) {
+    if (id == null || id.isEmpty) return 'FD3429';
+    final clean = id.replaceAll('-', '');
+    final suffix = clean.length >= 4 ? clean.substring(0, 4).toUpperCase() : '3429';
+    return 'FD$suffix';
+  }
+
+  void _initDefaultSchedules() {
+    _schedules = [
+      DayScheduleItem(dayOfWeek: 7, dayName: 'อาทิตย์', openTime: '09:00', closeTime: '23:00', isClosed: false),
+      DayScheduleItem(dayOfWeek: 1, dayName: 'จันทร์', openTime: '10:00', closeTime: '22:00', isClosed: true),
+      DayScheduleItem(dayOfWeek: 2, dayName: 'อังคาร', openTime: '10:00', closeTime: '22:00', isClosed: false),
+      DayScheduleItem(dayOfWeek: 3, dayName: 'พุธ', openTime: '10:00', closeTime: '22:00', isClosed: false),
+      DayScheduleItem(dayOfWeek: 4, dayName: 'พฤหัสบดี', openTime: '10:00', closeTime: '22:00', isClosed: false),
+      DayScheduleItem(dayOfWeek: 5, dayName: 'ศุกร์', openTime: '10:00', closeTime: '22:00', isClosed: false),
+      DayScheduleItem(dayOfWeek: 6, dayName: 'เสาร์', openTime: '09:00', closeTime: '23:00', isClosed: false),
+    ];
+  }
+
+  /// ดึงข้อมูลร้านค้าจริงจาก Supabase
+  Future<void> _loadRestaurantDetails() async {
+    if (widget.restaurantId == null) return;
+
+    try {
+      // 1. ดึงข้อมูลจากตาราง restaurants
+      final res = await Supabase.instance.client
+          .from('restaurants')
+          .select()
+          .eq('id', widget.restaurantId!)
+          .maybeSingle();
+
+      if (res != null && mounted) {
+        setState(() {
+          _name = res['name']?.toString() ?? _name;
+          if (res['address'] != null && res['address'].toString().isNotEmpty) {
+            _address = res['address'].toString();
+          }
+          if (res['phone'] != null && res['phone'].toString().isNotEmpty) {
+            _phone = res['phone'].toString();
+          }
+          if (res['google_maps_url'] != null && res['google_maps_url'].toString().isNotEmpty) {
+            _mapsUrl = res['google_maps_url'].toString();
+          }
+          if (res['status'] != null) {
+            _status = res['status'].toString();
+          }
+          if (res['image_url'] != null && res['image_url'].toString().isNotEmpty) {
+            _currentImageUrl = res['image_url'].toString();
+          }
+        });
+
+        // ดึง email ของ owner ถ้ามี
+        try {
+          final currentUser = Supabase.instance.client.auth.currentUser;
+          if (currentUser != null && currentUser.email != null && currentUser.email!.isNotEmpty) {
+            setState(() {
+              _email = currentUser.email!.toUpperCase();
+            });
+          }
+        } catch (_) {}
+
+        // 2. ถ้ามี cuisine_type_id ให้ดึงชื่อหมวดหมู่จากตาราง cuisine_types
+        final cuisineTypeId = res['cuisine_type_id'];
+        if (cuisineTypeId != null) {
+          try {
+            final cType = await Supabase.instance.client
+                .from('cuisine_types')
+                .select('name')
+                .eq('id', cuisineTypeId)
+                .maybeSingle();
+            if (cType != null && cType['name'] != null && mounted) {
+              setState(() {
+                _category = cType['name'].toString();
+              });
+            }
+          } catch (_) {}
+        }
+      }
+
+      // 3. ดึงเวลาเปิด-ปิดจากตาราง operating_hours
+      try {
+        final hoursRows = await Supabase.instance.client
+            .from('operating_hours')
+            .select()
+            .eq('restaurant_id', widget.restaurantId!);
+
+        if (hoursRows is List && hoursRows.isNotEmpty && mounted) {
+          final Map<int, Map<String, dynamic>> dbMap = {};
+          for (final row in hoursRows) {
+            final d = (row['day_of_week'] as num?)?.toInt();
+            if (d != null) {
+              dbMap[d] = Map<String, dynamic>.from(row as Map);
+            }
+          }
+
+          setState(() {
+            for (final item in _schedules) {
+              if (dbMap.containsKey(item.dayOfWeek)) {
+                final d = dbMap[item.dayOfWeek]!;
+                item.openTime = d['open_time']?.toString() ?? item.openTime;
+                item.closeTime = d['close_time']?.toString() ?? item.closeTime;
+                item.isClosed = d['is_closed'] as bool? ?? false;
+              }
+            }
+          });
+        }
+      } catch (_) {}
+
+      // 4. ดึงรูปภาพจากตาราง restaurant_images ถ้า _currentImageUrl ยังว่างอยู่
+      if (_currentImageUrl == null || _currentImageUrl!.isEmpty) {
+        try {
+          final imgRows = await Supabase.instance.client
+              .from('restaurant_images')
+              .select('image_url, is_logo, sort_order')
+              .eq('restaurant_id', widget.restaurantId!)
+              .order('sort_order', ascending: true);
+
+          if (imgRows is List && imgRows.isNotEmpty && mounted) {
+            final match = imgRows.firstWhere(
+              (i) => i['is_logo'] == true,
+              orElse: () => imgRows.first,
+            );
+            if (match['image_url'] != null) {
+              setState(() {
+                _currentImageUrl = match['image_url'].toString();
+              });
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (e) {
+      debugPrint('Error loading restaurant info from Supabase: $e');
+    }
+  }
+
+  void _launchMaps() async {
+    String url = _mapsUrl.trim();
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://$url';
+    }
+    final uri = Uri.tryParse(url);
+    if (uri != null) {
+      try {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF9F9FB),
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: kOwnerPrimaryColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 32),
+          icon: const Icon(Icons.chevron_left_rounded, color: Colors.white, size: 34),
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          'ข้อมูลร้านค้า',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+          'ข้อมูลร้าน',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            letterSpacing: 0.3,
+          ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(_isEditing ? Icons.check_rounded : Icons.edit_rounded, color: Colors.white),
-            onPressed: () {
-              setState(() {
-                _isEditing = !_isEditing;
-              });
-              if (!_isEditing) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('บันทึกข้อมูลเรียบร้อยแล้ว'),
-                    backgroundColor: kOwnerPrimaryColor,
-                  ),
-                );
-              }
-            },
-          ),
-        ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ป้ายโปรไฟล์ร้าน
-            Center(
-              child: Stack(
+            // ส่วนที่ 1: ส่วนหัวโปรไฟล์ร้าน (รูปทรงกลม + ชื่อร้าน + รหัสร้าน)
+            _buildStoreProfileHeader(),
+
+            const Divider(height: 1, thickness: 1, color: Color(0xFFF2E6E8)),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 110,
-                    height: 110,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: kOwnerPrimaryColor, width: 3),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const ClipOval(
-                      child: Image(
-                        image: NetworkImage(
-                          'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=300&auto=format&fit=crop&q=80',
-                        ),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  if (_isEditing)
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: const BoxDecoration(
-                          color: kOwnerPrimaryColor,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
-                      ),
-                    ),
+                  // ส่วนที่ 2: ที่อยู่
+                  _buildAddressSection(),
+
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, thickness: 1, color: Color(0xFFF2E6E8)),
+                  const SizedBox(height: 16),
+
+                  // ส่วนที่ 3: เวลาเปิด - ปิดร้าน
+                  _buildOperatingHoursSection(),
+
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, thickness: 1, color: Color(0xFFF2E6E8)),
+                  const SizedBox(height: 16),
+
+                  // ส่วนที่ 4: สิ่งอำนวยความสะดวก
+                  _buildAmenitiesSection(),
+
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, thickness: 1, color: Color(0xFFF2E6E8)),
+                  const SizedBox(height: 16),
+
+                  // ส่วนที่ 5: สถานะร้านค้า (Stepper 4 ขั้น + การ์ดผลการตรวจสอบ)
+                  _buildStatusSection(),
+
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-
-            // ช่องกรอกข้อมูลต่างๆ
-            _buildInfoCard(
-              title: 'ชื่อร้านอาหาร',
-              controller: _nameController,
-              icon: Icons.store_rounded,
-              enabled: _isEditing,
-            ),
-            const SizedBox(height: 14),
-            _buildInfoCard(
-              title: 'หมวดหมู่ร้านค้า',
-              controller: _categoryController,
-              icon: Icons.category_rounded,
-              enabled: _isEditing,
-            ),
-            const SizedBox(height: 14),
-            _buildInfoCard(
-              title: 'ที่อยู่ร้านอาหาร',
-              controller: _addressController,
-              icon: Icons.location_on_rounded,
-              maxLines: 2,
-              enabled: _isEditing,
-            ),
-            const SizedBox(height: 14),
-            _buildInfoCard(
-              title: 'เบอร์โทรศัพท์ติดต่อ',
-              controller: _phoneController,
-              icon: Icons.phone_rounded,
-              enabled: _isEditing,
-            ),
-            const SizedBox(height: 14),
-            _buildInfoCard(
-              title: 'เวลาเปิด - ปิดทำการ',
-              controller: _hoursController,
-              icon: Icons.access_time_filled_rounded,
-              enabled: _isEditing,
-            ),
-
-            const SizedBox(height: 32),
-
-            if (_isEditing)
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    setState(() => _isEditing = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('บันทึกข้อมูลเรียบร้อยแล้ว'),
-                        backgroundColor: kOwnerPrimaryColor,
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kOwnerPrimaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                  child: const Text('บันทึกการเปลี่ยนแปลง', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                ),
-              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildInfoCard({
-    required String title,
-    required TextEditingController controller,
-    required IconData icon,
-    required bool enabled,
-    int maxLines = 1,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  // ==========================================================================
+  // 1. STORE PROFILE HEADER
+  // ==========================================================================
+  Widget _buildStoreProfileHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 18.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
+          // รูปภาพโปรไฟล์ทรงกลม พร้อมปุ่มกล้อง "แก้ไข"
+          Stack(
+            clipBehavior: Clip.none,
             children: [
-              Icon(icon, color: kOwnerPrimaryColor, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w600),
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFFF2E6E8), width: 1.5),
+                  color: const Color(0xFFFBF6F7),
+                ),
+                child: ClipOval(
+                  child: _buildAvatarImage(),
+                ),
+              ),
+              Positioned(
+                bottom: 0,
+                right: -4,
+                child: InkWell(
+                  onTap: _showEditPhotoDialog,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.55),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.camera_alt, color: Colors.white, size: 10),
+                        SizedBox(width: 3),
+                        Text(
+                          'แก้ไข',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: controller,
-            enabled: enabled,
-            maxLines: maxLines,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87),
-            decoration: InputDecoration(
-              isDense: true,
-              contentPadding: const EdgeInsets.symmetric(vertical: 4),
-              border: enabled ? const UnderlineInputBorder() : InputBorder.none,
+
+          const SizedBox(width: 16),
+
+          // รายละเอียดชื่อร้าน ประเภทอาหาร และรหัสร้าน
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _name,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black87,
+                          letterSpacing: 0.2,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: _showEditNameDialog,
+                      borderRadius: BorderRadius.circular(6),
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.edit_note_rounded,
+                          size: 19,
+                          color: Color(0xFF4B5563),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'ประเภทอาหาร : $_category',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: Colors.grey[700],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'รหัสร้าน : $_storeCode',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: Colors.grey[700],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ==========================================================================
+  // 2. ADDRESS SECTION
+  // ==========================================================================
+  Widget _buildAddressSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'ที่อยู่',
+              style: TextStyle(
+                fontSize: 16.5,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            InkWell(
+              onTap: _showEditAddressDialog,
+              child: const Text(
+                'แก้ไข',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: kOwnerPrimaryColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // แถวที่ 1: ไอคอนหมุด + ที่อยู่ + ลิงก์แผนที่
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.location_on_outlined, color: kOwnerPrimaryColor, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _address,
+                    style: const TextStyle(fontSize: 13.5, color: Colors.black87, height: 1.3),
+                  ),
+                  const SizedBox(height: 2),
+                  InkWell(
+                    onTap: _launchMaps,
+                    child: Text(
+                      _mapsUrl.isNotEmpty ? _mapsUrl : 'www.googlemap.com',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF2563EB),
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        // แถวที่ 2: ไอคอนโทรศัพท์ + เบอร์
+        Row(
+          children: [
+            const Icon(Icons.phone_outlined, color: kOwnerPrimaryColor, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              _phone,
+              style: const TextStyle(fontSize: 13.5, color: Colors.black87),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 10),
+
+        // แถวที่ 3: ไอคอนอีเมล + อีเมล
+        Row(
+          children: [
+            const Icon(Icons.mail_outline_rounded, color: kOwnerPrimaryColor, size: 20),
+            const SizedBox(width: 12),
+            Text(
+              _email,
+              style: const TextStyle(fontSize: 13.5, color: Colors.black87),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // ==========================================================================
+  // 3. OPERATING HOURS SECTION
+  // ==========================================================================
+  Widget _buildOperatingHoursSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'เวลาเปิด - ปิดร้าน',
+              style: TextStyle(
+                fontSize: 16.5,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            InkWell(
+              onTap: _showEditOperatingHoursDialog,
+              child: const Text(
+                'แก้ไข',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: kOwnerPrimaryColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // ตารางทั้ง 7 วัน
+        for (final item in _schedules) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2.5),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  item.dayName,
+                  style: TextStyle(fontSize: 13.5, color: Colors.grey[700]),
+                ),
+                Text(
+                  item.displayTime,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    color: item.isClosed ? Colors.grey[600] : const Color(0xFF262626),
+                    fontWeight: item.isClosed ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ==========================================================================
+  // 4. AMENITIES SECTION
+  // ==========================================================================
+  Widget _buildAmenitiesSection() {
+    IconData getAmenityIcon(String name) {
+      for (final opt in kAllAmenityOptions) {
+        if (opt.label == name) return opt.icon;
+      }
+      if (name.contains('ปลั๊ก')) return Icons.power_rounded;
+      if (name.contains('เน็ต') || name.contains('wifi')) return Icons.wifi_rounded;
+      if (name.contains('น้ำ') || name.contains('wc')) return Icons.favorite_border_rounded;
+      if (name.contains('แอร์') || name.contains('ปรับอากาศ')) return Icons.ac_unit_rounded;
+      if (name.contains('กลุ่ม')) return Icons.groups_rounded;
+      if (name.contains('จอดรถยนต์')) return Icons.directions_car_rounded;
+      if (name.contains('จักรยานยนต์')) return Icons.two_wheeler_rounded;
+      if (name.contains('บัตรเครดิต')) return Icons.credit_card_rounded;
+      if (name.contains('เดลิเวอรี่')) return Icons.delivery_dining_rounded;
+      if (name.contains('เด็ก')) return Icons.child_care_rounded;
+      if (name.contains('Pet') || name.contains('สัตว์')) return Icons.pets_rounded;
+      if (name.contains('สังสรรค์')) return Icons.sports_bar_rounded;
+      if (name.contains('เพลง')) return Icons.music_note_rounded;
+      if (name.contains('สนทนา')) return Icons.record_voice_over_rounded;
+      if (name.contains('พิการ')) return Icons.accessible_rounded;
+      if (name.contains('ถ่ายรูป')) return Icons.photo_camera_rounded;
+      return Icons.check_circle_outline_rounded;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'สิ่งอำนวยความสะดวก',
+              style: TextStyle(
+                fontSize: 16.5,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            InkWell(
+              onTap: () async {
+                final updated = await Navigator.push<List<String>>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => OwnerEditAmenitiesScreen(
+                      restaurantId: widget.restaurantId,
+                      initialAmenities: _amenities,
+                    ),
+                  ),
+                );
+                if (updated != null && mounted) {
+                  setState(() {
+                    _amenities = updated;
+                  });
+                }
+              },
+              child: const Text(
+                'แก้ไข',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: kOwnerPrimaryColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        for (final item in _amenities) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Row(
+              children: [
+                Icon(getAmenityIcon(item), color: kOwnerPrimaryColor, size: 20),
+                const SizedBox(width: 12),
+                Text(
+                  item,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    color: Color(0xFF262626),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ==========================================================================
+  // 5. STATUS SECTION (STEPPER + RESULT CARD)
+  // ==========================================================================
+  Widget _buildStatusSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'สถานะร้านค้า',
+          style: TextStyle(
+            fontSize: 16.5,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // 4-Step Stepper
+        _buildStepperIndicator(),
+
+        const SizedBox(height: 22),
+
+        // การ์ดข้อความผลการตรวจสอบสีเขียวมินต์
+        _buildStatusResultCard(),
+      ],
+    );
+  }
+
+  Widget _buildStepperIndicator() {
+    final steps = [
+      {'num': '1', 'title': 'ส่งคำขอ', 'icon': Icons.description_outlined},
+      {'num': '2', 'title': 'รอตรวจสอบ', 'icon': Icons.hourglass_empty_rounded},
+      {'num': '3', 'title': 'กำลังตรวจสอบ', 'icon': Icons.manage_search_rounded},
+      {'num': '4', 'title': 'ผลการตรวจสอบ', 'icon': Icons.shopping_bag_outlined},
+    ];
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (int i = 0; i < steps.length; i++) ...[
+          // Step Node
+          Expanded(
+            child: Column(
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    // วงกลมสเต็ป
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(
+                          color: kOwnerTealColor,
+                          width: 2.2,
+                        ),
+                      ),
+                      child: Center(
+                        child: Icon(
+                          steps[i]['icon'] as IconData,
+                          color: kOwnerTealColor,
+                          size: 21,
+                        ),
+                      ),
+                    ),
+
+                    // ตราติ๊กถูกสีเขียวด้านล่างวงกลม
+                    Positioned(
+                      bottom: -2,
+                      child: Container(
+                        width: 15,
+                        height: 15,
+                        decoration: const BoxDecoration(
+                          color: kOwnerTealColor,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.check, color: Colors.white, size: 10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  steps[i]['num'] as String,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.bold,
+                    color: kOwnerTealColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  steps[i]['title'] as String,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: kOwnerTealColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // เส้นเชื่อมระหว่างวงกลม
+          if (i < steps.length - 1)
+            Container(
+              width: 24,
+              height: 2.2,
+              margin: const EdgeInsets.only(top: 21),
+              color: kOwnerTealColor,
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildStatusResultCard() {
+    final isApproved = _status == 'approved';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 20),
+      decoration: BoxDecoration(
+        color: isApproved ? const Color(0xFFE2F7EE) : const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          // วงกลมไอคอนตะกร้า/ร้านค้าตรงกลาง
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: isApproved ? const Color(0xFF34D399) : const Color(0xFFFBBF24),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Icon(
+                isApproved ? Icons.storefront_outlined : Icons.hourglass_top_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            isApproved ? 'ผ่านการตรวจสอบ' : 'รอการตรวจสอบ',
+            style: TextStyle(
+              fontSize: 15.5,
+              fontWeight: FontWeight.w800,
+              color: isApproved ? const Color(0xFF047857) : const Color(0xFFB45309),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isApproved ? 'ร้านค้าของคุณได้รับการอนุมัติแล้ว' : 'คำขอของคุณอยู่ระหว่างการพิจารณา',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1F2937),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            isApproved
+                ? 'ร้านค้าของคุณเปิดให้บริการแล้ว\nคุณสามารถจัดการร้านค้าและเมนูอาหารได้เลย'
+                : 'เจ้าหน้าที่กำลังดำเนินการตรวจสอบข้อมูลร้านค้า\nคุณจะได้รับการแจ้งเตือนเมื่อการอนุมัติเสร็จสิ้น',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF4B5563),
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================================
+  // HELPERS & EDIT DIALOGS
+  // ==========================================================================
+  Widget _buildAvatarImage() {
+    if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty) {
+      if (_currentImageUrl!.startsWith('assets/')) {
+        return Image.asset(
+          _currentImageUrl!,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackStoreLogo(),
+        );
+      }
+      return Image.network(
+        _currentImageUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _buildFallbackStoreLogo(),
+      );
+    }
+    return _buildFallbackStoreLogo();
+  }
+
+  Widget _buildFallbackStoreLogo() {
+    return Container(
+      color: const Color(0xFFF9ECEF),
+      child: const Center(
+        child: Icon(
+          Icons.storefront_rounded,
+          color: kOwnerPrimaryColor,
+          size: 40,
+        ),
+      ),
+    );
+  }
+
+  /// แก้ไขชื่อร้านค้า
+  void _showEditNameDialog() {
+    final controller = TextEditingController(text: _name);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('แก้ไขชื่อร้านค้า', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'ชื่อร้านค้า',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kOwnerPrimaryColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final newName = controller.text.trim();
+              if (newName.isNotEmpty) {
+                setState(() => _name = newName);
+                if (widget.restaurantId != null) {
+                  try {
+                    await Supabase.instance.client
+                        .from('restaurants')
+                        .update({'name': newName})
+                        .eq('id', widget.restaurantId!);
+                  } catch (_) {}
+                }
+              }
+              if (mounted) Navigator.pop(ctx);
+            },
+            child: const Text('บันทึก'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// แก้ไขรูปภาพร้าน
+  void _showEditPhotoDialog() {
+    final controller = TextEditingController(text: _currentImageUrl ?? '');
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('แก้ไขรูปร้านอาหาร', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'URL ของรูปภาพ',
+            hintText: 'https://...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('ยกเลิก'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kOwnerPrimaryColor,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              final newUrl = controller.text.trim();
+              if (newUrl.isNotEmpty) {
+                setState(() => _currentImageUrl = newUrl);
+                if (widget.restaurantId != null) {
+                  try {
+                    // Update table restaurants if column exists
+                    await Supabase.instance.client
+                        .from('restaurants')
+                        .update({'image_url': newUrl})
+                        .eq('id', widget.restaurantId!);
+                  } catch (_) {}
+                }
+              }
+              if (mounted) Navigator.pop(ctx);
+            },
+            child: const Text('บันทึก'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// แก้ไขที่อยู่, แผนที่, เบอร์โทร, อีเมล
+  void _showEditAddressDialog() {
+    final addressCtrl = TextEditingController(text: _address);
+    final mapsCtrl = TextEditingController(text: _mapsUrl);
+    final phoneCtrl = TextEditingController(text: _phone);
+    final emailCtrl = TextEditingController(text: _email);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'แก้ไขข้อมูลติดต่อและที่อยู่',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: addressCtrl,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'ที่อยู่ร้านอาหาร',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: mapsCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'ลิงก์ Google Maps',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'เบอร์โทรศัพท์ติดต่อ',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'อีเมลร้านค้า',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kOwnerPrimaryColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  onPressed: () async {
+                    setState(() {
+                      _address = addressCtrl.text.trim();
+                      _mapsUrl = mapsCtrl.text.trim();
+                      _phone = phoneCtrl.text.trim();
+                      _email = emailCtrl.text.trim();
+                    });
+
+                    if (widget.restaurantId != null) {
+                      try {
+                        await Supabase.instance.client
+                            .from('restaurants')
+                            .update({
+                              'address': _address,
+                              'google_maps_url': _mapsUrl,
+                              'phone': _phone,
+                            })
+                            .eq('id', widget.restaurantId!);
+                      } catch (_) {}
+                    }
+
+                    if (mounted) Navigator.pop(ctx);
+                  },
+                  child: const Text('บันทึกข้อมูล', style: TextStyle(fontSize: 16)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// แก้ไขเวลาเปิด-ปิดร้าน
+  void _showEditOperatingHoursDialog() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.75,
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'แก้ไขเวลาเปิด - ปิดร้าน',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: _schedules.length,
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemBuilder: (_, index) {
+                      final item = _schedules[index];
+                      return Row(
+                        children: [
+                          SizedBox(
+                            width: 80,
+                            child: Text(
+                              item.dayName,
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          Switch(
+                            value: !item.isClosed,
+                            activeColor: kOwnerPrimaryColor,
+                            onChanged: (val) {
+                              setModalState(() {
+                                item.isClosed = !val;
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          if (item.isClosed)
+                            const Text('หยุดทำการ', style: TextStyle(color: Colors.grey))
+                          else
+                            Row(
+                              children: [
+                                Text('${item.openTime} - ${item.closeTime}'),
+                              ],
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kOwnerPrimaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      setState(() {});
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('บันทึกเวลาเปิด-ปิด', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// แก้ไขสิ่งอำนวยความสะดวก
+  void _showEditAmenitiesDialog() {
+    final allOptions = [
+      'มีปลั๊กไฟ',
+      'มีอินเทอร์เน็ต',
+      'มีห้องน้ำ',
+      'เครื่องปรับอากาศ',
+      'เหมาะกับกลุ่ม',
+      'มีที่จอดรถ',
+      'รับบัตรเครดิต',
+      'อนุญาตให้นำสัตว์เลี้ยงเข้าได้',
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'เลือกสิ่งอำนวยความสะดวก',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: allOptions.map((opt) {
+                    final selected = _amenities.contains(opt);
+                    return FilterChip(
+                      label: Text(opt),
+                      selected: selected,
+                      selectedColor: kOwnerPrimaryColor.withOpacity(0.15),
+                      checkmarkColor: kOwnerPrimaryColor,
+                      labelStyle: TextStyle(
+                        color: selected ? kOwnerPrimaryColor : Colors.black87,
+                        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      onSelected: (val) {
+                        setModalState(() {
+                          if (val) {
+                            _amenities.add(opt);
+                          } else {
+                            _amenities.remove(opt);
+                          }
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kOwnerPrimaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () {
+                      setState(() {});
+                      Navigator.pop(ctx);
+                    },
+                    child: const Text('บันทึก', style: TextStyle(fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

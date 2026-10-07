@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../home/home_screen.dart';
 import 'owner_stats_screen.dart';
 import 'owner_menu_screen.dart';
@@ -12,12 +13,14 @@ const Color kOwnerBorderColor = Color(0xFFF3E7EA);
 const Color kOwnerButtonGrey = Color(0xFFD6D0D3);
 
 class OwnerDashboardScreen extends StatefulWidget {
+  final String? restaurantId;
   final String restaurantName;
   final String? restaurantCategory;
   final String? restaurantImageUrl;
 
   const OwnerDashboardScreen({
     super.key,
+    this.restaurantId,
     this.restaurantName = 'The CHICKEN',
     this.restaurantCategory,
     this.restaurantImageUrl,
@@ -28,6 +31,76 @@ class OwnerDashboardScreen extends StatefulWidget {
 }
 
 class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
+  late String _displayName;
+  String? _displayCategory;
+  String? _displayImageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayName = widget.restaurantName;
+    _displayCategory = widget.restaurantCategory;
+    _displayImageUrl = widget.restaurantImageUrl;
+    _refreshRestaurantData();
+  }
+
+  Future<void> _refreshRestaurantData() async {
+    if (widget.restaurantId == null) return;
+    try {
+      final res = await Supabase.instance.client
+          .from('restaurants')
+          .select()
+          .eq('id', widget.restaurantId!)
+          .maybeSingle();
+
+      if (res != null && mounted) {
+        setState(() {
+          _displayName = res['name']?.toString() ?? _displayName;
+          if (res['image_url'] != null && res['image_url'].toString().isNotEmpty) {
+            _displayImageUrl = res['image_url'].toString();
+          }
+        });
+
+        if (_displayImageUrl == null || _displayImageUrl!.isEmpty) {
+          try {
+            final imgRes = await Supabase.instance.client
+                .from('restaurant_images')
+                .select('image_url, is_logo, sort_order')
+                .eq('restaurant_id', widget.restaurantId!)
+                .order('sort_order', ascending: true);
+            if (imgRes is List && imgRes.isNotEmpty && mounted) {
+              final match = imgRes.firstWhere(
+                (item) => item['is_logo'] == true,
+                orElse: () => imgRes.first,
+              );
+              if (match['image_url'] != null) {
+                setState(() {
+                  _displayImageUrl = match['image_url'].toString();
+                });
+              }
+            }
+          } catch (_) {}
+        }
+
+        final cTypeId = res['cuisine_type_id'];
+        if (cTypeId != null) {
+          try {
+            final cType = await Supabase.instance.client
+                .from('cuisine_types')
+                .select('name')
+                .eq('id', cTypeId)
+                .maybeSingle();
+            if (cType != null && cType['name'] != null && mounted) {
+              setState(() {
+                _displayCategory = cType['name'].toString();
+              });
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
   void _handleBack() {
     if (Navigator.canPop(context)) {
       Navigator.pop(context);
@@ -104,7 +177,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
                   // แสดงชื่อร้านอาหารที่เลือก
                   Text(
-                    widget.restaurantName,
+                    _displayName,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 22,
@@ -113,10 +186,10 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                       letterSpacing: 0.4,
                     ),
                   ),
-                  if (widget.restaurantCategory != null && widget.restaurantCategory!.isNotEmpty) ...[
+                  if (_displayCategory != null && _displayCategory!.isNotEmpty) ...[
                     const SizedBox(height: 4),
                     Text(
-                      widget.restaurantCategory!,
+                      _displayCategory!,
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -142,7 +215,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                 icon: const _StatsChartIcon(color: kOwnerPrimaryColor, size: 46),
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const OwnerStatsScreen()),
+                                  MaterialPageRoute(
+                                    builder: (_) => OwnerStatsScreen(
+                                      restaurantId: widget.restaurantId,
+                                      restaurantName: _displayName,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -153,7 +231,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                 icon: const _FoodMenuIcon(color: kOwnerPrimaryColor, size: 46),
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const OwnerMenuScreen()),
+                                  MaterialPageRoute(
+                                    builder: (_) => OwnerMenuScreen(
+                                      restaurantId: widget.restaurantId,
+                                      restaurantName: _displayName,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -162,10 +245,20 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                               child: _buildMenuCard(
                                 title: 'ข้อมูลร้าน',
                                 icon: const _StoreInfoIcon(color: kOwnerPrimaryColor, size: 46),
-                                onTap: () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (_) => const OwnerRestaurantInfoScreen()),
-                                ),
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => OwnerRestaurantInfoScreen(
+                                        restaurantId: widget.restaurantId,
+                                        restaurantName: _displayName,
+                                        restaurantCategory: _displayCategory,
+                                        restaurantImageUrl: _displayImageUrl,
+                                      ),
+                                    ),
+                                  );
+                                  _refreshRestaurantData();
+                                },
                               ),
                             ),
                           ],
@@ -182,7 +275,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                                 icon: const _ReviewSmileIcon(color: kOwnerPrimaryColor, size: 46),
                                 onTap: () => Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const OwnerReviewsScreen()),
+                                  MaterialPageRoute(
+                                    builder: (_) => OwnerReviewsScreen(
+                                      restaurantId: widget.restaurantId,
+                                      restaurantName: _displayName,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -334,16 +432,16 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
 
   /// รูปภาพโปรไฟล์ของร้านอาหารที่เลือก
   Widget _buildRestaurantAvatar() {
-    if (widget.restaurantImageUrl != null && widget.restaurantImageUrl!.isNotEmpty) {
-      if (widget.restaurantImageUrl!.startsWith('assets/')) {
+    if (_displayImageUrl != null && _displayImageUrl!.isNotEmpty) {
+      if (_displayImageUrl!.startsWith('assets/')) {
         return Image.asset(
-          widget.restaurantImageUrl!,
+          _displayImageUrl!,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _buildFallbackAvatar(),
         );
       }
       return Image.network(
-        widget.restaurantImageUrl!,
+        _displayImageUrl!,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _buildFallbackAvatar(),
       );
@@ -352,7 +450,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   }
 
   Widget _buildFallbackAvatar() {
-    final nameUpper = widget.restaurantName.toUpperCase();
+    final nameUpper = _displayName.toUpperCase();
     if (nameUpper.contains('CHICKEN')) {
       return _buildDefaultChickenLogo();
     }

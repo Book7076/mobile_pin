@@ -11,7 +11,14 @@ const Color kOwnerPillBg = Color(0xFFF7ECEF);
 const Color kOwnerBorderColor = Color(0xFFF2EAEB);
 
 class OwnerStatsScreen extends StatefulWidget {
-  const OwnerStatsScreen({super.key});
+  final String? restaurantId;
+  final String restaurantName;
+
+  const OwnerStatsScreen({
+    super.key,
+    this.restaurantId,
+    this.restaurantName = 'The CHICKEN',
+  });
 
   @override
   State<OwnerStatsScreen> createState() => _OwnerStatsScreenState();
@@ -580,7 +587,12 @@ class _OwnerStatsScreenState extends State<OwnerStatsScreen> with SingleTickerPr
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const OwnerReviewsScreen()),
+          MaterialPageRoute(
+            builder: (_) => OwnerReviewsScreen(
+              restaurantId: widget.restaurantId,
+              restaurantName: widget.restaurantName,
+            ),
+          ),
         );
       },
       child: Container(
@@ -702,7 +714,12 @@ class _OwnerStatsScreenState extends State<OwnerStatsScreen> with SingleTickerPr
       onTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const OwnerMenuScreen()),
+          MaterialPageRoute(
+            builder: (_) => OwnerMenuScreen(
+              restaurantId: widget.restaurantId,
+              restaurantName: widget.restaurantName,
+            ),
+          ),
         );
       },
       child: Container(

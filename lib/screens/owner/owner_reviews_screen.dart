@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// สีหลักของแบรนด์ตามภาพ (แดงเบอร์กันดี / เลือดหมูเข้ม)
 const Color kOwnerPrimaryColor = Color(0xFF7C1431);
@@ -31,7 +32,14 @@ class ReviewItem {
 }
 
 class OwnerReviewsScreen extends StatefulWidget {
-  const OwnerReviewsScreen({super.key});
+  final String? restaurantId;
+  final String restaurantName;
+
+  const OwnerReviewsScreen({
+    super.key,
+    this.restaurantId,
+    this.restaurantName = 'The CHICKEN',
+  });
 
   @override
   State<OwnerReviewsScreen> createState() => _OwnerReviewsScreenState();
@@ -40,10 +48,75 @@ class OwnerReviewsScreen extends StatefulWidget {
 class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
   // รายการรีวิว 10 รายการเริ่มต้น ตรงตามภาพต้นแบบ 100%
   late List<ReviewItem> _reviews;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _initReviews();
+    if (widget.restaurantId != null) {
+      _loadReviewsFromSupabase();
+    }
+  }
+
+  Future<void> _loadReviewsFromSupabase() async {
+    if (widget.restaurantId == null) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final data = await Supabase.instance.client
+          .from('reviews')
+          .select('*, users(first_name, last_name, email)')
+          .eq('restaurant_id', widget.restaurantId!);
+
+      if (data.isNotEmpty) {
+        final List<ReviewItem> loaded = [];
+        for (final row in data) {
+          String uName = '';
+          if (row['users'] != null && row['users'] is Map) {
+            final u = row['users'] as Map;
+            final f = u['first_name']?.toString().trim() ?? '';
+            final l = u['last_name']?.toString().trim() ?? '';
+            if (f.isNotEmpty || l.isNotEmpty) {
+              uName = '$f $l'.trim();
+            } else if (u['email'] != null) {
+              uName = u['email'].toString().split('@').first;
+            }
+          }
+          if (uName.isEmpty) uName = 'ผู้ใช้งาน';
+
+          final rawDate = row['created_at'] ?? row['create_at'];
+          DateTime dt = DateTime.now();
+          if (rawDate != null) {
+            dt = DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
+          }
+
+          loaded.add(
+            ReviewItem(
+              id: row['id']?.toString() ?? '',
+              userName: uName,
+              avatarUrl: row['photo_url']?.toString(),
+              rating: (row['rating'] as num?)?.toInt() ?? 5,
+              comment: row['comment']?.toString() ?? '',
+              dateText: '${dt.day}/${dt.month}/${dt.year}',
+              createdAt: dt,
+            ),
+          );
+        }
+        if (mounted) {
+          setState(() {
+            _reviews = loaded;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading reviews from Supabase: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _initReviews() {
     _reviews = [
       ReviewItem(
         id: '1',
@@ -176,8 +249,11 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
         ],
       ),
       body: SafeArea(
-        child: ListView(
-          physics: const BouncingScrollPhysics(),
+        child: RefreshIndicator(
+          color: kOwnerPrimaryColor,
+          onRefresh: _loadReviewsFromSupabase,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
           children: [
             // 1. การ์ดสรุปคะแนนรวม & สัดส่วนแถบดาว
@@ -193,8 +269,9 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   // ==========================================
   // 1. การ์ดสรุปคะแนนรวม & สัดส่วนแถบดาว
@@ -225,38 +302,41 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // วงกลมไอคอนดาวชมพูอ่อน
-                    Container(
-                      width: 58,
-                      height: 58,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFFBF1F3),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Icon(
-                          Icons.star_rounded,
-                          color: kOwnerPrimaryColor,
-                          size: 38,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // วงกลมไอคอนดาวชมพูอ่อน
+                      Container(
+                        width: 58,
+                        height: 58,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFBF1F3),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Center(
+                          child: Icon(
+                            Icons.star_rounded,
+                            color: kOwnerPrimaryColor,
+                            size: 38,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    // ตัวเลขคะแนนเฉลี่ย เช่น 4.9
-                    Text(
-                      _formattedAverage,
-                      style: const TextStyle(
-                        fontSize: 38,
-                        fontWeight: FontWeight.bold,
-                        color: kOwnerTextDark,
-                        height: 1.0,
+                      const SizedBox(width: 12),
+                      // ตัวเลขคะแนนเฉลี่ย เช่น 4.9
+                      Text(
+                        _formattedAverage,
+                        style: const TextStyle(
+                          fontSize: 38,
+                          fontWeight: FontWeight.bold,
+                          color: kOwnerTextDark,
+                          height: 1.0,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -619,28 +699,49 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         elevation: 0,
                       ),
-                      onPressed: () {
+                      onPressed: () async {
                         if (nameController.text.trim().isEmpty) return;
+
+                        final commentText = commentController.text.trim();
+                        final userNameText = nameController.text.trim();
 
                         final newReview = ReviewItem(
                           id: DateTime.now().millisecondsSinceEpoch.toString(),
-                          userName: nameController.text.trim(),
-                          avatarLetter: nameController.text.trim().substring(0, 1),
+                          userName: userNameText,
+                          avatarLetter: userNameText.substring(0, 1),
                           rating: selectedRating,
-                          comment: commentController.text.trim(),
+                          comment: commentText,
                           dateText: 'วันนี้',
                         );
 
-                        setState(() {
-                          _reviews.insert(0, newReview);
-                        });
+                        if (widget.restaurantId != null) {
+                          try {
+                            final user = Supabase.instance.client.auth.currentUser;
+                            if (user != null) {
+                              await Supabase.instance.client.from('reviews').insert({
+                                'restaurant_id': widget.restaurantId,
+                                'user_id': user.id,
+                                'rating': selectedRating,
+                                'comment': commentText,
+                              });
+                            }
+                          } catch (e) {
+                            debugPrint('Error inserting review to Supabase: $e');
+                          }
+                        }
+
+                        if (mounted) {
+                          setState(() {
+                            _reviews.insert(0, newReview);
+                          });
+                        }
 
                         Navigator.pop(context);
 
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('เพิ่มรีวิวใหม่จาก "${newReview.userName}" เรียบร้อย (คะแนนรวมคำนวณใหม่ทันที)'),
+                            content: Text('เพิ่มรีวิวใหม่จาก "$userNameText" เรียบร้อย (คะแนนรวมคำนวณใหม่ทันที)'),
                             backgroundColor: kOwnerPrimaryColor,
                             behavior: SnackBarBehavior.floating,
                           ),

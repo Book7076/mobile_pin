@@ -200,7 +200,7 @@ class RestaurantAdminModel {
       name: json['name'] as String? ?? '',
       storeCode: json['store_code'] as String?,
       address: json['address'] as String? ?? '',
-      mapUrl: json['map_url'] as String?,
+      mapUrl: (json['google_maps_url'] ?? json['map_url'])?.toString(),
       lat: (json['lat'] as num?)?.toDouble() ?? 18.7883,
       lng: (json['lng'] as num?)?.toDouble() ?? 98.9853,
       phone: json['phone'] as String? ?? '',
@@ -208,9 +208,13 @@ class RestaurantAdminModel {
       menu: json['menu'] as String?,
       imageUrl: json['image_url'] as String?,
       status: json['status'] as String? ?? 'pending',
-      createdAt: json['created_at'] != null 
-          ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
-          : DateTime.now(),
+      createdAt: (json['crated_at'] != null
+              ? DateTime.tryParse(json['crated_at'].toString())
+              : null) ??
+          (json['created_at'] != null
+              ? DateTime.tryParse(json['created_at'].toString())
+              : null) ??
+          DateTime.now(),
       rejectionReason: json['rejection_reason'] as String?,
       reviewerName: json['reviewer_name'] as String?,
       requestSubmittedDate: json['request_submitted_date'] != null

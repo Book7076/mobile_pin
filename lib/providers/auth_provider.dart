@@ -94,10 +94,11 @@ class AuthStateNotifier extends StateNotifier<UserModel?> {
     }
 
     // Check demo accounts
-    if (email.contains('admin')) {
+    final lowerEmail = email.trim().toLowerCase();
+    if (lowerEmail == 'admin@mealmate.com' || lowerEmail == 'admin@test.com') {
       state = MockData.demoAdmin;
       return true;
-    } else if (email.contains('owner')) {
+    } else if (lowerEmail == 'owner@mealmate.com' || lowerEmail == 'owner@test.com') {
       state = MockData.demoOwner;
       return true;
     }

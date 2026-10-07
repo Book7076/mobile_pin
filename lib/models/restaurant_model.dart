@@ -61,6 +61,10 @@ class RestaurantModel {
   final bool isLiked;
   final double? distanceKm;
   final String? locationBadge;
+  final String? googleMapsUrl;
+  final int? cuisineTypeId;
+  final String? rejectionReason;
+  final DateTime? createdAt;
 
   RestaurantModel({
     required this.id,
@@ -87,6 +91,10 @@ class RestaurantModel {
     this.isLiked = false,
     this.distanceKm,
     this.locationBadge,
+    this.googleMapsUrl,
+    this.cuisineTypeId,
+    this.rejectionReason,
+    this.createdAt,
   });
 
   factory RestaurantModel.fromJson(Map<String, dynamic> json) {
@@ -100,10 +108,31 @@ class RestaurantModel {
     }
 
     List<String> parsedImages = [];
-    if (json['image_urls'] != null && json['image_urls'] is List) {
-      parsedImages = (json['image_urls'] as List).map((e) => e.toString()).toList();
-    } else if (json['image_url'] != null) {
-      parsedImages = [json['image_url'].toString()];
+    if (json['restaurant_images'] != null && json['restaurant_images'] is List) {
+      final imgList = (json['restaurant_images'] as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      imgList.sort((a, b) => ((a['sort_order'] ?? 99) as num).compareTo((b['sort_order'] ?? 99) as num));
+      parsedImages = imgList
+          .map((e) => e['image_url']?.toString() ?? '')
+          .where((u) => u.isNotEmpty)
+          .toList();
+    }
+    if (parsedImages.isEmpty) {
+      if (json['image_urls'] != null && json['image_urls'] is List) {
+        parsedImages = (json['image_urls'] as List).map((e) => e.toString()).toList();
+      } else if (json['image_url'] != null && json['image_url'].toString().isNotEmpty) {
+        parsedImages = [json['image_url'].toString()];
+      } else if (json['imageUrl'] != null && json['imageUrl'].toString().isNotEmpty) {
+        parsedImages = [json['imageUrl'].toString()];
+      }
+    }
+
+    if (parsedImages.isEmpty) {
+      parsedImages = [
+        'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&q=80',
+      ];
     }
 
     List<SignatureDish> parsedDishes = [];
@@ -116,6 +145,13 @@ class RestaurantModel {
     List<String> parsedFeatures = ['มีที่จอดรถ', 'ห้องแอร์', 'พร้อมเพย์'];
     if (json['features'] != null && json['features'] is List) {
       parsedFeatures = (json['features'] as List).map((e) => e.toString()).toList();
+    }
+
+    DateTime? parsedCreatedAt;
+    if (json['crated_at'] != null) {
+      parsedCreatedAt = DateTime.tryParse(json['crated_at'].toString());
+    } else if (json['created_at'] != null) {
+      parsedCreatedAt = DateTime.tryParse(json['created_at'].toString());
     }
 
     return RestaurantModel(
@@ -142,6 +178,10 @@ class RestaurantModel {
       isFavorite: json['is_favorite'] as bool? ?? false,
       isLiked: json['is_liked'] as bool? ?? false,
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
+      googleMapsUrl: json['google_maps_url']?.toString() ?? json['map_url']?.toString(),
+      cuisineTypeId: (json['cuisine_type_id'] as num?)?.toInt(),
+      rejectionReason: json['rejection_reason']?.toString(),
+      createdAt: parsedCreatedAt,
     );
   }
 
@@ -170,6 +210,9 @@ class RestaurantModel {
       'is_favorite': isFavorite,
       'is_liked': isLiked,
       'distance_km': distanceKm,
+      if (googleMapsUrl != null) 'google_maps_url': googleMapsUrl,
+      if (cuisineTypeId != null) 'cuisine_type_id': cuisineTypeId,
+      if (rejectionReason != null) 'rejection_reason': rejectionReason,
     };
   }
 
@@ -197,6 +240,10 @@ class RestaurantModel {
     bool? isFavorite,
     bool? isLiked,
     double? distanceKm,
+    String? googleMapsUrl,
+    int? cuisineTypeId,
+    String? rejectionReason,
+    DateTime? createdAt,
   }) {
     return RestaurantModel(
       id: id ?? this.id,
@@ -222,6 +269,10 @@ class RestaurantModel {
       isFavorite: isFavorite ?? this.isFavorite,
       isLiked: isLiked ?? this.isLiked,
       distanceKm: distanceKm ?? this.distanceKm,
+      googleMapsUrl: googleMapsUrl ?? this.googleMapsUrl,
+      cuisineTypeId: cuisineTypeId ?? this.cuisineTypeId,
+      rejectionReason: rejectionReason ?? this.rejectionReason,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

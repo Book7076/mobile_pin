@@ -55,10 +55,18 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
       }
 
       // 2. Fetch approved restaurants from Supabase
-      final response = await supabase
-          .from('restaurants')
-          .select()
-          .eq('status', 'approved');
+      dynamic response;
+      try {
+        response = await supabase
+            .from('restaurants')
+            .select('*, restaurant_images(*)')
+            .eq('status', 'approved');
+      } catch (_) {
+        response = await supabase
+            .from('restaurants')
+            .select()
+            .eq('status', 'approved');
+      }
 
       final allRestaurants =
           (response as List).map((e) => RestaurantModel.fromJson(e)).toList();

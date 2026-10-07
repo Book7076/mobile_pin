@@ -212,17 +212,31 @@ class AdminRestaurantNotifier extends StateNotifier<List<RestaurantAdminModel>> 
 
   Future<void> _fetchFromSupabase() async {
     try {
-      final response = await supabase
-          .from('restaurants')
-          .select()
-          .order('created_at', ascending: false);
+      dynamic response;
+      try {
+        response = await supabase
+            .from('restaurants')
+            .select()
+            .order('crated_at', ascending: false);
+      } catch (_) {
+        try {
+          response = await supabase
+              .from('restaurants')
+              .select()
+              .order('created_at', ascending: false);
+        } catch (_) {
+          response = await supabase.from('restaurants').select();
+        }
+      }
 
-      if (response.isNotEmpty) {
+      if (response != null && response is List && response.isNotEmpty) {
         final List<RestaurantAdminModel> loaded = [];
         for (var item in response) {
-          loaded.add(RestaurantAdminModel.fromJson(item));
+          loaded.add(RestaurantAdminModel.fromJson(Map<String, dynamic>.from(item)));
         }
-        state = loaded;
+        if (loaded.isNotEmpty) {
+          state = loaded;
+        }
       }
     } catch (_) {
       // ใช้ Mock Data ต่อไปหากยังไม่ได้ต่อ Database จริง

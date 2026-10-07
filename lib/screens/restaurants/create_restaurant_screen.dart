@@ -71,17 +71,18 @@ class _CreateRestaurantScreenState extends ConsumerState<CreateRestaurantScreen>
     try {
       final user = supabase.auth.currentUser;
       if (user != null) {
-        await supabase.from('restaurants').insert({
+        final insertData = <String, dynamic>{
           'owner_id': user.id,
           'name': _nameController.text.trim(),
           'address': _addressController.text.trim(),
           'phone': _phoneController.text.trim(),
-          'email': _emailController.text.trim(),
-          'menu': _menuController.text.trim(),
-          'lat': _selectedLocation!.latitude,
-          'lng': _selectedLocation!.longitude,
           'status': 'pending', // Waiting for admin approval
-        });
+        };
+        if (_selectedLocation != null) {
+          insertData['google_maps_url'] =
+              'https://maps.google.com/?q=${_selectedLocation!.latitude},${_selectedLocation!.longitude}';
+        }
+        await supabase.from('restaurants').insert(insertData);
       }
 
       if (mounted) {

@@ -1,29 +1,89 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/mock_data.dart';
+import '../main.dart';
 import '../models/filter_criteria_model.dart';
 import '../models/restaurant_model.dart';
 import '../models/review_model.dart';
 
 // 1. Master Restaurants List
 class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
-  RestaurantsNotifier() : super(MockData.restaurants);
-
-  void addRestaurant(RestaurantModel restaurant) {
-    state = [restaurant, ...state];
+  RestaurantsNotifier() : super(MockData.restaurants) {
+    loadRestaurants();
   }
 
-  void updateRestaurant(RestaurantModel updated) {
+  Future<void> loadRestaurants() async {
+    try {
+      dynamic response;
+      try {
+        response = await supabase
+            .from('restaurants')
+            .select('*, restaurant_images(*)')
+            .order('crated_at', ascending: false);
+      } catch (_) {
+        try {
+          response = await supabase
+              .from('restaurants')
+              .select('*, restaurant_images(*)')
+              .order('created_at', ascending: false);
+        } catch (_) {
+          try {
+            response = await supabase.from('restaurants').select('*, restaurant_images(*)');
+          } catch (_) {
+            response = await supabase.from('restaurants').select();
+          }
+        }
+      }
+
+      if (response != null && response is List && response.isNotEmpty) {
+        final List<RestaurantModel> loaded = [];
+        for (final item in response) {
+          loaded.add(RestaurantModel.fromJson(Map<String, dynamic>.from(item)));
+        }
+        if (loaded.isNotEmpty) {
+          state = loaded;
+        }
+      }
+    } catch (e) {
+      debugPrint('Note: Error loading restaurants from Supabase: $e');
+    }
+  }
+
+  Future<void> addRestaurant(RestaurantModel restaurant) async {
+    state = [restaurant, ...state];
+    try {
+      await supabase.from('restaurants').insert(restaurant.toJson());
+    } catch (_) {}
+  }
+
+  Future<void> updateRestaurant(RestaurantModel updated) async {
     state = [
       for (final r in state)
         if (r.id == updated.id) updated else r
     ];
+    try {
+      await supabase
+          .from('restaurants')
+          .update(updated.toJson())
+          .eq('id', updated.id);
+    } catch (_) {}
   }
 
-  void updateRestaurantStatus(String id, String newStatus) {
+  Future<void> updateRestaurantStatus(String id, String newStatus, {String? rejectionReason}) async {
     state = [
       for (final r in state)
-        if (r.id == id) r.copyWith(status: newStatus) else r
+        if (r.id == id)
+          r.copyWith(status: newStatus, rejectionReason: rejectionReason)
+        else
+          r
     ];
+    try {
+      final updateData = <String, dynamic>{'status': newStatus};
+      if (rejectionReason != null) {
+        updateData['rejection_reason'] = rejectionReason;
+      }
+      await supabase.from('restaurants').update(updateData).eq('id', id);
+    } catch (_) {}
   }
 
   void toggleFavorite(String id) {
