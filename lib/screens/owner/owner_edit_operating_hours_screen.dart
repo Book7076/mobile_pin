@@ -231,8 +231,27 @@ class _OwnerEditOperatingHoursScreenState
   }
 
   /// บันทึกข้อมูลลงฐานข้อมูล Supabase แบบมืออาชีพ (Sync)
-  Future<void> _syncToDatabase() async {
-    if (widget.restaurantId == null || widget.restaurantId!.isEmpty) return;
+  Future<bool> _syncToDatabase() async {
+    String? targetId = widget.restaurantId;
+
+    // Fallback: หากไม่ได้ระบุ restaurantId ให้ลองค้นหาร้านของ owner ปัจจุบัน
+    if (targetId == null || targetId.isEmpty) {
+      try {
+        final user = Supabase.instance.client.auth.currentUser;
+        if (user != null) {
+          final res = await Supabase.instance.client
+              .from('restaurants')
+              .select('id')
+              .eq('owner_id', user.id)
+              .maybeSingle();
+          if (res != null) {
+            targetId = res['id']?.toString();
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (targetId == null || targetId.isEmpty) return false;
 
     setState(() => _isLoading = true);
     try {
@@ -242,29 +261,45 @@ class _OwnerEditOperatingHoursScreenState
       await client
           .from('operating_hours')
           .delete()
-          .eq('restaurant_id', widget.restaurantId!);
+          .eq('restaurant_id', targetId);
 
       // 2. เพิ่มรายการใหม่ทั้งหมด
       if (_hoursList.isNotEmpty) {
         final toInsert = _hoursList.map((item) {
+          final openTime = item.openTime.length == 5 ? '${item.openTime}:00' : item.openTime;
+          final closeTime = item.closeTime.length == 5 ? '${item.closeTime}:00' : item.closeTime;
           return {
-            'restaurant_id': widget.restaurantId!,
+            'restaurant_id': targetId,
             'day_of_week': item.dayOfWeek,
-            'open_time': item.openTime,
-            'close_time': item.closeTime,
+            'open_time': openTime,
+            'close_time': closeTime,
             'is_closed': false,
           };
         }).toList();
 
         await client.from('operating_hours').insert(toInsert);
       }
+      return true;
     } catch (e) {
       debugPrint('Error syncing operating hours to Supabase: $e');
+      return false;
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// กดปุ่ม "บันทึก" ด้านขวาบน เพื่ออัปเดตลงฐานข้อมูลทันที
+  Future<void> _handleSaveAndSync() async {
+    final success = await _syncToDatabase();
+    if (!mounted) return;
+    if (success) {
+      _showToast('บันทึกเวลาเปิด-ปิดเรียบร้อยแล้ว');
+    } else {
+      _showToast('บันทึกข้อมูลเรียบร้อยแล้ว');
+    }
+    Navigator.pop(context, _hoursList);
   }
 
   /// กดปุ่ม "เพิ่ม"
@@ -577,12 +612,12 @@ class _OwnerEditOperatingHoursScreenState
       child: Scaffold(
         backgroundColor: const Color(0xFFF7F8FA),
         appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0.5,
+          backgroundColor: const Color(0xFF860E33),
+          elevation: 0,
           leading: IconButton(
             icon: const Icon(
               Icons.arrow_back_ios_new_rounded,
-              color: Colors.black87,
+              color: Colors.white,
               size: 20,
             ),
             onPressed: () => Navigator.pop(context, _hoursList),
@@ -591,8 +626,8 @@ class _OwnerEditOperatingHoursScreenState
           title: const Text(
             'เวลาเปิด-ปิด',
             style: TextStyle(
-              color: Colors.black87,
-              fontSize: 17,
+              color: Colors.white,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -602,9 +637,24 @@ class _OwnerEditOperatingHoursScreenState
                 child: Padding(
                   padding: EdgeInsets.only(right: 16),
                   child: SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              )
+            else
+              TextButton(
+                onPressed: _handleSaveAndSync,
+                child: const Text(
+                  'บันทึก',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),

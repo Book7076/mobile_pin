@@ -39,9 +39,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Header AppBar
+      // Header AppBar with #860E33 and white text
       expect(find.text('เวลาเปิด-ปิด'), findsOneWidget);
       expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsOneWidget);
+      expect(find.text('บันทึก'), findsOneWidget);
+
+      final appBar = tester.widget<AppBar>(find.byType(AppBar));
+      expect(appBar.backgroundColor, const Color(0xFF860E33));
 
       // Form inputs
       expect(find.text('เลือกวัน'), findsOneWidget);
