@@ -49,7 +49,7 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
     try {
       final res = await Supabase.instance.client
           .from('restaurants')
-          .select()
+          .select('*, cuisine_types(id, name)')
           .eq('id', widget.restaurantId!)
           .maybeSingle();
 
@@ -58,6 +58,9 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           _displayName = res['name']?.toString() ?? _displayName;
           if (res['image_url'] != null && res['image_url'].toString().isNotEmpty) {
             _displayImageUrl = res['image_url'].toString();
+          }
+          if (res['cuisine_types'] != null && res['cuisine_types']['name'] != null) {
+            _displayCategory = res['cuisine_types']['name'].toString();
           }
         });
 
@@ -82,20 +85,23 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           } catch (_) {}
         }
 
-        final cTypeId = res['cuisine_type_id'];
-        if (cTypeId != null) {
-          try {
-            final cType = await Supabase.instance.client
-                .from('cuisine_types')
-                .select('name')
-                .eq('id', cTypeId)
-                .maybeSingle();
-            if (cType != null && cType['name'] != null && mounted) {
-              setState(() {
-                _displayCategory = cType['name'].toString();
-              });
-            }
-          } catch (_) {}
+        if (res['cuisine_types'] == null || res['cuisine_types']['name'] == null) {
+          final cTypeId = res['cuisine_type_id'];
+          if (cTypeId != null) {
+            try {
+              final int cId = (cTypeId as num).toInt();
+              final cType = await Supabase.instance.client
+                  .from('cuisine_types')
+                  .select('name')
+                  .eq('id', cId)
+                  .maybeSingle();
+              if (cType != null && cType['name'] != null && mounted) {
+                setState(() {
+                  _displayCategory = cType['name'].toString();
+                });
+              }
+            } catch (_) {}
+          }
         }
       }
     } catch (_) {}

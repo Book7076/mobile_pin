@@ -6,6 +6,13 @@ import 'owner_edit_amenities_screen.dart';
 
 const Color kOwnerPrimaryColor = Color(0xFF7C1431);
 const Color kOwnerTealColor = Color(0xFF00BFA5);
+const Color kOwnerMaroonColor = Color(0xFF9E3A52);
+const Color kOwnerGreyBorder = Color(0xFF6B7280);
+const Color kOwnerGreyBadge = Color(0xFF9CA3AF);
+const Color kOwnerGreyLine = Color(0xFFD1D5DB);
+const Color kOwnerRedColor = Color(0xFFE11D48);
+
+enum _StepState { completed, active, inactive, rejected }
 
 /// โมเดลช่วยจัดเก็บเวลาเปิด-ปิดแต่ละวันสำหรับหน้าจอแสดงผล
 class DayScheduleItem {
@@ -39,6 +46,7 @@ class OwnerRestaurantInfoScreen extends StatefulWidget {
   final String restaurantName;
   final String? restaurantCategory;
   final String? restaurantImageUrl;
+  final String? initialStatus;
 
   const OwnerRestaurantInfoScreen({
     super.key,
@@ -46,6 +54,7 @@ class OwnerRestaurantInfoScreen extends StatefulWidget {
     this.restaurantName = 'THE CHICKEN',
     this.restaurantCategory,
     this.restaurantImageUrl,
+    this.initialStatus,
   });
 
   @override
@@ -61,7 +70,8 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
   late String _phone;
   late String _email;
   String? _currentImageUrl;
-  String _status = 'approved';
+  late String _status;
+  String? _rejectionReason;
   bool _isLoading = false;
 
   // รายการวันทั้ง 7 วัน เรียงตาม mockup: อาทิตย์, จันทร์, อังคาร, พุธ, พฤหัสบดี, ศุกร์, เสาร์
@@ -87,6 +97,7 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
     _phone = '0991234567';
     _email = 'ITLOVER@GMAIL.COM';
     _currentImageUrl = widget.restaurantImageUrl;
+    _status = widget.initialStatus ?? 'pending';
 
     // เริ่มต้นเวลาเปิดปิดตาม Mockup
     _initDefaultSchedules();
@@ -118,10 +129,10 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
     if (widget.restaurantId == null) return;
 
     try {
-      // 1. ดึงข้อมูลจากตาราง restaurants
+      // 1. ดึงข้อมูลจากตาราง restaurants พร้อม join cuisine_types
       final res = await Supabase.instance.client
           .from('restaurants')
-          .select()
+          .select('*, cuisine_types(id, name)')
           .eq('id', widget.restaurantId!)
           .maybeSingle();
 
@@ -140,8 +151,14 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
           if (res['status'] != null) {
             _status = res['status'].toString();
           }
+          if (res['rejection_reason'] != null) {
+            _rejectionReason = res['rejection_reason'].toString();
+          }
           if (res['image_url'] != null && res['image_url'].toString().isNotEmpty) {
             _currentImageUrl = res['image_url'].toString();
+          }
+          if (res['cuisine_types'] != null && res['cuisine_types']['name'] != null) {
+            _category = res['cuisine_types']['name'].toString();
           }
         });
 
@@ -155,14 +172,15 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
           }
         } catch (_) {}
 
-        // 2. ถ้ามี cuisine_type_id ให้ดึงชื่อหมวดหมู่จากตาราง cuisine_types
+        // 2. ถ้ายังไม่ได้ category ให้ดึงตรงจากตาราง cuisine_types ตาม cuisine_type_id
         final cuisineTypeId = res['cuisine_type_id'];
-        if (cuisineTypeId != null) {
+        if ((res['cuisine_types'] == null || res['cuisine_types']['name'] == null) && cuisineTypeId != null) {
           try {
+            final cTypeId = (cuisineTypeId as num).toInt();
             final cType = await Supabase.instance.client
                 .from('cuisine_types')
                 .select('name')
-                .eq('id', cuisineTypeId)
+                .eq('id', cTypeId)
                 .maybeSingle();
             if (cType != null && cType['name'] != null && mounted) {
               setState(() {
@@ -687,178 +705,580 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
   // ==========================================================================
   // 5. STATUS SECTION (STEPPER + RESULT CARD)
   // ==========================================================================
+  String get _normalizedStatus {
+    final s = _status.trim().toLowerCase();
+    if (s == 'rejected' || s.contains('reject') || s.contains('ไม่ผ่าน')) {
+      return 'rejected';
+    }
+    if (s == 'in_review' || s == 'reviewing' || s == 'checking' || s.contains('กำลังตรวจ')) {
+      return 'in_review';
+    }
+    if (s == 'pending' || s == 'waiting' || s.contains('รอตรวจ') || s.contains('อยู่ระหว่าง')) {
+      return 'pending';
+    }
+    return 'approved';
+  }
+
+  List<String> _getRejectionReasons() {
+    if (_rejectionReason != null && _rejectionReason!.trim().isNotEmpty) {
+      final lines = _rejectionReason!
+          .split(RegExp(r'[\r\n]+'))
+          .map((e) => e.replaceAll(RegExp(r'^[\s•\-\*]+'), '').trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+      if (lines.isNotEmpty) return lines;
+    }
+    return const [
+      'รูปภาพหน้าร้านไม่ชัดเจน',
+      'เมนูอาหารบางรายการไม่ถูกต้อง',
+      'ข้อมูลติดต่อร้านค้าไม่ครบถ้วน',
+    ];
+  }
+
   Widget _buildStatusSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'สถานะร้านค้า',
-          style: TextStyle(
-            fontSize: 16.5,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'สถานะร้านค้า',
+              style: TextStyle(
+                fontSize: 16.5,
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            // ปุ่มเมนูสำหรับดูตัวอย่างแต่ละสถานะ (pending, in_review, rejected, approved)
+            PopupMenuButton<String>(
+              tooltip: 'เลือกดูตัวอย่างสถานะ',
+              icon: Icon(
+                Icons.tune_rounded,
+                size: 18,
+                color: Colors.grey.shade400,
+              ),
+              onSelected: (val) {
+                setState(() {
+                  _status = val;
+                });
+              },
+              itemBuilder: (ctx) => const [
+                PopupMenuItem(
+                  value: 'pending',
+                  child: Text('รอตรวจสอบ (รูปที่ 2)'),
+                ),
+                PopupMenuItem(
+                  value: 'in_review',
+                  child: Text('กำลังตรวจสอบ'),
+                ),
+                PopupMenuItem(
+                  value: 'rejected',
+                  child: Text('ไม่ผ่านการตรวจสอบ (รูปที่ 3)'),
+                ),
+                PopupMenuItem(
+                  value: 'approved',
+                  child: Text('ผ่านการตรวจสอบ (อนุมัติแล้ว)'),
+                ),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
 
         // 4-Step Stepper
         _buildStepperIndicator(),
 
         const SizedBox(height: 22),
 
-        // การ์ดข้อความผลการตรวจสอบสีเขียวมินต์
+        // การ์ดข้อความผลการตรวจสอบ
         _buildStatusResultCard(),
       ],
     );
   }
 
   Widget _buildStepperIndicator() {
-    final steps = [
-      {'num': '1', 'title': 'ส่งคำขอ', 'icon': Icons.description_outlined},
-      {'num': '2', 'title': 'รอตรวจสอบ', 'icon': Icons.hourglass_empty_rounded},
-      {'num': '3', 'title': 'กำลังตรวจสอบ', 'icon': Icons.manage_search_rounded},
-      {'num': '4', 'title': 'ผลการตรวจสอบ', 'icon': Icons.shopping_bag_outlined},
-    ];
+    final status = _normalizedStatus;
+
+    // กำหนดสถานะของแต่ละขั้นตอน
+    _StepState step1State = _StepState.completed;
+    _StepState step2State = _StepState.inactive;
+    _StepState step3State = _StepState.inactive;
+    _StepState step4State = _StepState.inactive;
+
+    Color line1Color = kOwnerTealColor;
+    Color line2Color = kOwnerGreyLine;
+    Color line3Color = kOwnerGreyLine;
+
+    if (status == 'pending') {
+      // รูปที่ 2: ขั้นที่ 1 ส่งคำขอ (เขียว), ขั้นที่ 2 รอตรวจสอบ (แดงเลือดหมู), ขั้นที่ 3-4 สีเทา
+      step1State = _StepState.completed;
+      step2State = _StepState.active;
+      step3State = _StepState.inactive;
+      step4State = _StepState.inactive;
+      line1Color = kOwnerTealColor;
+      line2Color = kOwnerGreyLine;
+      line3Color = kOwnerGreyLine;
+    } else if (status == 'in_review') {
+      // กำลังตรวจสอบ: ขั้นที่ 1-2 เขียว, ขั้นที่ 3 กำลังตรวจสอบ (แดงเลือดหมู), ขั้นที่ 4 สีเทา
+      step1State = _StepState.completed;
+      step2State = _StepState.completed;
+      step3State = _StepState.active;
+      step4State = _StepState.inactive;
+      line1Color = kOwnerTealColor;
+      line2Color = kOwnerTealColor;
+      line3Color = kOwnerGreyLine;
+    } else if (status == 'rejected') {
+      // รูปที่ 3: ขั้นที่ 1-3 เขียว, ขั้นที่ 4 ไม่ผ่าน (แดง มีไอคอนกากบาท X)
+      step1State = _StepState.completed;
+      step2State = _StepState.completed;
+      step3State = _StepState.completed;
+      step4State = _StepState.rejected;
+      line1Color = kOwnerTealColor;
+      line2Color = kOwnerTealColor;
+      line3Color = kOwnerTealColor;
+    } else {
+      // approved: ผ่านทุกขั้นตอน (สีเขียวทั้ง 4 ขั้น)
+      step1State = _StepState.completed;
+      step2State = _StepState.completed;
+      step3State = _StepState.completed;
+      step4State = _StepState.completed;
+      line1Color = kOwnerTealColor;
+      line2Color = kOwnerTealColor;
+      line3Color = kOwnerTealColor;
+    }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (int i = 0; i < steps.length; i++) ...[
-          // Step Node
-          Expanded(
-            child: Column(
-              children: [
-                Stack(
-                  alignment: Alignment.center,
-                  clipBehavior: Clip.none,
-                  children: [
-                    // วงกลมสเต็ป
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        border: Border.all(
-                          color: kOwnerTealColor,
-                          width: 2.2,
-                        ),
-                      ),
-                      child: Center(
-                        child: Icon(
-                          steps[i]['icon'] as IconData,
-                          color: kOwnerTealColor,
-                          size: 21,
-                        ),
-                      ),
-                    ),
+        _buildStepNode(
+          num: '1',
+          title: 'ส่งคำขอ',
+          icon: Icons.description_outlined,
+          state: step1State,
+        ),
+        _buildConnectorLine(line1Color),
+        _buildStepNode(
+          num: '2',
+          title: 'รอตรวจสอบ',
+          icon: Icons.hourglass_empty_rounded,
+          state: step2State,
+        ),
+        _buildConnectorLine(line2Color),
+        _buildStepNode(
+          num: '3',
+          title: 'กำลังตรวจสอบ',
+          icon: Icons.manage_search_rounded,
+          state: step3State,
+        ),
+        _buildConnectorLine(line3Color),
+        _buildStepNode(
+          num: '4',
+          title: 'ผลการตรวจสอบ',
+          icon: Icons.shopping_basket_outlined,
+          state: step4State,
+        ),
+      ],
+    );
+  }
 
-                    // ตราติ๊กถูกสีเขียวด้านล่างวงกลม
-                    Positioned(
-                      bottom: -2,
-                      child: Container(
-                        width: 15,
-                        height: 15,
-                        decoration: const BoxDecoration(
-                          color: kOwnerTealColor,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.check, color: Colors.white, size: 10),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  steps[i]['num'] as String,
-                  style: const TextStyle(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.bold,
-                    color: kOwnerTealColor,
+  Widget _buildConnectorLine(Color color) {
+    return Container(
+      width: 22,
+      height: 2.2,
+      margin: const EdgeInsets.only(top: 21),
+      color: color,
+    );
+  }
+
+  Widget _buildStepNode({
+    required String num,
+    required String title,
+    required IconData icon,
+    required _StepState state,
+  }) {
+    Color borderColor;
+    Color iconColor;
+    Color badgeColor;
+    Color numColor;
+    Color titleColor;
+    Widget circleChild;
+
+    switch (state) {
+      case _StepState.completed:
+        borderColor = kOwnerTealColor;
+        iconColor = kOwnerTealColor;
+        badgeColor = kOwnerTealColor;
+        numColor = kOwnerTealColor;
+        titleColor = kOwnerTealColor;
+        circleChild = Center(
+          child: Icon(icon, color: iconColor, size: 21),
+        );
+        break;
+      case _StepState.active:
+        borderColor = kOwnerMaroonColor;
+        iconColor = kOwnerMaroonColor;
+        badgeColor = kOwnerMaroonColor;
+        numColor = kOwnerMaroonColor;
+        titleColor = kOwnerMaroonColor;
+        circleChild = Center(
+          child: Icon(icon, color: iconColor, size: 21),
+        );
+        break;
+      case _StepState.inactive:
+        borderColor = kOwnerGreyBorder;
+        iconColor = kOwnerGreyBorder;
+        badgeColor = kOwnerGreyBadge;
+        numColor = kOwnerGreyBorder;
+        titleColor = const Color(0xFF1F2937); // ข้อความหัวข้อสีเข้มตามรูปที่ 2
+        circleChild = Center(
+          child: Icon(icon, color: iconColor, size: 21),
+        );
+        break;
+      case _StepState.rejected:
+        borderColor = kOwnerRedColor;
+        iconColor = Colors.white;
+        badgeColor = kOwnerRedColor;
+        numColor = kOwnerRedColor;
+        titleColor = kOwnerRedColor;
+        circleChild = Container(
+          margin: const EdgeInsets.all(2.5),
+          decoration: const BoxDecoration(
+            color: kOwnerRedColor,
+            shape: BoxShape.circle,
+          ),
+          child: const Center(
+            child: Icon(Icons.close_rounded, color: Colors.white, size: 22),
+          ),
+        );
+        break;
+    }
+
+    return Expanded(
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  border: Border.all(
+                    color: borderColor,
+                    width: 2.2,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  steps[i]['title'] as String,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                    color: kOwnerTealColor,
+                child: circleChild,
+              ),
+              Positioned(
+                bottom: -2,
+                child: Container(
+                  width: 15,
+                  height: 15,
+                  decoration: BoxDecoration(
+                    color: badgeColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.check, color: Colors.white, size: 10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            num,
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.bold,
+              color: numColor,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w600,
+              color: titleColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusResultCard() {
+    final status = _normalizedStatus;
+
+    if (status == 'pending') {
+      // รูปที่ 2: การ์ดสีเทา มีไอคอนนาฬิกา
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.access_time_rounded,
+                  color: Color(0xFF111827),
+                  size: 20,
+                ),
+                SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'อยู่ระหว่างรอเจ้าหน้าที่ตรวจสอบ',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111827),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+            Text(
+              'โดยปกติใช้เวลาประมาณ 3-5 วันทำการ\n(ไม่รวมวันหยุดเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์)',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF4B5563),
+                fontWeight: FontWeight.w500,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == 'in_review') {
+      // กำลังตรวจสอบ: การ์ดสีเทา มีไอคอนตรวจสอบ คล้ายรูปที่ 2
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: const Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.manage_search_rounded,
+                  color: Color(0xFF111827),
+                  size: 22,
+                ),
+                SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'เจ้าหน้าที่กำลังตรวจสอบข้อมูลร้านค้า',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111827),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+            Text(
+              'ระบบกำลังตรวจสอบความถูกต้องของข้อมูลร้านค้าและเมนูอาหาร\nคุณจะได้รับการแจ้งเตือนทันทีเมื่อการตรวจสอบเสร็จสิ้น',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF4B5563),
+                fontWeight: FontWeight.w500,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (status == 'rejected') {
+      // รูปที่ 3: สองการ์ดสีชมพูอ่อน (การ์ดแจ้งไม่ผ่าน + การ์ดเหตุผล)
+      final reasons = _getRejectionReasons();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // การ์ดที่ 1: สถานะไม่ผ่านการตรวจสอบ
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFDF0F2),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white,
+                    border: Border.all(color: const Color(0xFFE11D48), width: 2),
+                  ),
+                  padding: const EdgeInsets.all(3.5),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFE11D48),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.close_rounded, color: Colors.white, size: 26),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'ไม่ผ่านการตรวจสอบ',
+                  style: TextStyle(
+                    fontSize: 16.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF991B1B),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'กรุณาแก้ไขข้อมูลและส่งคำขอใหม่',
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1F2937),
                   ),
                 ),
               ],
             ),
           ),
 
-          // เส้นเชื่อมระหว่างวงกลม
-          if (i < steps.length - 1)
-            Container(
-              width: 24,
-              height: 2.2,
-              margin: const EdgeInsets.only(top: 21),
-              color: kOwnerTealColor,
+          const SizedBox(height: 14),
+
+          // การ์ดที่ 2: เหตุผลที่ไม่ผ่านการตรวจสอบ
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFDF0F2),
+              borderRadius: BorderRadius.circular(18),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'เหตุผลที่ไม่ผ่านการตรวจสอบ',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                for (final reason in reasons)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2.5),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '•  ',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF374151),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            reason,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF374151),
+                              height: 1.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ],
-      ],
-    );
-  }
+      );
+    }
 
-  Widget _buildStatusResultCard() {
-    final isApproved = _status == 'approved';
-
+    // approved: การ์ดสีเขียวมินต์
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 20),
       decoration: BoxDecoration(
-        color: isApproved ? const Color(0xFFE2F7EE) : const Color(0xFFFFF7ED),
-        borderRadius: BorderRadius.circular(16),
+        color: const Color(0xFFE2F7EE),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Column(
         children: [
-          // วงกลมไอคอนตะกร้า/ร้านค้าตรงกลาง
           Container(
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              color: isApproved ? const Color(0xFF34D399) : const Color(0xFFFBBF24),
+              color: Color(0xFF34D399),
               shape: BoxShape.circle,
             ),
             child: Center(
               child: Icon(
-                isApproved ? Icons.storefront_outlined : Icons.hourglass_top_rounded,
+                Icons.storefront_outlined,
                 color: Colors.white,
                 size: 24,
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Text(
-            isApproved ? 'ผ่านการตรวจสอบ' : 'รอการตรวจสอบ',
+            'ผ่านการตรวจสอบ',
             style: TextStyle(
               fontSize: 15.5,
               fontWeight: FontWeight.w800,
-              color: isApproved ? const Color(0xFF047857) : const Color(0xFFB45309),
+              color: Color(0xFF047857),
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
-            isApproved ? 'ร้านค้าของคุณได้รับการอนุมัติแล้ว' : 'คำขอของคุณอยู่ระหว่างการพิจารณา',
-            style: const TextStyle(
+            'ร้านค้าของคุณได้รับการอนุมัติแล้ว',
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.bold,
               color: Color(0xFF1F2937),
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
-            isApproved
-                ? 'ร้านค้าของคุณเปิดให้บริการแล้ว\nคุณสามารถจัดการร้านค้าและเมนูอาหารได้เลย'
-                : 'เจ้าหน้าที่กำลังดำเนินการตรวจสอบข้อมูลร้านค้า\nคุณจะได้รับการแจ้งเตือนเมื่อการอนุมัติเสร็จสิ้น',
+            'ร้านค้าของคุณเปิดให้บริการแล้ว\nคุณสามารถจัดการร้านค้าและเมนูอาหารได้เลย',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               color: Color(0xFF4B5563),
               height: 1.4,

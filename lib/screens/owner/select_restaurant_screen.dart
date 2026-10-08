@@ -135,7 +135,7 @@ class _SelectRestaurantScreenState extends ConsumerState<SelectRestaurantScreen>
         try {
           response = await supabase
               .from('restaurants')
-              .select()
+              .select('*, cuisine_types(id, name)')
               .eq('owner_id', currentUid);
         } catch (e) {
           debugPrint('Error querying restaurants by owner_id ($currentUid): $e');
@@ -153,7 +153,7 @@ class _SelectRestaurantScreenState extends ConsumerState<SelectRestaurantScreen>
           if (userRow != null && userRow['id'] != null && userRow['id'] != currentUid) {
             final altResponse = await supabase
                 .from('restaurants')
-                .select()
+                .select('*, cuisine_types(id, name)')
                 .eq('owner_id', userRow['id']);
             if (altResponse.isNotEmpty) {
               response = altResponse;
@@ -168,18 +168,23 @@ class _SelectRestaurantScreenState extends ConsumerState<SelectRestaurantScreen>
         final items = <OwnerRestaurantItem>[];
         for (final data in response) {
           String category = 'ร้านอาหาร';
-          final cuisineId = data['cuisine_type_id'];
-          if (cuisineId != null) {
-            try {
-              final cType = await supabase
-                  .from('cuisine_types')
-                  .select('name')
-                  .eq('id', cuisineId)
-                  .maybeSingle();
-              if (cType != null && cType['name'] != null) {
-                category = cType['name'].toString();
-              }
-            } catch (_) {}
+          if (data['cuisine_types'] != null && data['cuisine_types']['name'] != null) {
+            category = data['cuisine_types']['name'].toString();
+          } else {
+            final cuisineId = data['cuisine_type_id'];
+            if (cuisineId != null) {
+              try {
+                final int cId = (cuisineId as num).toInt();
+                final cType = await supabase
+                    .from('cuisine_types')
+                    .select('name')
+                    .eq('id', cId)
+                    .maybeSingle();
+                if (cType != null && cType['name'] != null) {
+                  category = cType['name'].toString();
+                }
+              } catch (_) {}
+            }
           }
 
           // ตรวจสอบรูปภาพจาก data['image_url'] หรือจากตาราง restaurant_images
