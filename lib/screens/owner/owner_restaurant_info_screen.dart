@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/operating_hours_model.dart';
 import 'owner_edit_amenities_screen.dart';
+import 'owner_edit_operating_hours_screen.dart';
 
 const Color kOwnerPrimaryColor = Color(0xFF7C1431);
 const Color kOwnerTealColor = Color(0xFF00BFA5);
@@ -21,6 +22,7 @@ class DayScheduleItem {
   String openTime;
   String closeTime;
   bool isClosed;
+  List<String> timeRanges;
 
   DayScheduleItem({
     required this.dayOfWeek,
@@ -28,10 +30,25 @@ class DayScheduleItem {
     required this.openTime,
     required this.closeTime,
     required this.isClosed,
+    this.timeRanges = const [],
   });
 
   String get displayTime {
     if (isClosed) return 'หยุดทำการ';
+    if (timeRanges.isNotEmpty) {
+      return timeRanges.map((r) {
+        final parts = r.split('-');
+        if (parts.length == 2) {
+          String clean(String t) {
+            final sub = t.trim().split(':');
+            if (sub.length >= 2) return '${sub[0].padLeft(2, '0')}.${sub[1].padLeft(2, '0')}';
+            return t.trim().replaceAll(':', '.');
+          }
+          return '${clean(parts[0])} - ${clean(parts[1])}';
+        }
+        return r.replaceAll(':', '.');
+      }).join(', ');
+    }
     String clean(String t) {
       final parts = t.split(':');
       if (parts.length >= 2) return '${parts[0].padLeft(2, '0')}.${parts[1].padLeft(2, '0')}';
@@ -196,24 +213,41 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
         final hoursRows = await Supabase.instance.client
             .from('operating_hours')
             .select()
-            .eq('restaurant_id', widget.restaurantId!);
+            .eq('restaurant_id', widget.restaurantId!)
+            .order('day_of_week', ascending: true)
+            .order('open_time', ascending: true);
 
         if (hoursRows is List && hoursRows.isNotEmpty && mounted) {
-          final Map<int, Map<String, dynamic>> dbMap = {};
+          final Map<int, List<Map<String, dynamic>>> dbMap = {};
           for (final row in hoursRows) {
-            final d = (row['day_of_week'] as num?)?.toInt();
-            if (d != null) {
-              dbMap[d] = Map<String, dynamic>.from(row as Map);
+            final rawDay = (row['day_of_week'] as num?)?.toInt();
+            if (rawDay != null) {
+              final d = rawDay == 0 ? 7 : rawDay;
+              dbMap.putIfAbsent(d, () => []).add(Map<String, dynamic>.from(row as Map));
             }
           }
 
           setState(() {
             for (final item in _schedules) {
               if (dbMap.containsKey(item.dayOfWeek)) {
-                final d = dbMap[item.dayOfWeek]!;
-                item.openTime = d['open_time']?.toString() ?? item.openTime;
-                item.closeTime = d['close_time']?.toString() ?? item.closeTime;
-                item.isClosed = d['is_closed'] as bool? ?? false;
+                final list = dbMap[item.dayOfWeek]!;
+                final openList = list.where((x) => x['is_closed'] != true).toList();
+                if (openList.isNotEmpty) {
+                  item.isClosed = false;
+                  item.openTime = openList.first['open_time']?.toString() ?? item.openTime;
+                  item.closeTime = openList.first['close_time']?.toString() ?? item.closeTime;
+                  item.timeRanges = openList.map((x) {
+                    final o = x['open_time']?.toString() ?? '';
+                    final c = x['close_time']?.toString() ?? '';
+                    return '$o - $c';
+                  }).toList();
+                } else {
+                  item.isClosed = true;
+                  item.timeRanges = [];
+                }
+              } else {
+                item.isClosed = true;
+                item.timeRanges = [];
               }
             }
           });
@@ -1526,87 +1560,71 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
     );
   }
 
-  /// แก้ไขเวลาเปิด-ปิดร้าน
-  void _showEditOperatingHoursDialog() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          return Container(
-            height: MediaQuery.of(ctx).size.height * 0.75,
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'แก้ไขเวลาเปิด - ปิดร้าน',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+  /// แก้ไขเวลาเปิด-ปิดร้าน นำทางไปยังหน้าแก้ไขเวลาเปิด-ปิด (ภาพที่ 2)
+  Future<void> _showEditOperatingHoursDialog() async {
+    final initialEntries = <OperatingHourEntry>[];
+    for (final schedule in _schedules) {
+      if (!schedule.isClosed) {
+        if (schedule.timeRanges.isNotEmpty) {
+          for (final range in schedule.timeRanges) {
+            final parts = range.split('-');
+            if (parts.length == 2) {
+              initialEntries.add(
+                OperatingHourEntry(
+                  dayOfWeek: schedule.dayOfWeek,
+                  dayName: schedule.dayName,
+                  openTime: parts[0].trim(),
+                  closeTime: parts[1].trim(),
                 ),
-                const SizedBox(height: 12),
-                Expanded(
-                  child: ListView.separated(
-                    itemCount: _schedules.length,
-                    separatorBuilder: (_, __) => const Divider(),
-                    itemBuilder: (_, index) {
-                      final item = _schedules[index];
-                      return Row(
-                        children: [
-                          SizedBox(
-                            width: 80,
-                            child: Text(
-                              item.dayName,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          Switch(
-                            value: !item.isClosed,
-                            activeColor: kOwnerPrimaryColor,
-                            onChanged: (val) {
-                              setModalState(() {
-                                item.isClosed = !val;
-                              });
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          if (item.isClosed)
-                            const Text('หยุดทำการ', style: TextStyle(color: Colors.grey))
-                          else
-                            Row(
-                              children: [
-                                Text('${item.openTime} - ${item.closeTime}'),
-                              ],
-                            ),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kOwnerPrimaryColor,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: () {
-                      setState(() {});
-                      Navigator.pop(ctx);
-                    },
-                    child: const Text('บันทึกเวลาเปิด-ปิด', style: TextStyle(fontSize: 16)),
-                  ),
-                ),
-              ],
+              );
+            }
+          }
+        } else {
+          initialEntries.add(
+            OperatingHourEntry(
+              dayOfWeek: schedule.dayOfWeek,
+              dayName: schedule.dayName,
+              openTime: schedule.openTime,
+              closeTime: schedule.closeTime,
             ),
           );
-        },
+        }
+      }
+    }
+
+    final updated = await Navigator.push<List<OperatingHourEntry>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OwnerEditOperatingHoursScreen(
+          restaurantId: widget.restaurantId,
+          initialHours: initialEntries.isNotEmpty ? initialEntries : null,
+        ),
       ),
     );
+
+    if (updated != null && mounted) {
+      final Map<int, List<OperatingHourEntry>> byDay = {};
+      for (final e in updated) {
+        byDay.putIfAbsent(e.dayOfWeek, () => []).add(e);
+      }
+
+      setState(() {
+        for (final s in _schedules) {
+          if (byDay.containsKey(s.dayOfWeek) && byDay[s.dayOfWeek]!.isNotEmpty) {
+            final dayList = byDay[s.dayOfWeek]!;
+            s.isClosed = false;
+            s.openTime = dayList.first.openTime;
+            s.closeTime = dayList.first.closeTime;
+            s.timeRanges = dayList.map((e) => '${e.openTime} - ${e.closeTime}').toList();
+          } else {
+            s.isClosed = true;
+            s.timeRanges = [];
+          }
+        }
+      });
+
+      _loadRestaurantDetails();
+    }
   }
 
   /// แก้ไขสิ่งอำนวยความสะดวก

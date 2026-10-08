@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants.dart';
 import '../../models/favorite_manager.dart';
 import '../../models/restaurant_model.dart';
 import '../../models/review_model.dart';
 import '../../providers/restaurant_provider.dart';
+import 'restaurant_all_menu_screen.dart';
 
 /// Restaurant Detail Screen matching Mockup Image 4:
 /// - Header: Back arrow (<) + "รายละเอียดร้านอาหาร" in Burgundy
@@ -54,11 +56,83 @@ class RestaurantDetailScreen extends ConsumerStatefulWidget {
 class _RestaurantDetailScreenState
     extends ConsumerState<RestaurantDetailScreen> {
   bool? _isBookmarked;
+  List<SignatureDish> _databaseDishes = [];
+  String? _lastLoadedRestaurantId;
 
   @override
   void initState() {
     super.initState();
     _initBookmarkState();
+    _loadDishesFromDatabase();
+  }
+
+  Future<void> _loadDishesFromDatabase([String? overrideId, String? overrideName]) async {
+    final effectiveId = overrideId ??
+        widget.restaurantId ??
+        widget.restaurantData?['id']?.toString();
+    final effectiveName = overrideName ??
+        widget.name ??
+        widget.restaurantData?['name']?.toString();
+
+    if (effectiveId != null && effectiveId == _lastLoadedRestaurantId && _databaseDishes.isNotEmpty) {
+      return;
+    }
+    _lastLoadedRestaurantId = effectiveId;
+
+    String? targetRestaurantId = effectiveId;
+
+    try {
+      // 1. If targetRestaurantId is not a UUID, try to lookup restaurant id in Supabase by name
+      if (targetRestaurantId == null || !targetRestaurantId.contains('-')) {
+        if (effectiveName != null && effectiveName.isNotEmpty) {
+          try {
+            final resRows = await Supabase.instance.client
+                .from('restaurants')
+                .select('id')
+                .ilike('name', '%$effectiveName%')
+                .limit(1);
+            if (resRows is List && resRows.isNotEmpty) {
+              targetRestaurantId = resRows.first['id']?.toString();
+            }
+          } catch (_) {}
+        }
+      }
+
+      // 2. Query top 3 menu items from menu_items table
+      if (targetRestaurantId != null && targetRestaurantId.isNotEmpty) {
+        final rows = await Supabase.instance.client
+            .from('menu_items')
+            .select('id, name, price, image_url, sort_order')
+            .eq('restaurant_id', targetRestaurantId)
+            .order('sort_order', ascending: true)
+            .limit(3);
+
+        if (rows is List && rows.isNotEmpty) {
+          final List<SignatureDish> loaded = [];
+          for (final row in rows) {
+            final name = row['name']?.toString() ?? '';
+            final price = (row['price'] as num?)?.toInt() ?? 0;
+            final img = row['image_url']?.toString();
+            if (name.isNotEmpty) {
+              loaded.add(SignatureDish(
+                name: name,
+                price: price,
+                imageUrl: (img != null && img.isNotEmpty) ? img : null,
+              ));
+            }
+          }
+
+          if (loaded.isNotEmpty && mounted) {
+            setState(() {
+              _databaseDishes = loaded;
+            });
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Note: Error loading dishes from Supabase in RestaurantDetailScreen: $e');
+    }
   }
 
   void _initBookmarkState() {
@@ -237,6 +311,10 @@ class _RestaurantDetailScreenState
       restaurant = restaurants.first;
     } else {
       restaurant = _createFallbackModel();
+    }
+
+    if (_databaseDishes.isEmpty && _lastLoadedRestaurantId != restaurant.id) {
+      _loadDishesFromDatabase(restaurant.id, restaurant.name);
     }
 
     if (restaurant.id.isEmpty) {
@@ -759,34 +837,77 @@ class _RestaurantDetailScreenState
 
   /// 5. เมนูอาหาร
   Widget _buildMenuSection(RestaurantModel restaurant) {
-    final dishes = restaurant.signatureDishes.isNotEmpty
-        ? restaurant.signatureDishes
-        : [
-            SignatureDish(
-              name: 'บุฟเฟต์',
-              price: 249,
-              imageUrl: restaurant.imageUrls.isNotEmpty
-                  ? restaurant.imageUrls.first
-                  : 'https://images.unsplash.com/photo-1547928576-a4a33237cbc3?w=400&q=80',
-            ),
-            SignatureDish(
-              name: 'กุ้งดอง',
-              price: 0,
-              imageUrl:
-                  'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&q=80',
-            ),
-          ];
+    final dishes = _databaseDishes.isNotEmpty
+        ? _databaseDishes.take(3).toList()
+        : (restaurant.signatureDishes.isNotEmpty
+            ? restaurant.signatureDishes.take(3).toList()
+            : [
+                SignatureDish(
+                  name: 'บุฟเฟต์',
+                  price: 249,
+                  imageUrl: restaurant.imageUrls.isNotEmpty
+                      ? restaurant.imageUrls.first
+                      : 'https://images.unsplash.com/photo-1547928576-a4a33237cbc3?w=400&q=80',
+                ),
+                SignatureDish(
+                  name: 'กุ้งดอง',
+                  price: 0,
+                  imageUrl:
+                      'https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400&q=80',
+                ),
+              ]);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'เมนูอาหาร',
-          style: TextStyle(
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            color: Color(0xFF1E293B),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Text(
+              'เมนูอาหาร',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E293B),
+              ),
+            ),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => RestaurantAllMenuScreen(
+                      restaurantId: restaurant.id,
+                      restaurantName: restaurant.name,
+                      initialDishes: _databaseDishes.isNotEmpty
+                          ? _databaseDishes
+                          : restaurant.signatureDishes,
+                    ),
+                  ),
+                );
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Text(
+                    'เมนูทั้งหมด',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppConstants.burgundyPrimary,
+                    ),
+                  ),
+                  SizedBox(width: 2),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: AppConstants.burgundyPrimary,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 14),
         Column(

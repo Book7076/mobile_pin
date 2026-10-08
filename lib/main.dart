@@ -23,14 +23,15 @@ import 'screens/admin/admin_login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await dotenv.load(fileName: ".env");
   } catch (e) {
     debugPrint("Note: .env file loading error or missing: $e");
   }
-  
-  if (AppConstants.supabaseUrl.isNotEmpty && AppConstants.supabaseAnonKey.isNotEmpty) {
+
+  if (AppConstants.supabaseUrl.isNotEmpty &&
+      AppConstants.supabaseAnonKey.isNotEmpty) {
     try {
       await Supabase.initialize(
         url: AppConstants.supabaseUrl,
@@ -40,12 +41,8 @@ Future<void> main() async {
       debugPrint("Supabase initialization failed: $e");
     }
   }
-  
-  runApp(
-    const ProviderScope(
-      child: MyApp(),
-    ),
-  );
+
+  runApp(const ProviderScope(child: MyApp()));
 }
 
 final supabase = Supabase.instance.client;
@@ -72,7 +69,8 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginScreen(),
         '/register': (context) => const RegisterScreen(),
         '/home': (context) => const HomeScreen(),
-        '/category-selection': (context) => const CategorySelectionScreen(isStandalone: false),
+        '/category-selection': (context) =>
+            const CategorySelectionScreen(isStandalone: false),
         '/shop-registration': (context) => const ShopRegistrationScreen(),
         '/shop-details': (context) => const ShopDetailsScreen(),
         '/add-menu': (context) => const AddMenuScreen(),

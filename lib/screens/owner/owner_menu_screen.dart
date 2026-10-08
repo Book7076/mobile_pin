@@ -18,51 +18,81 @@ class OwnerMenuScreen extends StatefulWidget {
 }
 
 class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
-  int _selectedCategory = 0;
-  final List<String> _categories = ['ทั้งหมด', 'ไก่ทอด', 'อาหารจานเดียว', 'ของทานเล่น', 'เครื่องดื่ม'];
+  String _selectedCategory = 'ทั้งหมด';
+  // รายการหมวดหมู่ทั้งหมดที่มีในฐานข้อมูล (จากตาราง categories หรือค่าเริ่มต้นตามภาพที่ 4)
+  List<String> _allCategories = [
+    'ข้าว',
+    'ของทอด',
+    'เมนูเส้น',
+    'เครื่องดื่ม',
+    'ของหวาน',
+  ];
+  final Map<String, String> _catNameToId = {};
   bool _isLoading = false;
 
-  // ตัวอย่างรายการเมนูสำรองกรณี Offline หรือยังไม่มีข้อมูลใน DB
+  /// หมวดหมู่ที่จะนำมาแสดงเป็นแท็บด้านบน (เฉพาะ 'ทั้งหมด' และหมวดหมู่ที่มีรายการเมนูในร้านจริงๆ)
+  List<String> get _displayedCategories {
+    final usedCategories = _menuItems
+        .map((item) => item['category']?.toString().trim() ?? '')
+        .where((c) => c.isNotEmpty)
+        .toSet();
+
+    final List<String> list = ['ทั้งหมด'];
+    for (final cat in _allCategories) {
+      if (usedCategories.contains(cat) && !list.contains(cat)) {
+        list.add(cat);
+      }
+    }
+    // กรณีมีหมวดหมู่อื่นที่ไม่ได้อยู่ใน _allCategories ให้ดึงมาแสดงด้วย
+    for (final cat in usedCategories) {
+      if (!list.contains(cat)) {
+        list.add(cat);
+      }
+    }
+    return list;
+  }
+
+  // รายการเมนูสำรองกรณี Offline หรือยังไม่มีข้อมูลใน DB (สอดคล้องกับภาพที่ 1)
   static final List<Map<String, dynamic>> _defaultMockItems = [
     {
       'id': 'mock-1',
-      'name': 'ไก่ทอดซอสเกาหลี (เซ็ตใหญ่)',
-      'category': 'ไก่ทอด',
-      'price': 199.0,
-      'isAvailable': true,
-      'image': 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=200&auto=format&fit=crop&q=80',
-    },
-    {
-      'id': 'mock-2',
-      'name': 'ไก่ป๊อปสไปซี่',
-      'category': 'ไก่ทอด',
-      'price': 69.0,
-      'isAvailable': true,
-      'image': 'https://images.unsplash.com/photo-1562967914-608f82629710?w=200&auto=format&fit=crop&q=80',
-    },
-    {
-      'id': 'mock-3',
-      'name': 'ข้าวหน้าไก่ทอดซอสเทอริยากิ',
-      'category': 'อาหารจานเดียว',
+      'name': 'ข้าวหน้ากุ้งย่างซีอิ๊ว',
+      'category': 'ข้าว',
       'price': 89.0,
       'isAvailable': true,
       'image': 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&auto=format&fit=crop&q=80',
     },
     {
+      'id': 'mock-2',
+      'name': 'ข้าวหน้าหมูสามชั้นย่าง',
+      'category': 'ข้าว',
+      'price': 118.0,
+      'isAvailable': true,
+      'image': 'https://images.unsplash.com/photo-1562967914-608f82629710?w=200&auto=format&fit=crop&q=80',
+    },
+    {
+      'id': 'mock-3',
+      'name': 'ข้าวหน้าหมูสันคอย่าง',
+      'category': 'ข้าว',
+      'price': 112.0,
+      'isAvailable': true,
+      'image': 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&auto=format&fit=crop&q=80',
+    },
+    {
       'id': 'mock-4',
-      'name': 'เฟรนช์ฟรายส์ชีส',
-      'category': 'ของทานเล่น',
-      'price': 59.0,
-      'isAvailable': false,
-      'image': 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=200&auto=format&fit=crop&q=80',
+      'name': 'ข้าวหน้าหมูสันคอซีอิ๊ว',
+      'category': 'ข้าว',
+      'price': 69.0,
+      'isAvailable': true,
+      'image': 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&auto=format&fit=crop&q=80',
     },
     {
       'id': 'mock-5',
-      'name': 'ชาไทยเย็นหวานน้อย',
-      'category': 'เครื่องดื่ม',
-      'price': 45.0,
+      'name': 'ข้าวหน้าไก่ย่าง โชยุ',
+      'category': 'ข้าว',
+      'price': 69.0,
       'isAvailable': true,
-      'image': 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=200&auto=format&fit=crop&q=80',
+      'image': 'https://images.unsplash.com/photo-1562967914-608f82629710?w=200&auto=format&fit=crop&q=80',
     },
   ];
 
@@ -74,7 +104,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     _loadMenuItems();
   }
 
-  /// โหลดข้อมูลเมนูจากตาราง menu_items ใน Supabase
+  /// โหลดข้อมูลเมนูจากตาราง menu_items และหมวดหมู่จากตาราง categories
   Future<void> _loadMenuItems() async {
     if (widget.restaurantId == null) {
       setState(() {
@@ -87,19 +117,80 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // 1. โหลดหมวดหมู่จากตาราง categories (เรียงตาม sort_order ภาพที่ 4)
+      try {
+        final catRows = await Supabase.instance.client
+            .from('categories')
+            .select('id, name, sort_order')
+            .eq('restaurant_id', widget.restaurantId!)
+            .order('sort_order', ascending: true);
+
+        if (catRows is List && catRows.isNotEmpty) {
+          final List<String> loadedCats = [];
+          _catNameToId.clear();
+          for (final row in catRows) {
+            final id = row['id']?.toString();
+            final name = row['name']?.toString().trim();
+            if (id != null && name != null && name.isNotEmpty) {
+              _catNameToId[name] = id;
+              if (!loadedCats.contains(name)) {
+                loadedCats.add(name);
+              }
+            }
+          }
+          if (loadedCats.isNotEmpty && mounted) {
+            setState(() {
+              _allCategories = loadedCats;
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Note: Error loading categories from Supabase: $e');
+      }
+
+      // 2. โหลดความสัมพันธ์ของเมนูกับหมวดหมู่จากตาราง menu_item_categories
+      final Map<String, String> itemToCategoryName = {};
+      try {
+        final linkRows = await Supabase.instance.client
+            .from('menu_item_categories')
+            .select('menu_item_id, category_id');
+
+        if (linkRows is List && linkRows.isNotEmpty) {
+          for (final row in linkRows) {
+            final mId = row['menu_item_id']?.toString();
+            final cId = row['category_id']?.toString();
+            if (mId != null && cId != null && _catNameToId.containsValue(cId)) {
+              final catEntry = _catNameToId.entries.firstWhere(
+                (e) => e.value == cId,
+                orElse: () => const MapEntry('', ''),
+              );
+              if (catEntry.key.isNotEmpty) {
+                itemToCategoryName[mId] = catEntry.key;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      // 3. โหลดเมนูอาหารจากตาราง menu_items
       final response = await Supabase.instance.client
           .from('menu_items')
           .select()
-          .eq('restaurant_id', widget.restaurantId!);
+          .eq('restaurant_id', widget.restaurantId!)
+          .order('sort_order', ascending: true);
 
       if (response.isNotEmpty) {
         final List<Map<String, dynamic>> loaded = [];
         for (final row in response) {
+          final id = row['id']?.toString() ?? '';
+          final name = row['name']?.toString() ?? '';
+          final categoryName = itemToCategoryName[id] ?? _detectCategoryByName(name);
+
           loaded.add({
-            'id': row['id']?.toString() ?? '',
+            'id': id,
             'restaurant_id': row['restaurant_id']?.toString() ?? '',
-            'name': row['name']?.toString() ?? '',
-            'category': 'ทั้งหมด',
+            'name': name,
+            'category': categoryName,
             'price': (row['price'] as num?)?.toDouble() ?? 0.0,
             'isAvailable': true,
             'image': (row['image_url'] != null && row['image_url'].toString().isNotEmpty)
@@ -132,11 +223,32 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     }
   }
 
+  /// ฟังก์ชันช่วยตรวจจับหมวดหมู่อาหารเริ่มต้นจากชื่ออาหาร (อิงตามหมวดหมู่ภาพที่ 4)
+  String _detectCategoryByName(String name) {
+    if (name.contains('ข้าว') || name.contains('โจ๊ก') || name.contains('ต้ม')) return 'ข้าว';
+    if (name.contains('เส้น') || name.contains('เตี๋ยว') || name.contains('สปาเกตตี') || name.contains('ผัดซีอิ๊ว') || name.contains('บะหมี่') || name.contains('ราเมน')) {
+      return 'เมนูเส้น';
+    }
+    if (name.contains('ทอด') || name.contains('เกี๊ยว') || name.contains('ป๊อป') || name.contains('ไก่')) {
+      return 'ของทอด';
+    }
+    if (name.contains('ชา') || name.contains('น้ำ') || name.contains('กาแฟ') || name.contains('นม') || name.contains('ดื่ม')) {
+      return 'เครื่องดื่ม';
+    }
+    if (name.contains('หวาน') || name.contains('เค้ก') || name.contains('ไอศกรีม') || name.contains('พุดดิ้ง') || name.contains('ขนม')) {
+      return 'ของหวาน';
+    }
+    return _allCategories.isNotEmpty ? _allCategories.first : 'ข้าว';
+  }
+
   /// เพิ่มเมนูใหม่ลงในตาราง menu_items ใน Supabase
   void _showAddMenuDialog() {
     final nameController = TextEditingController();
     final priceController = TextEditingController();
     final imageController = TextEditingController();
+    String selectedCategory = (_selectedCategory != 'ทั้งหมด' && _allCategories.contains(_selectedCategory))
+        ? _selectedCategory
+        : (_allCategories.isNotEmpty ? _allCategories.first : 'ข้าว');
 
     showModalBottomSheet(
       context: context,
@@ -145,149 +257,202 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final availableCats = _allCategories;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'เพิ่มเมนูใหม่',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: kOwnerPrimaryColor),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'เพิ่มเมนูใหม่',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: kOwnerPrimaryColor),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.grey),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.grey),
-                    onPressed: () => Navigator.pop(context),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: 'ชื่อเมนูอาหาร *',
+                      hintText: 'เช่น ข้าวหน้ากุ้งย่างซีอิ๊ว',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'ชื่อเมนูอาหาร *',
-                  hintText: 'เช่น ไก่ทอดซอสเกาหลี',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: priceController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'ราคา (บาท) *',
-                  hintText: 'เช่น 89',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: imageController,
-                decoration: InputDecoration(
-                  labelText: 'ลิงก์รูปภาพ (ไม่บังคับ)',
-                  hintText: 'https://...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final name = nameController.text.trim();
-                    final price = double.tryParse(priceController.text.trim()) ?? 0.0;
-                    final imgUrl = imageController.text.trim().isNotEmpty
-                        ? imageController.text.trim()
-                        : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&auto=format&fit=crop&q=80';
+                  const SizedBox(height: 14),
 
-                    if (name.isEmpty || priceController.text.trim().isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('กรุณากรอกชื่อและราคาอาหาร')),
-                      );
-                      return;
-                    }
-
-                    Navigator.pop(context);
-
-                    if (widget.restaurantId != null) {
-                      try {
-                        final insertData = {
-                          'restaurant_id': widget.restaurantId,
-                          'name': name,
-                          'price': price,
-                          'image_url': imgUrl,
-                        };
-
-                        final inserted = await Supabase.instance.client
-                            .from('menu_items')
-                            .insert(insertData)
-                            .select()
-                            .maybeSingle();
-
-                        if (inserted != null && mounted) {
-                          setState(() {
-                            _menuItems.insert(0, {
-                              'id': inserted['id']?.toString() ?? UniqueKey().toString(),
-                              'restaurant_id': widget.restaurantId,
-                              'name': name,
-                              'price': price,
-                              'image': imgUrl,
-                              'isAvailable': true,
-                              'category': 'ไก่ทอด',
+                  // หมวดหมู่อาหาร
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: availableCats.contains(selectedCategory) ? selectedCategory : availableCats.first,
+                        items: availableCats.map((cat) {
+                          return DropdownMenuItem<String>(
+                            value: cat,
+                            child: Text('หมวดหมู่: $cat'),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setModalState(() {
+                              selectedCategory = val;
                             });
-                          });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  TextField(
+                    controller: priceController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'ราคา (บาท) *',
+                      hintText: 'เช่น 89',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: imageController,
+                    decoration: InputDecoration(
+                      labelText: 'ลิงก์รูปภาพ (ไม่บังคับ)',
+                      hintText: 'https://...',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final name = nameController.text.trim();
+                        final price = double.tryParse(priceController.text.trim()) ?? 0.0;
+                        final imgUrl = imageController.text.trim().isNotEmpty
+                            ? imageController.text.trim()
+                            : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&auto=format&fit=crop&q=80';
+
+                        if (name.isEmpty || priceController.text.trim().isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('เพิ่มเมนูสำเร็จ'),
-                              backgroundColor: kOwnerPrimaryColor,
-                            ),
+                            const SnackBar(content: Text('กรุณากรอกชื่อและราคาอาหาร')),
                           );
                           return;
                         }
-                      } catch (e) {
-                        debugPrint('Error inserting menu item to Supabase: $e');
-                      }
-                    }
 
-                    // Fallback
-                    if (mounted) {
-                      setState(() {
-                        _menuItems.insert(0, {
-                          'id': UniqueKey().toString(),
-                          'name': name,
-                          'category': 'ไก่ทอด',
-                          'price': price,
-                          'isAvailable': true,
-                          'image': imgUrl,
-                        });
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('เพิ่มเมนูเรียบร้อยแล้ว'),
-                          backgroundColor: kOwnerPrimaryColor,
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kOwnerPrimaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        Navigator.pop(ctx);
+
+                        if (widget.restaurantId != null) {
+                          try {
+                            final insertData = {
+                              'restaurant_id': widget.restaurantId,
+                              'name': name,
+                              'price': price,
+                              'image_url': imgUrl,
+                            };
+
+                            final inserted = await Supabase.instance.client
+                                .from('menu_items')
+                                .insert(insertData)
+                                .select()
+                                .maybeSingle();
+
+                            if (inserted != null) {
+                              final newItemId = inserted['id']?.toString();
+                              // บันทึกลงตาราง menu_item_categories ถ้ามี category_id
+                              if (newItemId != null && _catNameToId.containsKey(selectedCategory)) {
+                                try {
+                                  await Supabase.instance.client
+                                      .from('menu_item_categories')
+                                      .insert({
+                                    'menu_item_id': newItemId,
+                                    'category_id': _catNameToId[selectedCategory],
+                                  });
+                                } catch (_) {}
+                              }
+
+                              if (mounted) {
+                                setState(() {
+                                  _menuItems.insert(0, {
+                                    'id': newItemId ?? UniqueKey().toString(),
+                                    'restaurant_id': widget.restaurantId,
+                                    'name': name,
+                                    'price': price,
+                                    'image': imgUrl,
+                                    'isAvailable': true,
+                                    'category': selectedCategory,
+                                  });
+                                  _selectedCategory = selectedCategory;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('เพิ่มเมนูสำเร็จ'),
+                                    backgroundColor: kOwnerPrimaryColor,
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                          } catch (e) {
+                            debugPrint('Error inserting menu item to Supabase: $e');
+                          }
+                        }
+
+                        // Fallback
+                        if (mounted) {
+                          setState(() {
+                            _menuItems.insert(0, {
+                              'id': UniqueKey().toString(),
+                              'name': name,
+                              'category': selectedCategory,
+                              'price': price,
+                              'isAvailable': true,
+                              'image': imgUrl,
+                            });
+                            _selectedCategory = selectedCategory;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('เพิ่มเมนูเรียบร้อยแล้ว'),
+                              backgroundColor: kOwnerPrimaryColor,
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kOwnerPrimaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('บันทึกเมนู', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
                   ),
-                  child: const Text('บันทึกเมนู', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -299,6 +464,8 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     final nameController = TextEditingController(text: item['name']);
     final priceController = TextEditingController(text: (item['price'] as num).toInt().toString());
     final imageController = TextEditingController(text: item['image']);
+    String selectedCategory = item['category']?.toString() ??
+        (_allCategories.isNotEmpty ? _allCategories.first : 'ข้าว');
 
     showModalBottomSheet(
       context: context,
@@ -307,106 +474,159 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final availableCats = _allCategories;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'แก้ไขเมนูอาหาร',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: kOwnerPrimaryColor),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'แก้ไขเมนูอาหาร',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: kOwnerPrimaryColor),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, color: Colors.grey),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, color: Colors.grey),
-                    onPressed: () => Navigator.pop(context),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: 'ชื่อเมนูอาหาร *',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // หมวดหมู่อาหาร
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade400),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: availableCats.contains(selectedCategory)
+                            ? selectedCategory
+                            : availableCats.first,
+                        items: availableCats.map((cat) {
+                          return DropdownMenuItem<String>(
+                            value: cat,
+                            child: Text('หมวดหมู่: $cat'),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setModalState(() {
+                              selectedCategory = val;
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  TextField(
+                    controller: priceController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'ราคา (บาท) *',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: imageController,
+                    decoration: InputDecoration(
+                      labelText: 'ลิงก์รูปภาพ',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final newName = nameController.text.trim();
+                        final newPrice = double.tryParse(priceController.text.trim()) ?? (item['price'] as num).toDouble();
+                        final newImage = imageController.text.trim().isNotEmpty ? imageController.text.trim() : item['image'];
+
+                        if (newName.isEmpty) return;
+
+                        Navigator.pop(ctx);
+
+                        final itemId = item['id']?.toString();
+                        if (itemId != null && !itemId.startsWith('mock-')) {
+                          try {
+                            await Supabase.instance.client.from('menu_items').update({
+                              'name': newName,
+                              'price': newPrice,
+                              'image_url': newImage,
+                            }).eq('id', itemId);
+
+                            if (_catNameToId.containsKey(selectedCategory)) {
+                              await Supabase.instance.client
+                                  .from('menu_item_categories')
+                                  .delete()
+                                  .eq('menu_item_id', itemId);
+                              await Supabase.instance.client
+                                  .from('menu_item_categories')
+                                  .insert({
+                                'menu_item_id': itemId,
+                                'category_id': _catNameToId[selectedCategory],
+                              });
+                            }
+                          } catch (e) {
+                            debugPrint('Error updating menu item in Supabase: $e');
+                          }
+                        }
+
+                        if (mounted) {
+                          setState(() {
+                            item['name'] = newName;
+                            item['price'] = newPrice;
+                            item['image'] = newImage;
+                            item['category'] = selectedCategory;
+                            _selectedCategory = selectedCategory;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('อัปเดตข้อมูลเมนูสำเร็จ'),
+                              backgroundColor: kOwnerPrimaryColor,
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: kOwnerPrimaryColor,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('บันทึกการแก้ไข', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameController,
-                decoration: InputDecoration(
-                  labelText: 'ชื่อเมนูอาหาร *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: priceController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'ราคา (บาท) *',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: imageController,
-                decoration: InputDecoration(
-                  labelText: 'ลิงก์รูปภาพ',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    final newName = nameController.text.trim();
-                    final newPrice = double.tryParse(priceController.text.trim()) ?? (item['price'] as num).toDouble();
-                    final newImage = imageController.text.trim().isNotEmpty ? imageController.text.trim() : item['image'];
-
-                    if (newName.isEmpty) return;
-
-                    Navigator.pop(context);
-
-                    final itemId = item['id']?.toString();
-                    if (itemId != null && !itemId.startsWith('mock-')) {
-                      try {
-                        await Supabase.instance.client.from('menu_items').update({
-                          'name': newName,
-                          'price': newPrice,
-                          'image_url': newImage,
-                        }).eq('id', itemId);
-                      } catch (e) {
-                        debugPrint('Error updating menu item in Supabase: $e');
-                      }
-                    }
-
-                    if (mounted) {
-                      setState(() {
-                        item['name'] = newName;
-                        item['price'] = newPrice;
-                        item['image'] = newImage;
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('อัปเดตข้อมูลเมนูสำเร็จ'),
-                          backgroundColor: kOwnerPrimaryColor,
-                        ),
-                      );
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kOwnerPrimaryColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text('บันทึกการแก้ไข', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -454,6 +674,9 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     if (mounted) {
       setState(() {
         _menuItems.removeAt(index);
+        if (!_displayedCategories.contains(_selectedCategory)) {
+          _selectedCategory = 'ทั้งหมด';
+        }
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -466,9 +689,14 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredList = _selectedCategory == 0
+    final displayedCats = _displayedCategories;
+    final currentSelected = displayedCats.contains(_selectedCategory)
+        ? _selectedCategory
+        : 'ทั้งหมด';
+
+    final filteredList = currentSelected == 'ทั้งหมด'
         ? _menuItems
-        : _menuItems.where((item) => item['category'] == _categories[_selectedCategory]).toList();
+        : _menuItems.where((item) => item['category'] == currentSelected).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9FB),
@@ -509,12 +737,13 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                       height: 38,
                       child: ListView.separated(
                         scrollDirection: Axis.horizontal,
-                        itemCount: _categories.length,
+                        itemCount: displayedCats.length,
                         separatorBuilder: (_, __) => const SizedBox(width: 8),
                         itemBuilder: (context, index) {
-                          final isSelected = _selectedCategory == index;
+                          final catName = displayedCats[index];
+                          final isSelected = currentSelected == catName;
                           return GestureDetector(
-                            onTap: () => setState(() => _selectedCategory = index),
+                            onTap: () => setState(() => _selectedCategory = catName),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               decoration: BoxDecoration(
@@ -522,7 +751,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                               child: Text(
-                                _categories[index],
+                                catName,
                                 style: TextStyle(
                                   color: isSelected ? Colors.white : Colors.grey[700],
                                   fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
