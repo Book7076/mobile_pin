@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
@@ -167,7 +168,7 @@ class _RestaurantAllMenuScreenState extends State<RestaurantAllMenuScreen> {
             'image': (row['image_url'] != null &&
                     row['image_url'].toString().isNotEmpty)
                 ? row['image_url'].toString()
-                : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&auto=format&fit=crop&q=80',
+                : '',
           });
         }
         if (mounted) {
@@ -523,29 +524,8 @@ class _RestaurantAllMenuScreenState extends State<RestaurantAllMenuScreen> {
                                   children: [
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(12),
-                                      child: Container(
-                                        width: 76,
-                                        height: 76,
-                                        color: const Color(0xFFF1F5F9),
-                                        child: (item['image'] != null &&
-                                                item['image']
-                                                    .toString()
-                                                    .isNotEmpty)
-                                            ? Image.network(
-                                                item['image'].toString(),
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) =>
-                                                    const Icon(
-                                                  Icons.restaurant_rounded,
-                                                  color: Color(0xFFCBD5E1),
-                                                  size: 32,
-                                                ),
-                                              )
-                                            : const Icon(
-                                                Icons.restaurant_rounded,
-                                                color: Color(0xFFCBD5E1),
-                                                size: 32,
-                                              ),
+                                      child: _buildDishThumbnailWidget(
+                                        item['image']?.toString(),
                                       ),
                                     ),
                                     const SizedBox(width: 14),
@@ -586,6 +566,61 @@ class _RestaurantAllMenuScreenState extends State<RestaurantAllMenuScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildDishThumbnailWidget(String? imgUrl) {
+    if (imgUrl == null || imgUrl.trim().isEmpty) {
+      return _buildNoDishImagePlaceholder();
+    }
+    if (imgUrl.startsWith('data:image')) {
+      try {
+        final base64String = imgUrl.split(',').last;
+        final bytes = base64Decode(base64String);
+        return Image.memory(
+          bytes,
+          width: 76,
+          height: 76,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildNoDishImagePlaceholder(),
+        );
+      } catch (_) {}
+    }
+    return Image.network(
+      imgUrl,
+      width: 76,
+      height: 76,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _buildNoDishImagePlaceholder(),
+    );
+  }
+
+  Widget _buildNoDishImagePlaceholder() {
+    return Container(
+      width: 76,
+      height: 76,
+      color: const Color(0xFFF1F5F9),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: const [
+            Icon(
+              Icons.camera_alt_outlined,
+              color: Color(0xFF94A3B8),
+              size: 26,
+            ),
+            SizedBox(height: 2),
+            Text(
+              'ไม่มีรูป',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF94A3B8),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

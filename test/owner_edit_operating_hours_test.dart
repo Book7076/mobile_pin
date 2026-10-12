@@ -192,6 +192,74 @@ void main() {
 
       // Now only 1 item remains
       expect(find.byIcon(Icons.close_rounded), findsNWidgets(1));
+
+      // User CAN delete all items down to 0
+      await tester.tap(find.byIcon(Icons.close_rounded).first);
+      await tester.pumpAndSettle();
+
+      // All items deleted (0 items remain)
+      expect(find.byIcon(Icons.close_rounded), findsNothing);
+
+      // Tapping "บันทึก" when empty is blocked by the 1-day minimum rule
+      await tester.tap(find.text('บันทึก'));
+      await tester.pumpAndSettle();
+      expect(find.text('ต้องมีเวลาเปิดทำการอย่างน้อย 1 วัน'), findsOneWidget);
+    });
+
+    testWidgets('Tapping back button discards edits and restores original data',
+        (tester) async {
+      await tester.binding.setSurfaceSize(const Size(430, 932));
+
+      List<OperatingHourEntry>? poppedResult;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => ElevatedButton(
+              onPressed: () async {
+                poppedResult = await Navigator.push<List<OperatingHourEntry>>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const OwnerEditOperatingHoursScreen(
+                      initialHours: [
+                        OperatingHourEntry(
+                          dayOfWeek: 1,
+                          dayName: 'จันทร์',
+                          openTime: '08:00',
+                          closeTime: '17:00',
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Open'),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Tap Open button
+      await tester.tap(find.text('Open'));
+      await tester.pumpAndSettle();
+
+      // Verify initial hour is present
+      expect(find.text('จันทร์'), findsOneWidget);
+
+      // Delete the only hour item
+      await tester.tap(find.byIcon(Icons.close_rounded).first);
+      await tester.pumpAndSettle();
+      expect(find.byIcon(Icons.close_rounded), findsNothing);
+
+      // Tap Back button (<)
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+      await tester.pumpAndSettle();
+
+      // Popped result must be the original hours before editing!
+      expect(poppedResult, isNotNull);
+      expect(poppedResult!.length, 1);
+      expect(poppedResult!.first.dayName, 'จันทร์');
     });
 
     testWidgets('OwnerRestaurantInfoScreen can navigate to OwnerEditOperatingHoursScreen',

@@ -175,12 +175,18 @@ class AuthStateNotifier extends StateNotifier<UserModel?> {
     required String name,
     required String phone,
     required List<String> dietaryPreferences,
+    String? username,
+    String? avatarUrl,
+    bool clearAvatar = false,
   }) {
     if (state != null) {
       state = state!.copyWith(
         name: name,
         phone: phone,
         dietaryPreferences: dietaryPreferences,
+        username: username ?? state!.username,
+        avatarUrl: clearAvatar ? null : (avatarUrl ?? state!.avatarUrl),
+        clearAvatar: clearAvatar,
       );
     }
   }

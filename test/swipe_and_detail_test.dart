@@ -212,8 +212,9 @@ void main() {
     expect(find.text('รถจักรยานยนต์'), findsOneWidget);
     expect(find.text('มีห้องน้ำ'), findsOneWidget);
 
-    // 6. Dishes Section
+    // 6. Dishes Section & "เมนูทั้งหมด" Button
     expect(find.text('เมนูอาหาร'), findsOneWidget);
+    expect(find.text('เมนูทั้งหมด'), findsOneWidget);
     expect(find.text('บุฟเฟต์'), findsOneWidget);
     expect(find.text('฿249'), findsOneWidget);
     expect(find.text('กุ้งดอง'), findsOneWidget);
@@ -224,6 +225,38 @@ void main() {
     expect(find.textContaining('ร้านสะอาด มีห้องน้ำที่สะอาด'), findsOneWidget);
     expect(find.text('UserB'), findsOneWidget);
     expect(find.textContaining('อาหารอร่อยแต่รออาหารค่อนข้างนาน'), findsOneWidget);
+  });
+
+  testWidgets('RestaurantDetailScreen tapping "เมนูทั้งหมด" navigates to RestaurantAllMenuScreen', (tester) async {
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2.75;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: MaterialApp(
+          home: RestaurantDetailScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Scroll to "เมนูทั้งหมด" and tap it
+    await tester.ensureVisible(find.text('เมนูทั้งหมด'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('เมนูทั้งหมด'));
+    await tester.pumpAndSettle();
+
+    // Verify navigating to RestaurantAllMenuScreen
+    expect(find.text('เมนูทั้งหมด'), findsWidgets);
+    expect(find.text('ทั้งหมด'), findsOneWidget);
+
+    // Tap back button
+    await tester.tap(find.byIcon(Icons.chevron_left_rounded).first);
+    await tester.pumpAndSettle();
+
+    // Returned to RestaurantDetailScreen
+    expect(find.byType(RestaurantDetailScreen), findsOneWidget);
   });
 
   testWidgets('SelectedRestaurantsScreen renders mockup layout and random pick dialog', (tester) async {

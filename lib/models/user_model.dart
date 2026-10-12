@@ -6,6 +6,7 @@ class UserModel {
   final String role; // 'user', 'owner', 'admin'
   final int swipeCount;
   final String? avatarUrl;
+  final String? username;
   final List<String> dietaryPreferences;
   final String? ownedRestaurantId;
 
@@ -17,6 +18,7 @@ class UserModel {
     required this.role,
     this.swipeCount = 0,
     this.avatarUrl,
+    this.username,
     this.dietaryPreferences = const [],
     this.ownedRestaurantId,
   });
@@ -58,7 +60,8 @@ class UserModel {
       phone: json['phone']?.toString() ?? '',
       role: json['user_type']?.toString() ?? json['role']?.toString() ?? 'customer',
       swipeCount: (json['swipe_count'] as num?)?.toInt() ?? 0,
-      avatarUrl: json['avatar_url']?.toString(),
+      avatarUrl: json['image_url']?.toString() ?? json['avatar_url']?.toString(),
+      username: json['username']?.toString(),
       dietaryPreferences: prefs,
       ownedRestaurantId: json['owned_restaurant_id']?.toString(),
     );
@@ -76,6 +79,8 @@ class UserModel {
       'role': role,
       'swipe_count': swipeCount,
       'avatar_url': avatarUrl,
+      'image_url': avatarUrl,
+      'username': username,
       'dietary_preferences': dietaryPreferences,
       'owned_restaurant_id': ownedRestaurantId,
     };
@@ -89,6 +94,8 @@ class UserModel {
     String? role,
     int? swipeCount,
     String? avatarUrl,
+    String? username,
+    bool clearAvatar = false,
     List<String>? dietaryPreferences,
     String? ownedRestaurantId,
   }) {
@@ -99,7 +106,8 @@ class UserModel {
       phone: phone ?? this.phone,
       role: role ?? this.role,
       swipeCount: swipeCount ?? this.swipeCount,
-      avatarUrl: avatarUrl ?? this.avatarUrl,
+      avatarUrl: clearAvatar ? null : (avatarUrl ?? this.avatarUrl),
+      username: username ?? this.username,
       dietaryPreferences: dietaryPreferences ?? this.dietaryPreferences,
       ownedRestaurantId: ownedRestaurantId ?? this.ownedRestaurantId,
     );

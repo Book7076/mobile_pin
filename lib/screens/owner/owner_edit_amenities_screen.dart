@@ -77,6 +77,17 @@ class _OwnerEditAmenitiesScreenState extends State<OwnerEditAmenitiesScreen> {
   }
 
   void _saveAndPop() async {
+    if (_selectedAmenities.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาเลือกสิ่งอำนวยความสะดวกอย่างน้อย 1 อย่าง'),
+          backgroundColor: kOwnerPrimaryColor,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
     final list = _selectedAmenities.toList();
     if (widget.restaurantId != null) {
       try {

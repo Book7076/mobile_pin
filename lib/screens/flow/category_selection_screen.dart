@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../models/filter_criteria_model.dart';
+import '../../models/swipe_session_model.dart';
 import '../../providers/restaurant_provider.dart';
 import 'budget_selection_screen.dart';
 
@@ -57,10 +58,14 @@ class _CategorySelectionScreenState
     if (_selectedIds.isEmpty) return;
     HapticFeedback.mediumImpact();
 
-    // Update filterCriteriaProvider with selected categories
+    final primaryCategory = _selectedIds.first;
+    final cuisineTypeId = mapCategoryToCuisineTypeId(primaryCategory);
+
+    // Update filterCriteriaProvider with selected categories and cuisineTypeId
     final current = ref.read(filterCriteriaProvider);
     ref.read(filterCriteriaProvider.notifier).state = current.copyWith(
       selectedCategories: _selectedIds.toList(),
+      cuisineTypeId: cuisineTypeId,
     );
 
     // Navigate to Flow 4 (Budget Selection)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
+import '../../models/swipe_session_model.dart';
 import '../../providers/restaurant_provider.dart';
 import 'food_swipe_screen.dart';
 
@@ -28,7 +29,7 @@ class BudgetSelectionScreen extends ConsumerStatefulWidget {
 }
 
 class _BudgetSelectionScreenState extends ConsumerState<BudgetSelectionScreen> {
-  static const double _minBudget = 40.0;
+  static const double _minBudget = 50.0; // Minimum budget is 50 THB
   static const double _maxBudget = 1000.0;
   static const double _step = 10.0;
 
@@ -72,11 +73,28 @@ class _BudgetSelectionScreenState extends ConsumerState<BudgetSelectionScreen> {
   void _confirmAndProceed() {
     HapticFeedback.mediumImpact();
 
-    // Save selected categories & budget to filter criteria provider
+    // Save selected categories, minBudget, maxBudget & cuisineTypeId to filter criteria provider
     final currentCriteria = ref.read(filterCriteriaProvider);
+    final cuisineTypeId = currentCriteria.cuisineTypeId ??
+        (widget.selectedCategories.isNotEmpty
+            ? mapCategoryToCuisineTypeId(widget.selectedCategories.first)
+            : null);
+
     ref.read(filterCriteriaProvider.notifier).state = currentCriteria.copyWith(
       selectedCategories: widget.selectedCategories,
+      minBudget: _minBudget,
       maxBudget: _currentBudget,
+      cuisineTypeId: cuisineTypeId,
+    );
+
+    // Reset swipe session so new session starts fresh with filtered restaurants
+    ref.read(swipeSessionProvider.notifier).reset();
+
+    // Initialize swipe session in Supabase & local state
+    ref.read(swipeSessionProvider.notifier).initSession(
+      cuisineTypeId: cuisineTypeId,
+      priceMin: _minBudget,
+      priceMax: _currentBudget,
     );
 
     // Navigate to FoodSwipeScreen

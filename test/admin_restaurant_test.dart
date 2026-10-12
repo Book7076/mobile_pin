@@ -266,51 +266,79 @@ void main() {
       expect(find.text('Potto Hot Pot'), findsWidgets);
     });
 
-    testWidgets('User Management Screen (Image 1) renders all users and handles restaurant status view', (WidgetTester tester) async {
+    testWidgets('User Problem Reports Screen renders reports, filters, and detail modal with status update', (WidgetTester tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
       await tester.pumpWidget(
         const ProviderScope(
           child: MaterialApp(
-            home: AdminDashboard(initialTabIndex: 2), // แท็บที่ 3: จัดการผู้ใช้งาน
+            home: AdminDashboard(initialTabIndex: 2), // แท็บที่ 3: รายงานปัญหาจากผู้ใช้งาน
           ),
         ),
       );
 
       // Header & Icon
-      expect(find.text('จัดการผู้ใช้งาน'), findsOneWidget);
+      expect(find.text('รายงานปัญหาจากผู้ใช้งาน'), findsOneWidget);
       expect(find.byIcon(Icons.notifications_none_rounded), findsOneWidget);
 
-      // ตรวจสอบชื่อผู้ใช้งาน 4 ท่าน (ตรงตามภาพที่ 1)
+      // ทดสอบแตะที่กระดิ่งแจ้งเตือน เปิด Notification Sheet
+      await tester.tap(find.byKey(const Key('admin_bell_button')));
+      await tester.pumpAndSettle();
+      expect(find.text('การแจ้งเตือนรายงานปัญหา'), findsOneWidget);
+      expect(find.text('กรองเฉพาะรายการรอดำเนินการ'), findsOneWidget);
+      // ปิด Notification Sheet
+      await tester.tap(find.byKey(const Key('close_notifications_sheet_button')));
+      await tester.pumpAndSettle();
+      expect(find.text('การแจ้งเตือนรายงานปัญหา'), findsNothing);
+
+      // ตรวจสอบว่าไม่มีแท็กความสำคัญ 'เร่งด่วน' หรือ 'สูง' บนการ์ด
+      expect(find.text('เร่งด่วน'), findsNothing);
+      expect(find.text('สูง'), findsNothing);
+
+      // ตรวจสอบว่าไม่มีรหัสรายงานแสดงบนหน้าจอ
+      expect(find.textContaining('REP-2026-'), findsNothing);
+
+      // ตรวจสอบ Filter Chips
+      expect(find.text('ทั้งหมด'), findsOneWidget);
+      expect(find.text('รอดำเนินการ'), findsWidgets);
+      expect(find.text('กำลังตรวจสอบ'), findsWidgets);
+      expect(find.text('แก้ไขแล้ว'), findsWidgets);
+
+      // ตรวจสอบชื่อผู้แจ้งปัญหา
       expect(find.text('Kodomo'), findsOneWidget);
       expect(find.text('Harry Potter'), findsOneWidget);
       expect(find.text('Deku Kung'), findsOneWidget);
       expect(find.text('Levi S. Kennedy'), findsOneWidget);
 
-      // ตรวจสอบอีเมล
-      expect(find.text('kodomo@gmail.com'), findsOneWidget);
-      expect(find.text('jkrolling@gmail.com'), findsOneWidget);
-      expect(find.text('gobeyondplus@gmail.com'), findsOneWidget);
-      expect(find.text('titanraccooncity@gmail.com'), findsOneWidget);
+      // ตรวจสอบหมวดหมู่ปัญหา
+      expect(find.text('ข้อมูลร้านค้าไม่ถูกต้อง'), findsWidgets);
+      expect(find.text('ร้านค้าปิดหรือไม่พบร้าน'), findsWidgets);
+      expect(find.text('ปัญหาการใช้งานแอปพลิเคชัน'), findsWidgets);
 
-      // ตรวจสอบเบอร์โทรศัพท์
-      expect(find.text('081-244-3984'), findsOneWidget);
-      expect(find.text('081-234-5678'), findsOneWidget);
-      expect(find.text('067-676-6767'), findsOneWidget);
-      expect(find.text('089-785-6767'), findsOneWidget);
-
-      // ตรวจสอบสถานะการใช้งาน
-      expect(find.text('ใช้งานอยู่'), findsNWidgets(3));
-      expect(find.text('ไม่ได้ใช้งาน'), findsOneWidget);
-
-      // ทดสอบกดที่การ์ด Kodomo เพื่อดูร้านค้าตามสถานะ
+      // ทดสอบกดที่การ์ด Kodomo เพื่อดูรายละเอียดและอัปเดตสถานะ
       await tester.tap(find.text('Kodomo'));
       await tester.pumpAndSettle();
 
       // ตรวจสอบ BottomSheet ที่เปิดขึ้นมา
-      expect(find.text('ร้านค้าของ Kodomo'), findsOneWidget);
-      expect(find.text('ทั้งหมด'), findsOneWidget);
-      expect(find.text('รอตรวจสอบ'), findsOneWidget);
-      expect(find.text('อนุมัติ'), findsOneWidget);
-      expect(find.text('ไม่อนุมัติ'), findsOneWidget);
+      expect(find.text('รายละเอียดรายงานปัญหา'), findsOneWidget);
+      expect(find.text('ข้อมูลผู้แจ้ง'), findsOneWidget);
+      expect(find.text('รายละเอียดปัญหาที่พบ'), findsOneWidget);
+      expect(find.text('อัปเดตสถานะการดำเนินการ'), findsOneWidget);
+      expect(find.text('บันทึกการเปลี่ยนแปลง'), findsOneWidget);
+
+      // ตรวจสอบว่าในหน้ารายละเอียดไม่มีคำว่าความเร่งด่วน
+      expect(find.textContaining('ความเร่งด่วน'), findsNothing);
+
+      // ทดสอบเปลี่ยนสถานะเป็น "แก้ไขแล้ว" และกดบันทึก
+      await tester.tap(find.text('แก้ไขแล้ว').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('บันทึกการเปลี่ยนแปลง'));
+      await tester.pumpAndSettle();
+
+      // BottomSheet ปิดลง และสถานะของการ์ด Kodomo อัปเดตเรียบร้อย
+      expect(find.text('รายละเอียดรายงานปัญหา'), findsNothing);
     });
 
     testWidgets('Settings Screen (Image 2) renders admin profile and logout button', (WidgetTester tester) async {

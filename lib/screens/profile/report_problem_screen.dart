@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../../core/mock_data.dart';
+import '../../main.dart';
 import 'report_problem_success_screen.dart';
 
 /// Data model representing each of the 4 problem categories
@@ -80,9 +82,13 @@ class ReportProblemScreen extends StatefulWidget {
 class _ReportProblemScreenState extends State<ReportProblemScreen> {
   late ReportCategory _selectedCategory;
   late final TextEditingController _restaurantController;
+  late final FocusNode _restaurantFocusNode;
   late final TextEditingController _detailController;
-  late final TextEditingController _emailController;
   bool _isSubmitting = false;
+
+  List<String> _databaseRestaurantNames = [];
+  List<String> _filteredRestaurants = [];
+  bool _showRestaurantDropdown = false;
 
   @override
   void initState() {
@@ -100,8 +106,24 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     }
 
     _restaurantController = TextEditingController(text: widget.initialRestaurant ?? '');
+    _restaurantFocusNode = FocusNode();
     _detailController = TextEditingController();
-    _emailController = TextEditingController();
+
+    _restaurantFocusNode.addListener(() {
+      if (!_restaurantFocusNode.hasFocus) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted && !_restaurantFocusNode.hasFocus) {
+            setState(() {
+              _showRestaurantDropdown = false;
+            });
+          }
+        });
+      } else if (_restaurantController.text.trim().isNotEmpty) {
+        _filterRestaurants(_restaurantController.text);
+      }
+    });
+
+    _loadRestaurantsFromDatabase();
 
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -116,10 +138,112 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
   @override
   void dispose() {
+    _restaurantFocusNode.dispose();
     _restaurantController.dispose();
     _detailController.dispose();
-    _emailController.dispose();
     super.dispose();
+  }
+
+  /// โหลดรายชื่อร้านค้าจากตาราง restaurants ใน database (รูปที่ 2)
+  Future<void> _loadRestaurantsFromDatabase() async {
+    final namesSet = <String>{};
+
+    // 1. ดึงข้อมูลจากตาราง restaurants ใน Supabase (ตาม schema รูปที่ 2 คอลัมน์ name)
+    try {
+      final response = await supabase
+          .from('restaurants')
+          .select('id, name')
+          .order('name');
+
+      if (response != null && response is List) {
+        for (final item in response) {
+          final name = item['name']?.toString().trim();
+          if (name != null && name.isNotEmpty) {
+            namesSet.add(name);
+          }
+        }
+      }
+    } catch (_) {
+      // Supabase uninitialized or offline
+    }
+
+    // 2. เติมข้อมูลร้านค้าตั้งต้น/MockData (เพื่อให้ใช้งานและทดสอบได้เสมอ)
+    for (final r in MockData.restaurants) {
+      if (r.name.trim().isNotEmpty) {
+        namesSet.add(r.name.trim());
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        _databaseRestaurantNames = namesSet.toList();
+      });
+    } else {
+      _databaseRestaurantNames = namesSet.toList();
+    }
+  }
+
+  /// ค้นหาร้านอาหารตามข้อความที่พิมพ์ โดยไล่เช็คจาก name ว่าตรงหรือใกล้เคียงกับอันไหน
+  Future<void> _filterRestaurants(String rawQuery) async {
+    final query = rawQuery.trim().toLowerCase();
+    if (query.isEmpty) {
+      setState(() {
+        _filteredRestaurants = [];
+        _showRestaurantDropdown = false;
+      });
+      return;
+    }
+
+    // ไล่เช็คจาก name ในหน่วยความจำก่อน (exact -> startsWith -> contains)
+    final exactMatches = <String>[];
+    final startsWithMatches = <String>[];
+    final containsMatches = <String>[];
+
+    for (final name in _databaseRestaurantNames) {
+      final lowerName = name.toLowerCase();
+      if (lowerName == query) {
+        exactMatches.add(name);
+      } else if (lowerName.startsWith(query)) {
+        startsWithMatches.add(name);
+      } else if (lowerName.contains(query)) {
+        containsMatches.add(name);
+      }
+    }
+
+    final combined = <String>{
+      ...exactMatches,
+      ...startsWithMatches,
+      ...containsMatches,
+    }.toList();
+
+    setState(() {
+      _filteredRestaurants = combined.take(6).toList();
+      _showRestaurantDropdown = _filteredRestaurants.isNotEmpty;
+    });
+
+    // ลองค้นหาเพิ่มเติมจากตาราง restaurants ใน Supabase แบบสด
+    try {
+      final res = await supabase
+          .from('restaurants')
+          .select('id, name')
+          .ilike('name', '%$query%')
+          .limit(6);
+
+      if (res != null && res is List && mounted) {
+        for (final item in res) {
+          final n = item['name']?.toString().trim();
+          if (n != null && n.isNotEmpty && !combined.contains(n)) {
+            combined.add(n);
+          }
+        }
+        if (mounted && _restaurantController.text.trim().toLowerCase() == query) {
+          setState(() {
+            _filteredRestaurants = combined.take(6).toList();
+            _showRestaurantDropdown = _filteredRestaurants.isNotEmpty;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   /// Show professional Bottom Sheet to choose between all 4 problem categories
@@ -367,31 +491,6 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
       return;
     }
 
-    // Optional email format validation
-    final email = _emailController.text.trim();
-    if (email.isNotEmpty && (!email.contains('@') || !email.contains('.'))) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
-              SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'รูปแบบอีเมลไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง',
-                  style: TextStyle(fontFamily: 'Prompt', fontSize: 13.5),
-                ),
-              ),
-            ],
-          ),
-          backgroundColor: const Color(0xFFB3261E),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-      return;
-    }
-
     setState(() => _isSubmitting = true);
 
     // Simulate quick professional submission delay
@@ -488,19 +587,12 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                     const SizedBox(height: 8),
                     _buildCategorySelector(),
 
-                    // Quick switcher pills for the 4 categories
-                    const SizedBox(height: 10),
-                    _buildQuickCategoryChips(),
-
                     const SizedBox(height: 20),
 
                     // Field 2: ร้านค้าที่เกี่ยวข้อง(ถ้ามี)
                     _buildFieldLabel('ร้านค้าที่เกี่ยวข้อง(ถ้ามี)'),
                     const SizedBox(height: 8),
-                    _buildTextInput(
-                      controller: _restaurantController,
-                      hintText: 'ร้านค้า',
-                    ),
+                    _buildRestaurantSearchField(),
 
                     const SizedBox(height: 20),
 
@@ -512,17 +604,6 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                       hintText: _selectedCategory.detailHint,
                       minLines: 5,
                       maxLines: 7,
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    // Field 4: อีเมลติดต่อกลับ
-                    _buildFieldLabel('อีเมลติดต่อกลับ'),
-                    const SizedBox(height: 8),
-                    _buildTextInput(
-                      controller: _emailController,
-                      hintText: 'อีเมล@gmail.com',
-                      keyboardType: TextInputType.emailAddress,
                     ),
 
                     const SizedBox(height: 32),
@@ -613,24 +694,30 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      _selectedCategory.icon,
-                      size: 20,
-                      color: const Color(0xFF6E162B),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      _selectedCategory.title,
-                      style: const TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF221F21),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        _selectedCategory.icon,
+                        size: 20,
+                        color: const Color(0xFF6E162B),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          _selectedCategory.title,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF221F21),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 const Icon(
                   Icons.keyboard_arrow_down_rounded,
                   color: Color(0xFF555555),
@@ -644,69 +731,156 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     );
   }
 
-  /// Quick switcher chips for all 4 categories directly on the form
-  Widget _buildQuickCategoryChips() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: ReportProblemScreen.categories.map((cat) {
-          final isSelected = _selectedCategory.id == cat.id;
-
-          // Short label for chip display
-          String shortLabel = cat.title;
-          if (cat.id == 'store_info') shortLabel = 'ข้อมูลร้านค้า';
-          if (cat.id == 'store_closed') shortLabel = 'ร้านปิด/ไม่พบร้าน';
-          if (cat.id == 'app_issue') shortLabel = 'ปัญหาแอป';
-          if (cat.id == 'other') shortLabel = 'อื่นๆ';
-
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () {
-                HapticFeedback.selectionClick();
-                setState(() {
-                  _selectedCategory = cat;
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF6E162B) : const Color(0xFFF7F7F7),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF6E162B)
-                        : const Color(0xFFE5E5E5),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      cat.icon,
-                      size: 14,
-                      color: isSelected ? Colors.white : const Color(0xFF666666),
+  /// วิดเจ็ตช่องค้นหาชื่อร้านค้าพร้อม Dropdown แนะนำร้านจากฐานข้อมูล
+  Widget _buildRestaurantSearchField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Text Input Box
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: const Color(0xFFF2DDE1),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.02),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: TextField(
+            key: const Key('report_restaurant_input'),
+            controller: _restaurantController,
+            focusNode: _restaurantFocusNode,
+            onChanged: _filterRestaurants,
+            style: const TextStyle(
+              fontSize: 14.5,
+              color: Color(0xFF221F21),
+              fontWeight: FontWeight.w500,
+            ),
+            decoration: InputDecoration(
+              hintText: 'ร้านค้า',
+              hintStyle: const TextStyle(
+                fontSize: 14.5,
+                color: Color(0xFFAAAAAA),
+                fontWeight: FontWeight.w400,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              border: InputBorder.none,
+              isDense: true,
+              suffixIcon: _restaurantController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF8E8E93)),
+                      onPressed: () {
+                        _restaurantController.clear();
+                        _filterRestaurants('');
+                      },
+                    )
+                  : const Icon(
+                      Icons.search_rounded,
+                      size: 20,
+                      color: Color(0xFFB0AAB0),
                     ),
-                    const SizedBox(width: 5),
-                    Text(
-                      shortLabel,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected ? Colors.white : const Color(0xFF444444),
+            ),
+          ),
+        ),
+
+        // Dropdown List ที่มาจาก Database ตาราง restaurants
+        if (_showRestaurantDropdown && _filteredRestaurants.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(
+            key: const Key('restaurant_search_dropdown'),
+            constraints: const BoxConstraints(maxHeight: 200),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFF2DDE1),
+                width: 1.2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.07),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: ListView.separated(
+                padding: EdgeInsets.zero,
+                shrinkWrap: true,
+                physics: const BouncingScrollPhysics(),
+                itemCount: _filteredRestaurants.length,
+                separatorBuilder: (_, __) => const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Color(0xFFF7EBF0),
+                  indent: 14,
+                  endIndent: 14,
+                ),
+                itemBuilder: (context, index) {
+                  final item = _filteredRestaurants[index];
+                  return InkWell(
+                    key: Key('restaurant_suggestion_$index'),
+                    onTap: () {
+                      _restaurantController.text = item;
+                      _restaurantController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: item.length),
+                      );
+                      setState(() {
+                        _showRestaurantDropdown = false;
+                      });
+                      _restaurantFocusNode.unfocus();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF7EAEC),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.storefront_outlined,
+                              size: 16,
+                              color: Color(0xFF6E162B),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              item,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF221F21),
+                              ),
+                            ),
+                          ),
+                          const Icon(
+                            Icons.north_west_rounded,
+                            size: 14,
+                            color: Color(0xFFB0AAB0),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
-          );
-        }).toList(),
-      ),
+          ),
+        ],
+      ],
     );
   }
 

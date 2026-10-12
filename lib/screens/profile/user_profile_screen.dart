@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,7 +9,6 @@ import '../../widgets/social_login_buttons.dart';
 import '../../providers/auth_provider.dart';
 import '../auth/login_screen.dart';
 import 'edit_user_profile_screen.dart';
-import 'edit_user_photo_screen.dart';
 
 class UserProfileScreen extends ConsumerStatefulWidget {
   final bool showDeleteDialogOnInit;
@@ -23,6 +23,7 @@ class UserProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
+  String _username = '';
   late String _name;
   late String _email;
   late String _phone;
@@ -30,13 +31,29 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   String? _profilePhotoUrl;
   late String _currentProvider;
 
+  User? get _safeCurrentUser {
+    try {
+      return supabase.auth.currentUser;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    final currentUser = supabase.auth.currentUser;
+    final currentUser = _safeCurrentUser;
     _currentProvider = AuthSessionManager.currentProvider;
 
     final authUser = ref.read(authProvider);
+    _username = authUser?.username ?? (currentUser?.userMetadata?['username']?.toString() ?? '');
+    final authAvatar = authUser?.avatarUrl ??
+        (currentUser?.userMetadata?['image_url']?.toString() ??
+            currentUser?.userMetadata?['avatar_url']?.toString());
+    if (authAvatar != null && authAvatar.trim().isNotEmpty) {
+      _profilePhotoUrl = authAvatar.trim();
+    }
+
     final metaFirst = (currentUser?.userMetadata?['first_name'] ?? currentUser?.userMetadata?['fname'])?.toString().trim() ?? '';
     final metaLast = (currentUser?.userMetadata?['last_name'] ?? currentUser?.userMetadata?['lname'])?.toString().trim() ?? '';
     final metaFullName = [metaFirst, metaLast].where((s) => s.isNotEmpty).join(' ');
@@ -70,20 +87,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       ),
     );
 
-    // เช็ค id จากตาราง users แล้วดึง phone และ Fname Lname มาแสดง
+    // เช็ค id จากตาราง users แล้วดึง phone, username, image_url และ Fname Lname มาแสดง
     _loadUserFromUsersTable();
-
-    if (widget.showDeleteDialogOnInit) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _showDeleteAccountDialog();
-        }
-      });
-    }
   }
 
   Future<void> _loadUserFromUsersTable() async {
-    final currentUser = supabase.auth.currentUser;
+    final currentUser = _safeCurrentUser;
     final userId = currentUser?.id ?? ref.read(authProvider)?.id;
 
     if (userId == null || userId.isEmpty) {
@@ -91,22 +100,36 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     }
 
     try {
-      // 1. เช็ค id ของคนที่ล็อกอินว่าตรงกับแถวไหนในตาราง users
+      // 1. เช็ค id ของคนที่ล็อกอินว่าตรงกับแถวไหนในตาราง users (เชื่อมกับ username และ image_url)
       var data = await supabase
           .from('users')
-          .select('id, email, phone, first_name, last_name')
+          .select('id, email, phone, first_name, last_name, username, image_url')
           .eq('id', userId)
           .maybeSingle();
 
       if (data == null && currentUser?.email != null && currentUser!.email!.isNotEmpty) {
         data = await supabase
             .from('users')
-            .select('id, email, phone, first_name, last_name')
+            .select('id, email, phone, first_name, last_name, username, image_url')
             .eq('email', currentUser.email!)
             .maybeSingle();
       }
 
       final userRow = data;
+      final authUser = ref.read(authProvider);
+
+      // ดึงค่า username
+      final rawUsername = userRow?['username']?.toString().trim() ??
+          currentUser?.userMetadata?['username']?.toString().trim() ??
+          authUser?.username ??
+          '';
+
+      // ดึงค่า image_url
+      final rawImageUrl = userRow?['image_url']?.toString().trim() ??
+          currentUser?.userMetadata?['image_url']?.toString().trim() ??
+          currentUser?.userMetadata?['avatar_url']?.toString().trim() ??
+          authUser?.avatarUrl;
+
       // ดึงค่า phone: จากตาราง users ก่อน ถ้าไม่มีให้ดึงจาก Supabase Auth
       var rawPhone = userRow?['phone']?.toString().trim();
       if (rawPhone == null || rawPhone.isEmpty) {
@@ -146,11 +169,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
       if (mounted) {
         setState(() {
+          _username = rawUsername;
           _phone = (rawPhone != null && rawPhone.isNotEmpty)
               ? _formatPhoneNumber(rawPhone)
               : '-';
           _name = resolvedName;
           _email = userRow?['email']?.toString() ?? (currentUser?.email ?? _email);
+          if (rawImageUrl != null && rawImageUrl.isNotEmpty) {
+            _profilePhotoUrl = rawImageUrl;
+          }
         });
 
         if (userRow != null) {
@@ -163,6 +190,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           }
           if (rawLastName.isNotEmpty) {
             mergedData['last_name'] = rawLastName;
+          }
+          if (rawUsername.isNotEmpty) {
+            mergedData['username'] = rawUsername;
+          }
+          if (rawImageUrl != null && rawImageUrl.isNotEmpty) {
+            mergedData['image_url'] = rawImageUrl;
           }
           ref.read(authProvider.notifier).setUserFromMap(mergedData);
         }
@@ -191,223 +224,96 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final currentName = _name != 'ผู้ใช้งาน' ? _name : (authUser?.name.isNotEmpty == true ? authUser!.name : _name);
     final currentEmail = _email.isNotEmpty ? _email : (authUser?.email.isNotEmpty == true ? authUser!.email : _email);
 
-    final result = await Navigator.of(context).push<Map<String, String>>(
+    final result = await Navigator.of(context).push<Map<String, dynamic>>(
       MaterialPageRoute(
         builder: (_) => EditUserProfileScreen(
+          initialUsername: _username,
           initialName: currentName,
           initialEmail: currentEmail,
           initialPhone: currentPhone == '-' ? '' : currentPhone,
+          initialImageUrl: _profilePhotoUrl,
         ),
       ),
     );
+
     if (result != null && mounted) {
-      final phoneInput = result['phone']?.trim() ?? '';
+      final phoneInput = result['phone']?.toString().trim() ?? '';
       final updatedPhone = phoneInput.isNotEmpty
           ? _formatPhoneNumber(phoneInput)
           : '-';
-      final updatedName = result['name'] ?? _name;
-      final updatedEmail = result['email'] ?? _email;
+      final updatedUsername = result['username']?.toString() ?? _username;
+      final updatedName = result['name']?.toString() ?? _name;
+      final updatedEmail = result['email']?.toString() ?? _email;
+      final updatedImageUrl = result['image_url']?.toString();
 
       setState(() {
+        _username = updatedUsername;
         _name = updatedName;
         _email = updatedEmail;
         _phone = updatedPhone;
+        _profilePhotoUrl = (updatedImageUrl != null && updatedImageUrl.isNotEmpty)
+            ? updatedImageUrl
+            : null;
       });
 
-      try {
-        final currentUser = supabase.auth.currentUser;
-        final userId = currentUser?.id ?? ref.read(authProvider)?.id;
-        final cleanPhone = updatedPhone == '-' ? '' : updatedPhone.replaceAll(RegExp(r'[-\s]'), '');
+      // ดึงข้อมูลล่าสุดจากตาราง users เพื่อให้ตรงกับฐานข้อมูลเสมอ
+      await _loadUserFromUsersTable();
+    }
+  }
 
-        final nameParts = updatedName.trim().split(RegExp(r'\s+'));
-        final firstName = nameParts.isNotEmpty ? nameParts.first : '';
-        final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
-
-        // 1. Update Supabase 'users' table by user.id
-        if (userId != null && userId.isNotEmpty) {
-          await supabase.from('users').update({
-            'phone': cleanPhone,
-            'first_name': firstName,
-            'last_name': lastName,
-          }).eq('id', userId);
-        }
-
-        // 2. Update Supabase Auth user metadata
-        if (currentUser != null) {
-          await supabase.auth.updateUser(
-            UserAttributes(
-              data: {
-                'phone': cleanPhone,
-                'first_name': firstName,
-                'last_name': lastName,
-                'name': updatedName,
-              },
-            ),
+  Widget _buildAvatarImage(String? imageUrl, {double size = 124}) {
+    if (imageUrl != null && imageUrl.trim().isNotEmpty) {
+      if (imageUrl.startsWith('data:image')) {
+        try {
+          final commaIndex = imageUrl.indexOf(',');
+          final base64String = commaIndex != -1 ? imageUrl.substring(commaIndex + 1) : imageUrl;
+          final bytes = base64Decode(base64String.replaceAll(RegExp(r'\s+'), ''));
+          return Image.memory(
+            bytes,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _buildFallbackAvatarIcon(size),
           );
+        } catch (_) {
+          return _buildFallbackAvatarIcon(size);
         }
-
-        // 3. Update AuthProvider
-        ref.read(authProvider.notifier).updateProfile(
-          name: updatedName,
-          phone: cleanPhone,
-          dietaryPreferences: ref.read(authProvider)?.dietaryPreferences ?? [],
+      } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+        return Image.network(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackAvatarIcon(size),
         );
-      } catch (_) {
-        // Fallback / ignore offline errors
+      } else if (imageUrl.startsWith('assets/')) {
+        return Image.asset(
+          imageUrl,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackAvatarIcon(size),
+        );
       }
     }
+    return _buildFallbackAvatarIcon(size);
   }
 
-  void _openEditPhotoScreen() async {
-    final result = await Navigator.of(context).push<String?>(
-      MaterialPageRoute(
-        builder: (_) => EditUserPhotoScreen(
-          currentPhotoUrl: _profilePhotoUrl,
-        ),
+  Widget _buildFallbackAvatarIcon(double size) {
+    return Center(
+      child: Icon(
+        Icons.person_rounded,
+        color: Colors.white,
+        size: size * 0.7,
       ),
     );
-    if (mounted) {
-      setState(() {
-        _profilePhotoUrl = result;
-      });
-    }
   }
 
-
-  void _showDeleteAccountDialog() {
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.40),
-      builder: (BuildContext dialogContext) {
-        return Center(
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              width: 280,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFAF4F5),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: const Color(0xFFDEC4C8),
-                  width: 1.0,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.18),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Confirmation Question
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 26),
-                    child: Text(
-                      'ต้องการลบบัญชีใช่หรือไม่',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1E1E1E),
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ),
-
-                  // Horizontal Divider
-                  Container(height: 1.0, color: const Color(0xFFDEC4C8)),
-
-                  // Actions: ยกเลิก | ยืนยัน
-                  SizedBox(
-                    height: 48,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Left Button: ยกเลิก (Solid Burgundy Text)
-                        Expanded(
-                          child: InkWell(
-                            onTap: () => Navigator.of(dialogContext).pop(),
-                            child: const Center(
-                              child: Text(
-                                'ยกเลิก',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 16.0,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF6E162B),
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Center Vertical Divider
-                        Container(
-                          width: 1.0,
-                          color: const Color(0xFFDEC4C8),
-                        ),
-
-                        // Right Button: ยืนยัน (Dark Text)
-                        Expanded(
-                          child: InkWell(
-                            onTap: () async {
-                              Navigator.of(dialogContext).pop();
-                              try {
-                                await supabase.auth.signOut();
-                              } catch (_) {}
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('ลบบัญชีผู้ใช้เรียบร้อยแล้ว'),
-                                    backgroundColor: const Color(0xFF6E162B),
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                  ),
-                                );
-                                Navigator.of(context).pushAndRemoveUntil(
-                                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                                  (route) => false,
-                                );
-                              }
-                            },
-                            child: const Center(
-                              child: Text(
-                                'ยืนยัน',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 16.0,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1E1E1E),
-                                  letterSpacing: -0.2,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final authUser = ref.watch(authProvider);
-    final currentUser = supabase.auth.currentUser;
+    final currentUser = _safeCurrentUser;
     final fallbackAuthPhone = (currentUser?.phone != null && currentUser!.phone!.isNotEmpty)
         ? currentUser.phone!
         : (currentUser?.userMetadata?['phone']?.toString() ?? '');
@@ -487,82 +393,18 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 children: [
                   const SizedBox(height: 6),
 
-                  // User Avatar with Camera Badge
+                  // User Avatar (Without Camera Badge - No edit on this screen)
                   Center(
-                    child: Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        // Large Circular Profile Avatar
-                        GestureDetector(
-                          onTap: _openEditPhotoScreen,
-                          child: Container(
-                            width: 124,
-                            height: 124,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF6E162B),
-                              shape: BoxShape.circle,
-                            ),
-                            child: _profilePhotoUrl != null
-                                ? ClipOval(
-                                    child: Image.network(
-                                      _profilePhotoUrl!,
-                                      width: 124,
-                                      height: 124,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => const Center(
-                                        child: Icon(
-                                          Icons.person_rounded,
-                                          color: Colors.white,
-                                          size: 88,
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : const Center(
-                                    child: Icon(
-                                      Icons.person_rounded,
-                                      color: Colors.white,
-                                      size: 88,
-                                    ),
-                                  ),
-                          ),
-                        ),
-
-                        // Camera Icon Badge at Bottom-Right
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: GestureDetector(
-                            onTap: _openEditPhotoScreen,
-                            child: Container(
-                              width: 34,
-                              height: 34,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: const Color(0xFF6E162B),
-                                  width: 1.4,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: const Center(
-                                child: Icon(
-                                  Icons.camera_alt_outlined,
-                                  color: Color(0xFF6E162B),
-                                  size: 19,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+                    child: Container(
+                      width: 124,
+                      height: 124,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF6E162B),
+                        shape: BoxShape.circle,
+                      ),
+                      child: ClipOval(
+                        child: _buildAvatarImage(_profilePhotoUrl, size: 124),
+                      ),
                     ),
                   ),
 
@@ -603,19 +445,23 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     ),
                     child: Column(
                       children: [
-                        // Row 1: ชื่อ - นามสกุล
+                        // Row 1: ชื่อผู้ใช้ (username ในตาราง users)
+                        _buildInfoRow('ชื่อผู้ใช้', _username.isNotEmpty ? _username : '-'),
+                        _buildDivider(),
+
+                        // Row 2: ชื่อ - นามสกุล
                         _buildInfoRow('ชื่อ - นามสกุล', effectiveName),
                         _buildDivider(),
 
-                        // Row 2: อีเมล
+                        // Row 3: อีเมล
                         _buildInfoRow('อีเมล', effectiveEmail),
                         _buildDivider(),
 
-                        // Row 3: เบอร์โทรศัพท์
+                        // Row 4: เบอร์โทรศัพท์
                         _buildInfoRow('เบอร์โทรศัพท์', effectivePhone),
                         _buildDivider(),
 
-                        // Row 4: รหัสผ่าน / เข้าสู่ระบบด้วย
+                        // Row 5: รหัสผ่าน / เข้าสู่ระบบด้วย
                         if (_currentProvider == 'facebook')
                           _buildInfoRow('เข้าสู่ระบบด้วย', '', valueWidget: _buildFacebookBadge())
                         else if (_currentProvider == 'google')
@@ -647,33 +493,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       onPressed: _openEditProfileScreen,
                       child: const Text(
                         'แก้ไขข้อมูล',
-                        style: TextStyle(
-                          fontSize: 15.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 14),
-
-                  // Button 2: ลบบัญชี (Solid Filled Button)
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6E162B),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                      onPressed: _showDeleteAccountDialog,
-                      child: const Text(
-                        'ลบบัญชี',
                         style: TextStyle(
                           fontSize: 15.5,
                           fontWeight: FontWeight.w700,

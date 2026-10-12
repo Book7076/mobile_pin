@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../models/favorite_manager.dart';
 import '../../models/restaurant_model.dart';
+import '../../models/swipe_session_model.dart';
 import '../../providers/restaurant_provider.dart';
 import '../../widgets/meal_mate_logo.dart';
 import '../restaurants/restaurant_detail_screen.dart';
@@ -40,6 +42,22 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
     _animController.addListener(() {
       setState(() {});
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(restaurantsProvider.notifier).loadRestaurants();
+      final session = ref.read(swipeSessionProvider);
+      if (session.currentSessionDbId == null) {
+        final criteria = ref.read(filterCriteriaProvider);
+        final cuisineTypeId = criteria.cuisineTypeId ??
+            (criteria.selectedCategories.isNotEmpty
+                ? mapCategoryToCuisineTypeId(criteria.selectedCategories.first)
+                : null);
+        ref.read(swipeSessionProvider.notifier).initSession(
+          cuisineTypeId: cuisineTypeId,
+          priceMin: criteria.minBudget,
+          priceMax: criteria.maxBudget ?? 1000.0,
+        );
+      }
+    });
   }
 
   @override
@@ -49,26 +67,27 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
   }
 
   List<RestaurantModel> _getSwipeList(List<RestaurantModel> allRestaurants) {
-    // Put shabu, rawtruckr, and teds first if present to match mockup
-    final preferredIds = [
+    final preferredKeys = [
       'rest_shabu_mouood',
       'rest_rawtruckr',
       'rest_teds_coffee',
+      'rawtruckr',
+      'teds coffee',
     ];
 
     final preferred = <RestaurantModel>[];
     final others = <RestaurantModel>[];
 
     for (final r in allRestaurants) {
-      if (preferredIds.contains(r.id)) {
+      final nameLower = r.name.toLowerCase();
+      final idLower = r.id.toLowerCase();
+      final isPref = preferredKeys.any((k) => idLower == k || nameLower.contains(k));
+      if (isPref) {
         preferred.add(r);
       } else {
         others.add(r);
       }
     }
-
-    preferred.sort((a, b) =>
-        preferredIds.indexOf(a.id).compareTo(preferredIds.indexOf(b.id)));
 
     return [...preferred, ...others];
   }
@@ -137,6 +156,8 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
     HapticFeedback.mediumImpact();
     final likedList = ref.read(swipeSessionProvider).likedRestaurants;
     if (likedList.isNotEmpty) {
+      // Mark session as completed in Supabase & provider
+      ref.read(swipeSessionProvider.notifier).finishSession();
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => const FinishTransitionScreen(),
@@ -385,22 +406,10 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Background Image
+              // Background Image (Prioritizing is_logo == false food/menu photo from DB)
               restaurant.imageUrls.isNotEmpty
-                  ? Image.network(
-                      restaurant.imageUrls.first,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => Container(
-                        color: const Color(0xFF2D3748),
-                        child: const Icon(Icons.restaurant,
-                            size: 64, color: Colors.white70),
-                      ),
-                    )
-                  : Container(
-                      color: const Color(0xFF2D3748),
-                      child: const Icon(Icons.restaurant,
-                          size: 64, color: Colors.white70),
-                    ),
+                  ? _buildCardImage(restaurant.imageUrls.first)
+                  : _buildImagePlaceholder(),
 
               // Bookmark / Favorite Button (Top-Right) - only on top interactive card
               if (isInteractive)
@@ -615,6 +624,45 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
     );
   }
 
+  Widget _buildCardImage(String imageUrl) {
+    if (imageUrl.startsWith('data:image')) {
+      try {
+        final commaIndex = imageUrl.indexOf(',');
+        final base64String = commaIndex != -1
+            ? imageUrl.substring(commaIndex + 1)
+            : imageUrl;
+        final bytes = base64Decode(base64String.replaceAll(RegExp(r'\s+'), ''));
+        return Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => _buildImagePlaceholder(),
+        );
+      } catch (_) {
+        return _buildImagePlaceholder();
+      }
+    } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+      return Image.network(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _buildImagePlaceholder(),
+      );
+    } else if (imageUrl.startsWith('assets/')) {
+      return Image.asset(
+        imageUrl,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => _buildImagePlaceholder(),
+      );
+    }
+    return _buildImagePlaceholder();
+  }
+
+  Widget _buildImagePlaceholder() {
+    return Container(
+      color: const Color(0xFF2D3748),
+      child: const Icon(Icons.restaurant, size: 64, color: Colors.white70),
+    );
+  }
+
   String _formatCategoryLabel(RestaurantModel restaurant) {
     if (restaurant.id == 'rest_shabu_mouood') {
       return 'ชาบู/หมูกระทะ';
@@ -625,18 +673,25 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
     if (restaurant.id == 'rest_teds_coffee') {
       return 'ร้านกาแฟ/ขนมหวาน';
     }
-    if (restaurant.categories.isNotEmpty) {
-      final cat = restaurant.categories.first;
+    for (final cat in restaurant.categories) {
       for (final fc in AppConstants.flowCategories) {
         if (fc['id'] == cat) return fc['name'] as String;
       }
-      return cat;
+      if (cat.contains(RegExp(r'[\u0E00-\u0E7F]'))) {
+        return cat;
+      }
     }
-    return 'อาหารทั่วไป';
+    return restaurant.categories.isNotEmpty
+        ? restaurant.categories.first
+        : 'อาหารทั่วไป';
   }
 
   /// Bottom Controls: Dislike (X), Info (i), Like (Heart) and "ถัดไป >"
   Widget _buildBottomControls(RestaurantModel? currentRestaurant) {
+    final likedCount =
+        ref.watch(swipeSessionProvider).likedRestaurants.length;
+    final canProceed = likedCount >= 1;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 10, 24, 18),
       child: Column(
@@ -699,35 +754,38 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
 
           const SizedBox(height: 12),
 
-          // "ถัดไป >" Button
+          // "ถัดไป >" Button (requires at least 1 restaurant liked)
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton(
-              key: const ValueKey('swipe_next_button'),
-              onPressed: _navigateToSelectedRestaurants,
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'ถัดไป',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
+            child: Opacity(
+              opacity: canProceed ? 1.0 : 0.45,
+              child: TextButton(
+                key: const ValueKey('swipe_next_button'),
+                onPressed: _navigateToSelectedRestaurants,
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'ถัดไป',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 14,
                       color: Colors.white,
                     ),
-                  ),
-                  SizedBox(width: 4),
-                  Icon(
-                    Icons.arrow_forward_ios_rounded,
-                    size: 14,
-                    color: Colors.white,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),

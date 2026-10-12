@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -932,22 +933,7 @@ class _RestaurantDetailScreenState
                           ),
                         ],
                       ),
-                      child:
-                          (dish.imageUrl != null && dish.imageUrl!.isNotEmpty)
-                          ? Image.network(
-                              dish.imageUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, _, _) => const Icon(
-                                Icons.restaurant,
-                                color: Color(0xFFCBD5E1),
-                                size: 28,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.restaurant,
-                              color: Color(0xFFCBD5E1),
-                              size: 28,
-                            ),
+                      child: _buildDishPreview(dish.imageUrl),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1117,6 +1103,56 @@ class _RestaurantDetailScreenState
             }).toList(),
           ),
       ],
+    );
+  }
+
+  Widget _buildDishPreview(String? url) {
+    if (url == null || url.trim().isEmpty) {
+      return _buildNoDishPhoto();
+    }
+    if (url.startsWith('data:image')) {
+      try {
+        final base64String = url.split(',').last;
+        final bytes = base64Decode(base64String);
+        return Image.memory(
+          bytes,
+          width: 90,
+          height: 75,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildNoDishPhoto(),
+        );
+      } catch (_) {}
+    }
+    return Image.network(
+      url,
+      width: 90,
+      height: 75,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _buildNoDishPhoto(),
+    );
+  }
+
+  Widget _buildNoDishPhoto() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(
+            Icons.camera_alt_outlined,
+            color: Color(0xFF94A3B8),
+            size: 26,
+          ),
+          SizedBox(height: 2),
+          Text(
+            'ไม่มีรูป',
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

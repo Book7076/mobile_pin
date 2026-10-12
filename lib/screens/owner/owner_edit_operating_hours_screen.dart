@@ -128,6 +128,7 @@ class _OwnerEditOperatingHoursScreenState
 
   // รายการเวลาเปิด-ปิดทั้งหมดที่ตั้งไว้
   final List<OperatingHourEntry> _hoursList = [];
+  final List<OperatingHourEntry> _originalHoursList = [];
   bool _isLoading = false;
 
   // ตัวเลือกวันตามรูปที่ 3
@@ -185,6 +186,7 @@ class _OwnerEditOperatingHoursScreenState
       ]);
     }
 
+    _originalHoursList.addAll(List<OperatingHourEntry>.from(_hoursList));
     _loadOperatingHoursFromSupabase();
   }
 
@@ -223,6 +225,8 @@ class _OwnerEditOperatingHoursScreenState
           _hoursList.clear();
           _hoursList.addAll(fetched);
           _sortHours();
+          _originalHoursList.clear();
+          _originalHoursList.addAll(List<OperatingHourEntry>.from(_hoursList));
         });
       }
     } catch (e) {
@@ -230,8 +234,14 @@ class _OwnerEditOperatingHoursScreenState
     }
   }
 
-  /// บันทึกข้อมูลลงฐานข้อมูล Supabase แบบมืออาชีพ (Sync)
+  /// บันทึกข้อมูลลงฐานข้อมูล Supabase แบบมืออาชีพ (Sync เมื่อกดบันทึกเท่านั้น)
   Future<bool> _syncToDatabase() async {
+    // เงื่อนไขใน Flutter: ร้านอาหารต้องมีเวลาเปิดทำการอย่างน้อย 1 วัน
+    if (_hoursList.isEmpty) {
+      _showToast('ต้องมีเวลาเปิดทำการอย่างน้อย 1 วัน');
+      return false;
+    }
+
     String? targetId = widget.restaurantId;
 
     // Fallback: หากไม่ได้ระบุ restaurantId ให้ลองค้นหาร้านของ owner ปัจจุบัน
@@ -264,24 +274,28 @@ class _OwnerEditOperatingHoursScreenState
           .eq('restaurant_id', targetId);
 
       // 2. เพิ่มรายการใหม่ทั้งหมด
-      if (_hoursList.isNotEmpty) {
-        final toInsert = _hoursList.map((item) {
-          final openTime = item.openTime.length == 5 ? '${item.openTime}:00' : item.openTime;
-          final closeTime = item.closeTime.length == 5 ? '${item.closeTime}:00' : item.closeTime;
-          return {
-            'restaurant_id': targetId,
-            'day_of_week': item.dayOfWeek,
-            'open_time': openTime,
-            'close_time': closeTime,
-            'is_closed': false,
-          };
-        }).toList();
+      final toInsert = _hoursList.map((item) {
+        final openTime = item.openTime.length == 5 ? '${item.openTime}:00' : item.openTime;
+        final closeTime = item.closeTime.length == 5 ? '${item.closeTime}:00' : item.closeTime;
+        return {
+          'restaurant_id': targetId,
+          'day_of_week': item.dayOfWeek,
+          'open_time': openTime,
+          'close_time': closeTime,
+          'is_closed': false,
+        };
+      }).toList();
 
-        await client.from('operating_hours').insert(toInsert);
-      }
+      await client.from('operating_hours').insert(toInsert);
       return true;
     } catch (e) {
       debugPrint('Error syncing operating hours to Supabase: $e');
+      final msg = e.toString();
+      if (msg.contains('42501') || msg.contains('violates row-level security')) {
+        _showToast('ไม่สามารถบันทึกได้เนื่องจากสิทธิ์ RLS ใน Supabase');
+      } else {
+        _showToast('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      }
       return false;
     } finally {
       if (mounted) {
@@ -292,18 +306,24 @@ class _OwnerEditOperatingHoursScreenState
 
   /// กดปุ่ม "บันทึก" ด้านขวาบน เพื่ออัปเดตลงฐานข้อมูลทันที
   Future<void> _handleSaveAndSync() async {
+    // เงื่อนไข: ร้านอาหารต้องมีเวลาเปิดทำการอย่างน้อย 1 วัน
+    if (_hoursList.isEmpty) {
+      _showToast('ต้องมีเวลาเปิดทำการอย่างน้อย 1 วัน');
+      return;
+    }
     final success = await _syncToDatabase();
     if (!mounted) return;
     if (success) {
       _showToast('บันทึกเวลาเปิด-ปิดเรียบร้อยแล้ว');
-    } else {
-      _showToast('บันทึกข้อมูลเรียบร้อยแล้ว');
+      // อัปเดตข้อมูลต้นฉบับให้เป็นชุดใหม่หลังจากบันทึกสำเร็จ
+      _originalHoursList.clear();
+      _originalHoursList.addAll(List<OperatingHourEntry>.from(_hoursList));
+      Navigator.pop(context, _hoursList);
     }
-    Navigator.pop(context, _hoursList);
   }
 
   /// กดปุ่ม "เพิ่ม"
-  void _handleAddHours() async {
+  void _handleAddHours() {
     if (_selectedDayOption == null) {
       _showToast('กรุณาเลือกวัน');
       return;
@@ -365,17 +385,15 @@ class _OwnerEditOperatingHoursScreenState
     });
 
     _showToast('เพิ่มเวลาเปิด-ปิดเรียบร้อยแล้ว');
-    await _syncToDatabase();
   }
 
-  /// กดปุ่ม "X" ลบช่วงเวลา
-  void _handleDeleteHour(int index) async {
+  /// กดปุ่ม "X" ลบช่วงเวลา (สามารถลบได้ทั้งหมดในหน้านี้ แต่จะยังไม่บันทึกจนกว่าจะกดปุ่มบันทึก)
+  void _handleDeleteHour(int index) {
     if (index >= 0 && index < _hoursList.length) {
       setState(() {
         _hoursList.removeAt(index);
       });
       _showToast('ลบช่วงเวลาเรียบร้อยแล้ว');
-      await _syncToDatabase();
     }
   }
 
@@ -606,7 +624,8 @@ class _OwnerEditOperatingHoursScreenState
   Widget build(BuildContext context) {
     return WillPopScope(
       onWillPop: () async {
-        Navigator.pop(context, _hoursList);
+        // กดกลับได้เสมอ โดยคืนค่าข้อมูลเดิมก่อนแก้ไข (ไม่มีการบันทึก)
+        Navigator.pop(context, List<OperatingHourEntry>.from(_originalHoursList));
         return false;
       },
       child: Scaffold(
@@ -620,7 +639,10 @@ class _OwnerEditOperatingHoursScreenState
               color: Colors.white,
               size: 20,
             ),
-            onPressed: () => Navigator.pop(context, _hoursList),
+            onPressed: () {
+              // กดกลับได้เสมอ โดยคืนค่าข้อมูลเดิมก่อนแก้ไข (ไม่มีการบันทึก)
+              Navigator.pop(context, List<OperatingHourEntry>.from(_originalHoursList));
+            },
           ),
           centerTitle: true,
           title: const Text(

@@ -5,6 +5,8 @@ import '../main.dart';
 import '../models/filter_criteria_model.dart';
 import '../models/restaurant_model.dart';
 import '../models/review_model.dart';
+import '../models/swipe_session_model.dart';
+import '../services/swipe_session_service.dart';
 
 // 1. Master Restaurants List
 class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
@@ -18,19 +20,27 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
       try {
         response = await supabase
             .from('restaurants')
-            .select('*, restaurant_images(*)')
+            .select('*, restaurant_images(*), cuisine_types(*), menu_items(*)')
             .order('crated_at', ascending: false);
       } catch (_) {
         try {
           response = await supabase
               .from('restaurants')
-              .select('*, restaurant_images(*)')
+              .select('*, restaurant_images(*), cuisine_types(*), menu_items(*)')
               .order('created_at', ascending: false);
         } catch (_) {
           try {
-            response = await supabase.from('restaurants').select('*, restaurant_images(*)');
+            response = await supabase
+                .from('restaurants')
+                .select('*, restaurant_images(*), cuisine_types(*), menu_items(*)');
           } catch (_) {
-            response = await supabase.from('restaurants').select();
+            try {
+              response = await supabase
+                  .from('restaurants')
+                  .select('*, restaurant_images(*)');
+            } catch (_) {
+              response = await supabase.from('restaurants').select();
+            }
           }
         }
       }
@@ -130,28 +140,51 @@ final filterCriteriaProvider =
 
 // 3. Filtered Restaurants for Swipe & Discover
 bool _checkCategoryMatch(String selectedCat, List<String> restaurantCategories) {
-  if (restaurantCategories.contains(selectedCat)) return true;
+  final normSelected = selectedCat.trim().toLowerCase();
+  for (final cat in restaurantCategories) {
+    if (cat.trim().toLowerCase() == normSelected) return true;
+  }
 
-  // Category alias mappings between Flow categories and restaurant dataset
+  // Category alias mappings between Flow categories and database cuisine types
   const aliases = <String, List<String>>{
-    'shabu_hotpot': ['shabu_grill', 'mookata', 'buffet'],
-    'mookata': ['shabu_grill', 'shabu_hotpot', 'buffet'],
-    'a_la_carte': ['made_to_order', 'street_food', 'thai'],
-    'made_to_order': ['a_la_carte', 'street_food'],
-    'street_food': ['a_la_carte', 'made_to_order'],
-    'cafe_beverage': ['cafe_dessert'],
-    'cafe_dessert': ['cafe_beverage', 'dessert_bakery'],
-    'dessert_bakery': ['cafe_dessert'],
-    'healthy': ['healthy_clean'],
-    'healthy_clean': ['healthy'],
-    'fast_food': ['fastfood'],
-    'fastfood': ['fast_food'],
-    'somtum_isan': ['thai', 'street_food'],
+    'thai': ['อาหารไทย', 'thai', 'somtum_isan', 'northern_thai', 'southern_thai', 'a_la_carte', 'street_food', 'made_to_order'],
+    'อาหารไทย': ['thai', 'somtum_isan', 'northern_thai', 'southern_thai', 'a_la_carte', 'street_food', 'made_to_order'],
+    'japanese': ['อาหารญี่ปุ่น', 'japanese'],
+    'อาหารญี่ปุ่น': ['japanese'],
+    'chinese': ['อาหารจีน', 'chinese'],
+    'อาหารจีน': ['chinese'],
+    'korean': ['อาหารเกาหลี', 'korean'],
+    'อาหารเกาหลี': ['korean'],
+    'shabu_hotpot': ['ชาบู/ฮอกพอด', 'ปิ้งย่าง/ชาบู', 'shabu_grill', 'mookata', 'buffet', 'shabu_hotpot', 'หมูกระทะ', 'ชาบู / ปิ้งย่าง / หมูกระทะ'],
+    'ชาบู/ฮอกพอด': ['shabu_hotpot', 'ปิ้งย่าง/ชาบู', 'shabu_grill', 'mookata', 'buffet', 'หมูกระทะ'],
+    'mookata': ['หมูกระทะ', 'ปิ้งย่าง/ชาบู', 'shabu_grill', 'shabu_hotpot', 'buffet', 'mookata', 'ชาบู/ฮอกพอด', 'ชาบู / ปิ้งย่าง / หมูกระทะ'],
+    'หมูกระทะ': ['mookata', 'ปิ้งย่าง/ชาบู', 'shabu_grill', 'shabu_hotpot', 'buffet', 'ชาบู/ฮอกพอด'],
+    'healthy': ['อาหารสุขภาพ', 'อาหารมังสวิรัติ', 'อาหารฮาลาล', 'healthy_clean', 'healthy', 'vegetarian', 'halal', 'อาหารคลีน / สุขภาพ'],
+    'อาหารสุขภาพ': ['healthy', 'อาหารมังสวิรัติ', 'อาหารฮาลาล', 'healthy_clean', 'vegetarian'],
+    'fast_food': ['ฟาสต์ฟู้ด', 'อาหารฟาสฟู้ด', 'อาหารอิตาเลียน', 'fastfood', 'fast_food', 'italian_western', 'ฟาสต์ฟู้ด / เบอร์เกอร์'],
+    'ฟาสต์ฟู้ด': ['fast_food', 'อาหารฟาสฟู้ด', 'อาหารอิตาเลียน', 'fastfood', 'italian_western'],
+    'noodles': ['ก๋วยเตี๋ยว', 'ก๋วยเตี๋ยว / บะหมี่', 'noodles'],
+    'ก๋วยเตี๋ยว': ['noodles', 'ก๋วยเตี๋ยว / บะหมี่'],
+    'a_la_carte': ['อาหารตามสั่ง', 'ตามสั่ง / สตรีทฟู้ด', 'made_to_order', 'street_food', 'a_la_carte', 'thai', 'อาหารไทย', 'อาหารเช้า', 'breakfast'],
+    'อาหารตามสั่ง': ['a_la_carte', 'made_to_order', 'street_food', 'thai', 'ตามสั่ง / สตรีทฟู้ด'],
+    'dessert_bakery': ['ขนมหวาน/เบเกอรี่', 'ของหวาน', 'อาหารเช้า', 'cafe_dessert', 'dessert_bakery', 'breakfast', 'คาเฟ่ / ของหวาน'],
+    'ขนมหวาน/เบเกอรี่': ['dessert_bakery', 'ของหวาน', 'อาหารเช้า', 'cafe_dessert'],
+    'cafe_beverage': ['คาเฟ่/เครื่องดื่ม', 'คาเฟ่', 'cafe_dessert', 'cafe_beverage', 'cafe', 'คาเฟ่ / ของหวาน'],
+    'คาเฟ่/เครื่องดื่ม': ['cafe_beverage', 'คาเฟ่', 'cafe_dessert', 'cafe'],
+    'italian_western': ['อาหารอิตาเลียน', 'fast_food', 'italian_western'],
+    'อาหารอิตาเลียน': ['italian_western', 'fast_food'],
+    'somtum_isan': ['อาหารอีสาน', 'somtum_isan', 'thai', 'อาหารไทย'],
+    'อาหารอีสาน': ['somtum_isan', 'thai'],
   };
 
-  final mapped = aliases[selectedCat];
+  final mapped = aliases[normSelected] ?? aliases[selectedCat];
   if (mapped != null) {
-    return mapped.any((alias) => restaurantCategories.contains(alias));
+    for (final alias in mapped) {
+      final normAlias = alias.trim().toLowerCase();
+      for (final cat in restaurantCategories) {
+        if (cat.trim().toLowerCase() == normAlias) return true;
+      }
+    }
   }
   return false;
 }
@@ -190,13 +223,21 @@ final filteredRestaurantsProvider = Provider<List<RestaurantModel>>((ref) {
     // Filter by max budget (Flow 4)
     if (criteria.maxBudget != null) {
       final budget = criteria.maxBudget!;
-      // If restaurant has signature dishes, check if any dish is within budget
       if (restaurant.signatureDishes.isNotEmpty) {
-        final hasAffordableDish =
-            restaurant.signatureDishes.any((dish) => dish.price <= budget);
-        if (!hasAffordableDish) {
-          if (budget < 100 && restaurant.priceLevel > 1) return false;
-          if (budget < 300 && restaurant.priceLevel > 2) return false;
+        // Direct match: has at least one dish within budget
+        final hasDirectMatch = restaurant.signatureDishes
+            .any((dish) => dish.price > 0 && dish.price <= budget);
+        if (!hasDirectMatch) {
+          // If no direct dish, allow slight flexibility (+15% or +10 THB)
+          final minDishPrice = restaurant.signatureDishes
+              .map((d) => d.price)
+              .where((p) => p > 0)
+              .fold<int>(999999, (prev, elem) => elem < prev ? elem : prev);
+
+          final tolerance = (budget * 0.15).round();
+          if (minDishPrice > budget + (tolerance > 10 ? tolerance : 10)) {
+            return false;
+          }
         }
       } else {
         if (budget < 100 && restaurant.priceLevel > 1) return false;
@@ -223,18 +264,31 @@ final filteredRestaurantsProvider = Provider<List<RestaurantModel>>((ref) {
   }).toList();
 });
 
+
 // 4. Current Swipe Session Notifier
 class SwipeSessionState {
   final List<RestaurantModel> likedRestaurants;
   final List<RestaurantModel> passedRestaurants;
   final RestaurantModel? selectedWinner; // For the "Pick One for Me" feature
   final bool isSessionFinished;
+  final String? currentSessionDbId;
+  final int? cuisineTypeId;
+  final double? priceMin;
+  final double? priceMax;
+  final int targetRestaurantCount;
+  final String status; // 'กำลังใช้', 'ปัดเสร็จแล้ว'
 
   SwipeSessionState({
     this.likedRestaurants = const [],
     this.passedRestaurants = const [],
     this.selectedWinner,
     this.isSessionFinished = false,
+    this.currentSessionDbId,
+    this.cuisineTypeId,
+    this.priceMin = 50.0,
+    this.priceMax,
+    this.targetRestaurantCount = 0,
+    this.status = SwipeSessionModel.statusInProgress,
   });
 
   SwipeSessionState copyWith({
@@ -242,12 +296,25 @@ class SwipeSessionState {
     List<RestaurantModel>? passedRestaurants,
     RestaurantModel? selectedWinner,
     bool? isSessionFinished,
+    String? currentSessionDbId,
+    int? cuisineTypeId,
+    double? priceMin,
+    double? priceMax,
+    int? targetRestaurantCount,
+    String? status,
   }) {
     return SwipeSessionState(
       likedRestaurants: likedRestaurants ?? this.likedRestaurants,
       passedRestaurants: passedRestaurants ?? this.passedRestaurants,
       selectedWinner: selectedWinner ?? this.selectedWinner,
       isSessionFinished: isSessionFinished ?? this.isSessionFinished,
+      currentSessionDbId: currentSessionDbId ?? this.currentSessionDbId,
+      cuisineTypeId: cuisineTypeId ?? this.cuisineTypeId,
+      priceMin: priceMin ?? this.priceMin,
+      priceMax: priceMax ?? this.priceMax,
+      targetRestaurantCount:
+          targetRestaurantCount ?? this.targetRestaurantCount,
+      status: status ?? this.status,
     );
   }
 }
@@ -255,13 +322,57 @@ class SwipeSessionState {
 class SwipeSessionNotifier extends StateNotifier<SwipeSessionState> {
   SwipeSessionNotifier() : super(SwipeSessionState());
 
+  /// Initializes a session in local state and creates record in Supabase `swipe_sessions` table
+  Future<String?> initSession({
+    int? cuisineTypeId,
+    double? priceMin = 50.0,
+    double? priceMax,
+    String? explicitUserId,
+  }) async {
+    final effectiveMin = priceMin ?? 50.0;
+    // Generate/insert in Supabase
+    final dbId = await SwipeSessionService.createSession(
+      cuisineTypeId: cuisineTypeId,
+      priceMin: effectiveMin,
+      priceMax: priceMax,
+      explicitUserId: explicitUserId,
+    );
+
+    state = state.copyWith(
+      currentSessionDbId: dbId,
+      cuisineTypeId: cuisineTypeId,
+      priceMin: effectiveMin,
+      priceMax: priceMax,
+      targetRestaurantCount: 0,
+      status: SwipeSessionModel.statusInProgress,
+    );
+
+    return dbId;
+  }
+
   void like(RestaurantModel restaurant) {
     final updatedLiked = [...state.likedRestaurants, restaurant];
     final isFinished = updatedLiked.length >= 5;
+    final newCount = updatedLiked.length;
+    final newStatus = isFinished
+        ? SwipeSessionModel.statusCompleted
+        : SwipeSessionModel.statusInProgress;
+
     state = state.copyWith(
       likedRestaurants: updatedLiked,
+      targetRestaurantCount: newCount,
+      status: newStatus,
       isSessionFinished: isFinished,
     );
+
+    // Sync to Supabase in background
+    if (state.currentSessionDbId != null) {
+      SwipeSessionService.updateSession(
+        sessionId: state.currentSessionDbId,
+        targetRestaurantCount: newCount,
+        status: newStatus,
+      );
+    }
   }
 
   void pass(RestaurantModel restaurant) {
@@ -271,7 +382,17 @@ class SwipeSessionNotifier extends StateNotifier<SwipeSessionState> {
   }
 
   void finishSession() {
-    state = state.copyWith(isSessionFinished: true);
+    state = state.copyWith(
+      isSessionFinished: true,
+      status: SwipeSessionModel.statusCompleted,
+    );
+
+    if (state.currentSessionDbId != null) {
+      SwipeSessionService.completeSession(
+        sessionId: state.currentSessionDbId,
+        targetRestaurantCount: state.likedRestaurants.length,
+      );
+    }
   }
 
   void setWinner(RestaurantModel restaurant) {

@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/operating_hours_model.dart';
+import '../../widgets/image_crop_screen.dart';
 import 'owner_edit_amenities_screen.dart';
 import 'owner_edit_operating_hours_screen.dart';
 
@@ -63,6 +67,7 @@ class OwnerRestaurantInfoScreen extends StatefulWidget {
   final String restaurantName;
   final String? restaurantCategory;
   final String? restaurantImageUrl;
+  final String? swipeCardImageUrl;
   final String? initialStatus;
 
   const OwnerRestaurantInfoScreen({
@@ -71,6 +76,7 @@ class OwnerRestaurantInfoScreen extends StatefulWidget {
     this.restaurantName = 'THE CHICKEN',
     this.restaurantCategory,
     this.restaurantImageUrl,
+    this.swipeCardImageUrl,
     this.initialStatus,
   });
 
@@ -87,9 +93,11 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
   late String _phone;
   late String _email;
   String? _currentImageUrl;
+  String? _swipeCardImageUrl;
   late String _status;
   String? _rejectionReason;
   bool _isLoading = false;
+  bool _isSaving = false;
 
   // รายการวันทั้ง 7 วัน เรียงตาม mockup: อาทิตย์, จันทร์, อังคาร, พุธ, พฤหัสบดี, ศุกร์, เสาร์
   late List<DayScheduleItem> _schedules;
@@ -114,6 +122,7 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
     _phone = '0991234567';
     _email = 'ITLOVER@GMAIL.COM';
     _currentImageUrl = widget.restaurantImageUrl;
+    _swipeCardImageUrl = widget.swipeCardImageUrl ?? widget.restaurantImageUrl;
     _status = widget.initialStatus ?? 'pending';
 
     // เริ่มต้นเวลาเปิดปิดตาม Mockup
@@ -254,28 +263,40 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
         }
       } catch (_) {}
 
-      // 4. ดึงรูปภาพจากตาราง restaurant_images ถ้า _currentImageUrl ยังว่างอยู่
-      if (_currentImageUrl == null || _currentImageUrl!.isEmpty) {
-        try {
-          final imgRows = await Supabase.instance.client
-              .from('restaurant_images')
-              .select('image_url, is_logo, sort_order')
-              .eq('restaurant_id', widget.restaurantId!)
-              .order('sort_order', ascending: true);
+      // 4. ดึงรูปภาพโปรไฟล์จากตาราง restaurant_images (is_logo = true)
+      try {
+        final imgRows = await Supabase.instance.client
+            .from('restaurant_images')
+            .select('image_url, is_logo, sort_order')
+            .eq('restaurant_id', widget.restaurantId!)
+            .eq('is_logo', true)
+            .maybeSingle();
 
-          if (imgRows is List && imgRows.isNotEmpty && mounted) {
-            final match = imgRows.firstWhere(
-              (i) => i['is_logo'] == true,
-              orElse: () => imgRows.first,
-            );
-            if (match['image_url'] != null) {
-              setState(() {
-                _currentImageUrl = match['image_url'].toString();
-              });
-            }
+        if (imgRows != null && imgRows['image_url'] != null && mounted) {
+          setState(() {
+            _currentImageUrl = imgRows['image_url'].toString();
+          });
+        }
+      } catch (_) {}
+
+      // 5. ดึงรูปภาพสำหรับหน้าปัดร้านอาหารจากตาราง restaurant_images (is_logo = false)
+      try {
+        final cardImgRows = await Supabase.instance.client
+            .from('restaurant_images')
+            .select('id, image_url, is_logo, sort_order')
+            .eq('restaurant_id', widget.restaurantId!)
+            .eq('is_logo', false)
+            .order('sort_order', ascending: true);
+
+        if (cardImgRows is List && cardImgRows.isNotEmpty && mounted) {
+          final firstImg = cardImgRows.first;
+          if (firstImg['image_url'] != null) {
+            setState(() {
+              _swipeCardImageUrl = firstImg['image_url'].toString();
+            });
           }
-        } catch (_) {}
-      }
+        }
+      } catch (_) {}
     } catch (e) {
       debugPrint('Error loading restaurant info from Supabase: $e');
     }
@@ -315,6 +336,34 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
           ),
         ),
         centerTitle: true,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12.0),
+            child: TextButton(
+              onPressed: _isSaving ? null : _saveAllRestaurantInfo,
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+                backgroundColor: Colors.white.withOpacity(0.18),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              ),
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                    )
+                  : const Text(
+                      'บันทึก',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -330,6 +379,13 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // รูปสำหรับหน้าปัดร้านอาหาร (is_logo: false)
+                  _buildSwipeCardImageSection(),
+
+                  const SizedBox(height: 16),
+                  const Divider(height: 1, thickness: 1, color: Color(0xFFF2E6E8)),
+                  const SizedBox(height: 16),
+
                   // ส่วนที่ 2: ที่อยู่
                   _buildAddressSection(),
 
@@ -377,23 +433,26 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFF2E6E8), width: 1.5),
-                  color: const Color(0xFFFBF6F7),
-                ),
-                child: ClipOval(
-                  child: _buildAvatarImage(),
+              GestureDetector(
+                onTap: _showPhotoOptions,
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFFF2E6E8), width: 1.5),
+                    color: const Color(0xFFFBF6F7),
+                  ),
+                  child: ClipOval(
+                    child: _buildAvatarImage(),
+                  ),
                 ),
               ),
               Positioned(
                 bottom: 0,
                 right: -4,
                 child: InkWell(
-                  onTap: _showEditPhotoDialog,
+                  onTap: _showPhotoOptions,
                   borderRadius: BorderRadius.circular(10),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -471,18 +530,205 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
                     color: Colors.grey[700],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'รหัสร้าน : $_storeCode',
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    color: Colors.grey[700],
-                  ),
-                ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ==========================================================================
+  // SWIPE CARD IMAGE SECTION (รูปสำหรับหน้าปัดร้านอาหาร is_logo: false)
+  // ==========================================================================
+  Widget _buildSwipeCardImageSection() {
+    final hasImage = _swipeCardImageUrl != null && _swipeCardImageUrl!.trim().isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'รูปสำหรับหน้าปัดร้านอาหาร',
+          style: TextStyle(
+            fontSize: 16.5,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'รูปภาพร้านอาหารหรือเมนูแนะนำ เพื่อแสดงบนหน้าปัดหาร้านอาหาร',
+          style: TextStyle(
+            fontSize: 12.5,
+            color: Colors.grey.shade600,
+            height: 1.3,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Preview or Upload Area
+        GestureDetector(
+          onTap: _showSwipeCardPhotoOptions,
+          child: Container(
+            width: double.infinity,
+            height: 200,
+            decoration: BoxDecoration(
+              color: hasImage ? Colors.grey.shade100 : const Color(0xFFFDF8F9),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: hasImage ? const Color(0xFFE5E7EB) : kOwnerPrimaryColor.withOpacity(0.35),
+                width: 1.5,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: hasImage
+                  ? Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        _buildSwipeCardImagePreview(),
+                        // Action Button "แก้ไข" at bottom right
+                        Positioned(
+                          right: 12,
+                          bottom: 12,
+                          child: InkWell(
+                            onTap: _showSwipeCardPhotoOptions,
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.55),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.camera_alt, color: Colors.white, size: 13),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'แก้ไข',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Center(
+                      child: SingleChildScrollView(
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: kOwnerPrimaryColor.withOpacity(0.08),
+                              ),
+                              child: const Icon(
+                                Icons.add_photo_alternate_rounded,
+                                color: kOwnerPrimaryColor,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'เพิ่มรูปสำหรับหน้าปัดร้านอาหาร',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.bold,
+                                color: kOwnerPrimaryColor,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'แตะเพื่อถ่ายรูป หรือเลือกจากคลัง (ครอบตัดได้)',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: kOwnerRedColor.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Text(
+                                '⚠️ ถ้าไม่ได้ใส่รูปนี้ จะไม่อนุญาตให้กดบันทึกข้อมูล',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: kOwnerRedColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSwipeCardImagePreview() {
+    if (_swipeCardImageUrl != null && _swipeCardImageUrl!.isNotEmpty) {
+      if (_swipeCardImageUrl!.startsWith('data:image')) {
+        try {
+          final commaIndex = _swipeCardImageUrl!.indexOf(',');
+          final base64String = commaIndex != -1
+              ? _swipeCardImageUrl!.substring(commaIndex + 1)
+              : _swipeCardImageUrl!;
+          final bytes = base64Decode(base64String);
+          return Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            errorBuilder: (_, __, ___) => _buildFallbackSwipeCardImage(),
+          );
+        } catch (_) {
+          return _buildFallbackSwipeCardImage();
+        }
+      }
+      if (_swipeCardImageUrl!.startsWith('assets/')) {
+        return Image.asset(
+          _swipeCardImageUrl!,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          errorBuilder: (_, __, ___) => _buildFallbackSwipeCardImage(),
+        );
+      }
+      return Image.network(
+        _swipeCardImageUrl!,
+        fit: BoxFit.cover,
+        width: double.infinity,
+        errorBuilder: (_, __, ___) => _buildFallbackSwipeCardImage(),
+      );
+    }
+    return _buildFallbackSwipeCardImage();
+  }
+
+  Widget _buildFallbackSwipeCardImage() {
+    return Container(
+      color: Colors.grey.shade200,
+      child: const Center(
+        child: Icon(Icons.restaurant, size: 48, color: Colors.grey),
       ),
     );
   }
@@ -773,50 +1019,13 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'สถานะร้านค้า',
-              style: TextStyle(
-                fontSize: 16.5,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
-              ),
-            ),
-            // ปุ่มเมนูสำหรับดูตัวอย่างแต่ละสถานะ (pending, in_review, rejected, approved)
-            PopupMenuButton<String>(
-              tooltip: 'เลือกดูตัวอย่างสถานะ',
-              icon: Icon(
-                Icons.tune_rounded,
-                size: 18,
-                color: Colors.grey.shade400,
-              ),
-              onSelected: (val) {
-                setState(() {
-                  _status = val;
-                });
-              },
-              itemBuilder: (ctx) => const [
-                PopupMenuItem(
-                  value: 'pending',
-                  child: Text('รอตรวจสอบ (รูปที่ 2)'),
-                ),
-                PopupMenuItem(
-                  value: 'in_review',
-                  child: Text('กำลังตรวจสอบ'),
-                ),
-                PopupMenuItem(
-                  value: 'rejected',
-                  child: Text('ไม่ผ่านการตรวจสอบ (รูปที่ 3)'),
-                ),
-                PopupMenuItem(
-                  value: 'approved',
-                  child: Text('ผ่านการตรวจสอบ (อนุมัติแล้ว)'),
-                ),
-              ],
-            ),
-          ],
+        const Text(
+          'สถานะร้านค้า',
+          style: TextStyle(
+            fontSize: 16.5,
+            fontWeight: FontWeight.bold,
+            color: Colors.black87,
+          ),
         ),
         const SizedBox(height: 16),
 
@@ -1328,6 +1537,22 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
   // ==========================================================================
   Widget _buildAvatarImage() {
     if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty) {
+      if (_currentImageUrl!.startsWith('data:image')) {
+        try {
+          final commaIndex = _currentImageUrl!.indexOf(',');
+          final base64String = commaIndex != -1
+              ? _currentImageUrl!.substring(commaIndex + 1)
+              : _currentImageUrl!;
+          final bytes = base64Decode(base64String);
+          return Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _buildFallbackStoreLogo(),
+          );
+        } catch (_) {
+          return _buildFallbackStoreLogo();
+        }
+      }
       if (_currentImageUrl!.startsWith('assets/')) {
         return Image.asset(
           _currentImageUrl!,
@@ -1404,53 +1629,561 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
     );
   }
 
-  /// แก้ไขรูปภาพร้าน
-  void _showEditPhotoDialog() {
-    final controller = TextEditingController(text: _currentImageUrl ?? '');
-    showDialog(
+  /// เมนูเลือกรูปภาพโปรไฟล์ร้านอาหาร (เฉพาะกล้อง และ คลังภาพ ไม่มี URL)
+  void _showPhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'รูปภาพโปรไฟล์ร้านอาหาร',
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kOwnerPrimaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: kOwnerPrimaryColor),
+                ),
+                title: const Text('ถ่ายรูปภาพ', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('ถ่ายรูปร้านจากกล้องของคุณ'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picker = ImagePicker();
+                  final picked = await picker.pickImage(
+                    source: ImageSource.camera,
+                    maxWidth: 1000,
+                    maxHeight: 1000,
+                    imageQuality: 85,
+                  );
+                  if (picked != null) {
+                    await _processPickedPhoto(picked);
+                  }
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kOwnerPrimaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: kOwnerPrimaryColor),
+                ),
+                title: const Text('เลือกจากคลังรูปภาพ', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('เลือกรูปภาพจากเครื่องของคุณ'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picker = ImagePicker();
+                  final picked = await picker.pickImage(
+                    source: ImageSource.gallery,
+                    maxWidth: 1000,
+                    maxHeight: 1000,
+                    imageQuality: 85,
+                  );
+                  if (picked != null) {
+                    await _processPickedPhoto(picked);
+                  }
+                },
+              ),
+              if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty) ...[
+                const Divider(),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                  ),
+                  title: const Text(
+                    'ลบรูปภาพ',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red),
+                  ),
+                  subtitle: const Text('นำรูปภาพโปรไฟล์ร้านนี้ออก'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _confirmDeletePhoto();
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _processPickedPhoto(XFile picked) async {
+    try {
+      final rawBytes = await picked.readAsBytes();
+      if (!mounted) return;
+
+      // เปิดหน้าจอครอบตัดรูปภาพ (Image Crop Screen)
+      final croppedBytes = await Navigator.push<Uint8List>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ImageCropScreen(imageBytes: rawBytes),
+        ),
+      );
+
+      if (croppedBytes == null) return;
+
+      // แปลงรูปที่ครอบตัดเป็น Data URL เพื่อจัดเก็บเป็น URL
+      String convertedUrl = 'data:image/png;base64,${base64Encode(croppedBytes)}';
+
+      // พยายามอัปโหลดเข้า Supabase Storage ถ้ามี bucket รองรับ
+      try {
+        final fileName = 'restaurant_logo_${DateTime.now().millisecondsSinceEpoch}.png';
+        await Supabase.instance.client.storage.from('restaurant-images').uploadBinary(
+          fileName,
+          croppedBytes,
+          fileOptions: const FileOptions(contentType: 'image/png', upsert: true),
+        );
+        final pubUrl = Supabase.instance.client.storage.from('restaurant-images').getPublicUrl(fileName);
+        if (pubUrl.isNotEmpty) {
+          convertedUrl = pubUrl;
+        }
+      } catch (_) {
+        // ใช้ Data URL บันทึกลงฐานข้อมูลได้อย่างสมบูรณ์
+      }
+
+      setState(() {
+        _currentImageUrl = convertedUrl;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ครอบตัดและเลือกรูปภาพเรียบร้อยแล้ว'),
+            backgroundColor: kOwnerPrimaryColor,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error processing picked restaurant photo: $e');
+    }
+  }
+
+  /// ป็อปอัพยืนยันการลบรูปภาพ
+  Future<void> _confirmDeletePhoto() async {
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('แก้ไขรูปร้านอาหาร', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'URL ของรูปภาพ',
-            hintText: 'https://...',
-            border: OutlineInputBorder(),
-          ),
-        ),
+        title: const Text('ยืนยันลบรูปภาพ', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('คุณต้องการลบรูปภาพร้านอาหารนี้ใช่หรือไม่?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('ยกเลิก'),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: kOwnerPrimaryColor,
+              backgroundColor: Colors.red,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            onPressed: () async {
-              final newUrl = controller.text.trim();
-              if (newUrl.isNotEmpty) {
-                setState(() => _currentImageUrl = newUrl);
-                if (widget.restaurantId != null) {
-                  try {
-                    // Update table restaurants if column exists
-                    await Supabase.instance.client
-                        .from('restaurants')
-                        .update({'image_url': newUrl})
-                        .eq('id', widget.restaurantId!);
-                  } catch (_) {}
-                }
-              }
-              if (mounted) Navigator.pop(ctx);
-            },
-            child: const Text('บันทึก'),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ลบรูปภาพ'),
           ),
         ],
       ),
     );
+
+    if (confirm == true && mounted) {
+      setState(() {
+        _currentImageUrl = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ลบรูปภาพเรียบร้อยแล้ว'),
+          backgroundColor: kOwnerPrimaryColor,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  /// เมนูตัวเลือกรูปภาพสำหรับหน้าปัดร้านอาหาร (ถ่ายรูป / คลังรูป / ลบรูป)
+  void _showSwipeCardPhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'รูปภาพสำหรับหน้าปัดร้านอาหาร',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kOwnerPrimaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: kOwnerPrimaryColor),
+                ),
+                title: const Text('ถ่ายรูปภาพ', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('ถ่ายรูปอาหารหรือเมนูจากกล้องของคุณ'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picker = ImagePicker();
+                  final picked = await picker.pickImage(
+                    source: ImageSource.camera,
+                    maxWidth: 1200,
+                    maxHeight: 1200,
+                    imageQuality: 85,
+                  );
+                  if (picked != null) {
+                    await _processPickedSwipeCardPhoto(picked);
+                  }
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: kOwnerPrimaryColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: kOwnerPrimaryColor),
+                ),
+                title: const Text('เลือกจากคลังรูปภาพ', style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('เลือกรูปภาพจากเครื่องของคุณ'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final picker = ImagePicker();
+                  final picked = await picker.pickImage(
+                    source: ImageSource.gallery,
+                    maxWidth: 1200,
+                    maxHeight: 1200,
+                    imageQuality: 85,
+                  );
+                  if (picked != null) {
+                    await _processPickedSwipeCardPhoto(picked);
+                  }
+                },
+              ),
+              if (_swipeCardImageUrl != null && _swipeCardImageUrl!.isNotEmpty) ...[
+                const Divider(),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                  ),
+                  title: const Text(
+                    'ลบรูปภาพ',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.red),
+                  ),
+                  subtitle: const Text('นำรูปสำหรับหน้าปัดนี้ออก'),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    await _confirmDeleteSwipeCardPhoto();
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// ครอปรูปภาพและแปลงเป็น Data URL สำหรับหน้าปัดร้านอาหาร
+  Future<void> _processPickedSwipeCardPhoto(XFile picked) async {
+    try {
+      final rawBytes = await picked.readAsBytes();
+      if (!mounted) return;
+
+      // คำนวณขนาดของการ์ดในหน้าปัดร้านอาหารตาม FoodSwipeScreen:
+      // width = screenSize.width * 0.88, height = screenSize.height * 0.64
+      final screenSize = MediaQuery.of(context).size;
+      final double cardWidth = screenSize.width > 0 ? screenSize.width * 0.88 : (390 * 0.88);
+      final double cardHeight = screenSize.height > 0 ? screenSize.height * 0.64 : (844 * 0.64);
+      final double swipeCardAspectRatio = cardWidth / cardHeight;
+
+      // เปิดหน้าจอครอบตัดรูปภาพ (Image Crop Screen) ให้มีขนาดและสัดส่วนเท่ากับหน้าปัดร้านอาหาร
+      final croppedBytes = await Navigator.push<Uint8List>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ImageCropScreen(
+            imageBytes: rawBytes,
+            targetWidth: cardWidth,
+            targetHeight: cardHeight,
+            aspectRatio: swipeCardAspectRatio,
+            cornerRadius: 24.0, // มุมโค้งมน 24px เท่ากับการ์ดในหน้าปัดร้านอาหาร
+            subtitleTag: 'ขนาดเท่ากับหน้าปัดร้านอาหาร',
+          ),
+        ),
+      );
+
+      if (croppedBytes == null) return;
+
+      // แปลงรูปที่ครอบตัดเป็น Data URL เพื่อจัดเก็บลง database ในฟิลด์ image_url
+      String convertedUrl = 'data:image/png;base64,${base64Encode(croppedBytes)}';
+
+      // พยายามอัปโหลดเข้า Supabase Storage ถ้ามี bucket รองรับ
+      try {
+        final fileName = 'restaurant_card_${DateTime.now().millisecondsSinceEpoch}.png';
+        await Supabase.instance.client.storage.from('restaurant-images').uploadBinary(
+          fileName,
+          croppedBytes,
+          fileOptions: const FileOptions(contentType: 'image/png', upsert: true),
+        );
+        final pubUrl = Supabase.instance.client.storage.from('restaurant-images').getPublicUrl(fileName);
+        if (pubUrl.isNotEmpty) {
+          convertedUrl = pubUrl;
+        }
+      } catch (_) {}
+
+      setState(() {
+        _swipeCardImageUrl = convertedUrl;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ครอบตัดและเลือกรูปสำหรับหน้าปัดร้านอาหารเรียบร้อยแล้ว'),
+            backgroundColor: kOwnerPrimaryColor,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error processing picked swipe card photo: $e');
+    }
+  }
+
+  /// ป็อปอัพยืนยันการลบรูปภาพสำหรับหน้าปัดร้านอาหาร
+  Future<void> _confirmDeleteSwipeCardPhoto() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('ยืนยันลบรูปภาพ', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('คุณต้องการลบรูปภาพสำหรับหน้าปัดร้านอาหารนี้ใช่หรือไม่?\n(หากลบรูปนี้ จะต้องใส่รูปใหม่ก่อนจึงจะสามารถกดบันทึกได้)'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('ยกเลิก', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('ลบรูปภาพ'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true && mounted) {
+      setState(() {
+        _swipeCardImageUrl = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ลบรูปภาพเรียบร้อยแล้ว'),
+          backgroundColor: kOwnerPrimaryColor,
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  /// บันทึกข้อมูลร้านค้าทั้งหมดเข้า Database (ตาราง restaurants รูปที่ 4 และ restaurant_images รูปที่ 1)
+  Future<void> _saveAllRestaurantInfo() async {
+    final List<String> missing = [];
+
+    // เงื่อนไข: ต้องมีรูปโปรไฟล์ร้านถึงจะกดบันทึกได้
+    if (_currentImageUrl == null || _currentImageUrl!.trim().isEmpty) {
+      missing.add('รูปภาพร้านอาหาร');
+    }
+
+    // เงื่อนไขสำคัญตามที่ user กำหนด: ต้องใส่รูปสำหรับหน้าปัดร้านอาหาร (is_logo = false) ถึงจะอนุญาตให้กดบันทึก
+    if (_swipeCardImageUrl == null || _swipeCardImageUrl!.trim().isEmpty) {
+      missing.add('รูปสำหรับหน้าปัดร้านอาหาร');
+    }
+
+    // เงื่อนไข: ชื่อร้าน
+    if (_name.trim().isEmpty) {
+      missing.add('ชื่อร้านอาหาร');
+    }
+
+    // เงื่อนไข: ที่อยู่
+    if (_address.trim().isEmpty) {
+      missing.add('ที่อยู่ร้านอาหาร');
+    }
+
+    // เงื่อนไข: เบอร์โทร
+    if (_phone.trim().isEmpty) {
+      missing.add('เบอร์โทรศัพท์');
+    }
+
+    // เงื่อนไข: เวลาเปิดปิด (อย่างน้อย 1 วัน)
+    final hasOpenHours = _schedules.any((s) => !s.isClosed);
+    if (!hasOpenHours) {
+      missing.add('เวลาเปิด-ปิดร้านอาหาร (อย่างน้อย 1 วัน)');
+    }
+
+    // เงื่อนไข: สิ่งอำนวยความสะดวก (อย่างน้อย 1 อย่าง)
+    if (_amenities.isEmpty) {
+      missing.add('สิ่งอำนวยความสะดวก (อย่างน้อย 1 อย่าง)');
+    }
+
+    if (missing.isNotEmpty) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('กรุณากรอกข้อมูลให้ครบถ้วน: ${missing.join(', ')}'),
+          backgroundColor: kOwnerRedColor,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
+      if (widget.restaurantId != null) {
+        // 1. อัปเดตข้อมูลร้านเข้าตาราง restaurants (รูปที่ 4: name, address, google_maps_url, phone)
+        await Supabase.instance.client.from('restaurants').update({
+          'name': _name.trim(),
+          'address': _address.trim(),
+          'google_maps_url': _mapsUrl.trim(),
+          'phone': _phone.trim(),
+        }).eq('id', widget.restaurantId!);
+
+        // 2. อัปเดต/บันทึกรูปภาพโปรไฟล์เข้าตาราง restaurant_images (is_logo = true)
+        if (_currentImageUrl != null && _currentImageUrl!.isNotEmpty) {
+          final existingLogo = await Supabase.instance.client
+              .from('restaurant_images')
+              .select('id')
+              .eq('restaurant_id', widget.restaurantId!)
+              .eq('is_logo', true)
+              .maybeSingle();
+
+          if (existingLogo != null && existingLogo['id'] != null) {
+            await Supabase.instance.client.from('restaurant_images').update({
+              'image_url': _currentImageUrl,
+              'sort_order': 0,
+            }).eq('id', existingLogo['id']);
+          } else {
+            await Supabase.instance.client.from('restaurant_images').insert({
+              'restaurant_id': widget.restaurantId!,
+              'image_url': _currentImageUrl,
+              'is_logo': true,
+              'sort_order': 0,
+            });
+          }
+        }
+
+        // 3. อัปเดต/บันทึกรูปสำหรับหน้าปัดร้านอาหารเข้าตาราง restaurant_images (รูปที่ 1: is_logo = false)
+        if (_swipeCardImageUrl != null && _swipeCardImageUrl!.isNotEmpty) {
+          final existingCardImg = await Supabase.instance.client
+              .from('restaurant_images')
+              .select('id')
+              .eq('restaurant_id', widget.restaurantId!)
+              .eq('is_logo', false)
+              .maybeSingle();
+
+          if (existingCardImg != null && existingCardImg['id'] != null) {
+            await Supabase.instance.client.from('restaurant_images').update({
+              'image_url': _swipeCardImageUrl,
+              'is_logo': false,
+              'sort_order': 1,
+            }).eq('id', existingCardImg['id']);
+          } else {
+            await Supabase.instance.client.from('restaurant_images').insert({
+              'restaurant_id': widget.restaurantId!,
+              'image_url': _swipeCardImageUrl,
+              'is_logo': false,
+              'sort_order': 1,
+            });
+          }
+        }
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('บันทึกข้อมูลร้านค้าเรียบร้อยแล้ว'),
+            backgroundColor: kOwnerPrimaryColor,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error saving restaurant info: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาดในการบันทึก: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   /// แก้ไขที่อยู่, แผนที่, เบอร์โทร, อีเมล

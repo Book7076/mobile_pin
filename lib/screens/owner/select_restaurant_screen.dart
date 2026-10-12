@@ -6,6 +6,7 @@ import '../../main.dart';
 import '../../providers/auth_provider.dart';
 import 'owner_dashboard_screen.dart';
 import '../restaurants/open_restaurant_intro_screen.dart';
+import '../../widgets/meal_mate_logo.dart';
 
 /// สีหลักของฝั่งเจ้าของร้าน (Burgundy / Red Maroon)
 const Color kOwnerPrimaryColor = Color(0xFF7C1431);
@@ -304,21 +305,15 @@ class _SelectRestaurantScreenState extends ConsumerState<SelectRestaurantScreen>
                   ],
                 ),
 
-                // Center MealMate Cutlery Logo
-                const _PlateForkKnifeLogo(width: 68, height: 50),
-                const SizedBox(height: 12),
-
-                // "MealMate" Brand Text
-                const Text(
-                  'MealMate',
-                  style: TextStyle(
-                    fontFamily: 'Courier',
-                    fontSize: 27,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: 2.2,
-                    height: 1.0,
-                  ),
+                // Center MealMate Official App Logo (ปรับขนาดโลโก้ให้ใหญ่และเด่นกว่าตัวอักษร)
+                const MealMateLogo(
+                  size: 82,
+                  showText: true,
+                  textSize: 24,
+                  textSpacing: 10,
+                  ringColor: Colors.white,
+                  iconColor: Colors.white,
+                  animateHeart: false,
                 ),
                 const SizedBox(height: 6),
 
@@ -326,7 +321,7 @@ class _SelectRestaurantScreenState extends ConsumerState<SelectRestaurantScreen>
                 const Text(
                   'เลือกร้านของคุณ',
                   style: TextStyle(
-                    fontSize: 15,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w500,
                     color: Colors.white,
                     letterSpacing: 0.1,
@@ -650,129 +645,7 @@ class _SelectRestaurantScreenState extends ConsumerState<SelectRestaurantScreen>
 // PAINTERS
 // ============================================================================
 
-/// วาดโลโก้ MealMate รูปช้อนส้อม จานตรงกลาง และมีด (สีขาวตามภาพ mockup)
-class _PlateForkKnifeLogo extends StatelessWidget {
-  final double width;
-  final double height;
-  final Color color;
 
-  const _PlateForkKnifeLogo({
-    this.width = 68,
-    this.height = 50,
-    this.color = Colors.white,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(width, height),
-      painter: _PlateForkKnifePainter(color: color),
-    );
-  }
-}
-
-class _PlateForkKnifePainter extends CustomPainter {
-  final Color color;
-  _PlateForkKnifePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final w = size.width;
-    final h = size.height;
-
-    // 1. Center Plate: solid circular disc
-    final plateRadius = h * 0.40;
-    final plateCenter = Offset(w * 0.50, h * 0.48);
-    canvas.drawCircle(plateCenter, plateRadius, paint);
-
-    // 2. Left Fork
-    final forkCenterX = w * 0.23;
-    final forkHandleWidth = w * 0.045;
-
-    // Handle
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(forkCenterX, h * 0.72),
-          width: forkHandleWidth,
-          height: h * 0.44,
-        ),
-        const Radius.circular(2),
-      ),
-      paint,
-    );
-
-    // Base bar
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(forkCenterX, h * 0.48),
-          width: w * 0.13,
-          height: h * 0.08,
-        ),
-        const Radius.circular(2),
-      ),
-      paint,
-    );
-
-    // 3 Prongs
-    const prongs = 3;
-    final prongWidth = forkHandleWidth * 0.7;
-    final prongSpacing = (w * 0.13 - prongWidth) / (prongs - 1);
-    final prongLeft = forkCenterX - (w * 0.13) / 2 + prongWidth / 2;
-    for (int i = 0; i < prongs; i++) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            prongLeft + i * prongSpacing - prongWidth / 2,
-            h * 0.16,
-            prongWidth,
-            h * 0.32,
-          ),
-          const Radius.circular(1.5),
-        ),
-        paint,
-      );
-    }
-
-    // 3. Right Knife
-    final knifeCenterX = w * 0.77;
-
-    // Handle
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(knifeCenterX, h * 0.72),
-          width: forkHandleWidth,
-          height: h * 0.44,
-        ),
-        const Radius.circular(2),
-      ),
-      paint,
-    );
-
-    // Knife Blade: curved edge at outer top
-    final knifePath = Path();
-    knifePath.moveTo(knifeCenterX - forkHandleWidth / 2, h * 0.50);
-    knifePath.lineTo(knifeCenterX - forkHandleWidth / 2, h * 0.16);
-    knifePath.quadraticBezierTo(
-      knifeCenterX + w * 0.075,
-      h * 0.19,
-      knifeCenterX + forkHandleWidth / 2,
-      h * 0.50,
-    );
-    knifePath.close();
-    canvas.drawPath(knifePath, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _PlateForkKnifePainter oldDelegate) =>
-      oldDelegate.color != color;
-}
 
 /// วาดวงกลมเส้นประ (Dotted / Dashed Circle) สำหรับปุ่ม "เพิ่มร้านใหม่"
 class _DottedCirclePainter extends CustomPainter {

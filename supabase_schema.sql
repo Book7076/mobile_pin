@@ -116,3 +116,34 @@ CREATE POLICY "Users can insert reviews"
 ON public.reviews FOR INSERT 
 WITH CHECK (auth.uid() = user_id);
 
+-- 5. Create a table for Swipe Sessions (รูปที่ 4)
+CREATE TABLE IF NOT EXISTS public.swipe_sessions (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references public.users(id),
+  cuisine_type_id bigint references public.cuisine_types(id),
+  price_min numeric,
+  price_max numeric,
+  target_restaurant_count integer not null default 0,
+  status text not null default 'กำลังใช้', -- 'กำลังใช้' หรือ 'ปัดเสร็จแล้ว'
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Turn on Row Level Security (RLS) for swipe_sessions table
+ALTER TABLE public.swipe_sessions ENABLE ROW LEVEL SECURITY;
+
+-- Allow users to view their own swipe sessions or all if needed
+CREATE POLICY "Users can view own swipe sessions"
+ON public.swipe_sessions FOR SELECT
+USING (true);
+
+-- Allow users to insert swipe sessions
+CREATE POLICY "Users can insert swipe sessions"
+ON public.swipe_sessions FOR INSERT
+WITH CHECK (true);
+
+-- Allow users to update swipe sessions (e.g., target_restaurant_count, status)
+CREATE POLICY "Users can update swipe sessions"
+ON public.swipe_sessions FOR UPDATE
+USING (true);
+
+

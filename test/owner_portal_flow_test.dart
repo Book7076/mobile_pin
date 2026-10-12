@@ -163,7 +163,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('เพิ่มเมนูใหม่'), findsOneWidget);
-      expect(find.text('บันทึกเมนู'), findsOneWidget);
+      expect(find.text('บันทึก'), findsOneWidget);
     });
 
     testWidgets('OwnerRestaurantInfoScreen renders and allows edit mode', (tester) async {
@@ -194,6 +194,41 @@ void main() {
 
       expect(find.text('แก้ไขข้อมูลติดต่อและที่อยู่'), findsOneWidget);
       expect(find.text('บันทึกข้อมูล'), findsOneWidget);
+    });
+
+    testWidgets('OwnerRestaurantInfoScreen navigates to OwnerEditOperatingHoursScreen with burgundy header', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(430, 932));
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: OwnerRestaurantInfoScreen(
+            restaurantId: 'test-rest-id',
+            restaurantName: 'The CHICKEN Test',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Find 'เวลาเปิด - ปิดร้าน' and tap its 'แก้ไข' button (third edit button)
+      final editButtons = find.text('แก้ไข');
+      expect(editButtons, findsWidgets);
+      await tester.tap(editButtons.at(2));
+      await tester.pumpAndSettle();
+
+      // Verify we arrived at OwnerEditOperatingHoursScreen
+      expect(find.text('เวลาเปิด-ปิด'), findsOneWidget);
+      expect(find.text('บันทึก'), findsOneWidget);
+      expect(find.text('เลือกวัน'), findsOneWidget);
+      expect(find.text('เพิ่ม'), findsOneWidget);
+
+      final appBar = tester.widget<AppBar>(find.byType(AppBar));
+      expect(appBar.backgroundColor, const Color(0xFF860E33));
+
+      // Tap back button
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(OwnerRestaurantInfoScreen), findsOneWidget);
     });
 
     testWidgets('OwnerReviewsScreen renders reviews and score summary', (tester) async {

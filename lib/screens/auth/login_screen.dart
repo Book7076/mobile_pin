@@ -148,14 +148,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // เช็ค id ว่าตรงกับแถวไหนในตาราง users แล้วดึงข้อมูลรวมถึง phone และ first_name, last_name
         var userData = await supabase
             .from('users')
-            .select('id, email, phone, first_name, last_name, user_type, role')
+            .select('id, email, phone, first_name, last_name, username, image_url, user_type, role')
             .eq('id', user.id)
             .maybeSingle();
 
         if (userData == null && user.email != null && user.email!.isNotEmpty) {
           userData = await supabase
               .from('users')
-              .select('id, email, phone, first_name, last_name, user_type, role')
+              .select('id, email, phone, first_name, last_name, username, image_url, user_type, role')
               .eq('email', user.email!)
               .maybeSingle();
         }
@@ -167,6 +167,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               : (user.userMetadata?['phone']?.toString() ?? '');
           final metaFirst = (user.userMetadata?['first_name'] ?? user.userMetadata?['fname'])?.toString().trim() ?? '';
           final metaLast = (user.userMetadata?['last_name'] ?? user.userMetadata?['lname'])?.toString().trim() ?? '';
+          final authAvatar = (user.userMetadata?['image_url'] ?? user.userMetadata?['avatar_url'])?.toString().trim() ?? '';
+          final authUsername = user.userMetadata?['username']?.toString().trim() ?? '';
+
           final mergedData = Map<String, dynamic>.from(userData);
           if ((mergedData['phone'] == null || mergedData['phone'].toString().trim().isEmpty) && authPhone.isNotEmpty) {
             mergedData['phone'] = authPhone;
@@ -176,6 +179,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           }
           if ((mergedData['last_name'] == null || mergedData['last_name'].toString().trim().isEmpty) && metaLast.isNotEmpty) {
             mergedData['last_name'] = metaLast;
+          }
+          if ((mergedData['image_url'] == null || mergedData['image_url'].toString().trim().isEmpty) && authAvatar.isNotEmpty) {
+            mergedData['image_url'] = authAvatar;
+          }
+          if ((mergedData['username'] == null || mergedData['username'].toString().trim().isEmpty) && authUsername.isNotEmpty) {
+            mergedData['username'] = authUsername;
           }
           ref.read(authProvider.notifier).setUserFromMap(mergedData);
         } else {
