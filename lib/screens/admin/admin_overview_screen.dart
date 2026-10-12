@@ -33,23 +33,25 @@ class AdminOverviewScreen extends ConsumerWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'หน้าหลักแอดมิน',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: AdminTheme.primaryMaroon,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'หน้าหลักแอดมิน',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AdminTheme.primaryMaroon,
+                          ),
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'ภาพรวมระบบแอปพลิเคชัน Meaimate',
-                        style: TextStyle(fontSize: 13, color: AdminTheme.textSecondary),
-                      ),
-                    ],
+                        SizedBox(height: 4),
+                        Text(
+                          'ภาพรวมระบบแอปพลิเคชัน Meaimate',
+                          style: TextStyle(fontSize: 13, color: AdminTheme.textSecondary),
+                        ),
+                      ],
+                    ),
                   ),
                   CircleAvatar(
                     backgroundColor: AdminTheme.accentPink,

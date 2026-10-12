@@ -101,12 +101,14 @@ class _OwnerStatsScreenState extends State<OwnerStatsScreen> with SingleTickerPr
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text(
-          'ภาพรวม',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1E1E1E),
+        const Expanded(
+          child: Text(
+            'ภาพรวม',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1E1E1E),
+            ),
           ),
         ),
         GestureDetector(
@@ -403,12 +405,12 @@ class _OwnerStatsScreenState extends State<OwnerStatsScreen> with SingleTickerPr
               ],
             )
           else
-            Row(
+            Wrap(
+              spacing: 16,
+              runSpacing: 6,
               children: [
                 _buildLegendItem(kOwnerPrimaryColor, 'ผู้เข้าชม'),
-                const SizedBox(width: 16),
                 _buildLegendItem(kOwnerSecondaryColor, 'ถูกใจ'),
-                const SizedBox(width: 16),
                 _buildLegendItem(kOwnerLightRose, 'ไม่ถูกใจ'),
               ],
             ),
@@ -653,25 +655,28 @@ class _OwnerStatsScreenState extends State<OwnerStatsScreen> with SingleTickerPr
                 Center(
                   child: Column(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Text(
-                            '4.9',
-                            style: TextStyle(
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                              color: kOwnerPrimaryColor,
-                              height: 1.0,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Text(
+                              '4.9',
+                              style: TextStyle(
+                                fontSize: 36,
+                                fontWeight: FontWeight.bold,
+                                color: kOwnerPrimaryColor,
+                                height: 1.0,
+                              ),
                             ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(
-                            Icons.star_rounded,
-                            color: kOwnerPrimaryColor,
-                            size: 32,
-                          ),
-                        ],
+                            SizedBox(width: 4),
+                            Icon(
+                              Icons.star_rounded,
+                              color: kOwnerPrimaryColor,
+                              size: 32,
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       const Text(

@@ -42,17 +42,30 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
     _animController.addListener(() {
       setState(() {});
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       ref.read(restaurantsProvider.notifier).loadRestaurants();
       final session = ref.read(swipeSessionProvider);
-      if (session.currentSessionDbId == null) {
-        final criteria = ref.read(filterCriteriaProvider);
+      final criteria = ref.read(filterCriteriaProvider);
+      if (session.currentSessionDbId != null) {
+        // ดึงประเภทที่ผู้ใช้เลือกใน session นี้จากตาราง swipe_session_cuisines โดยกรองด้วย session_id
+        await ref
+            .read(swipeSessionProvider.notifier)
+            .loadSessionCuisines(session.currentSessionDbId!);
+      } else if (criteria.selectedCategories.isNotEmpty ||
+          criteria.cuisineTypeId != null) {
+        final cuisineTypeIds = criteria.selectedCategories
+            .map((cat) => mapCategoryToCuisineTypeId(cat))
+            .whereType<int>()
+            .toSet()
+            .toList();
         final cuisineTypeId = criteria.cuisineTypeId ??
-            (criteria.selectedCategories.isNotEmpty
-                ? mapCategoryToCuisineTypeId(criteria.selectedCategories.first)
-                : null);
-        ref.read(swipeSessionProvider.notifier).initSession(
+            (cuisineTypeIds.isNotEmpty ? cuisineTypeIds.first : 1);
+        if (cuisineTypeIds.isEmpty) {
+          cuisineTypeIds.add(cuisineTypeId);
+        }
+        await ref.read(swipeSessionProvider.notifier).initSession(
           cuisineTypeId: cuisineTypeId,
+          cuisineTypeIds: cuisineTypeIds,
           priceMin: criteria.minBudget,
           priceMax: criteria.maxBudget ?? 1000.0,
         );
@@ -541,23 +554,8 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
                       ),
                       const SizedBox(height: 8),
 
-                      // Category Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppConstants.burgundyPrimary,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Text(
-                          _formatCategoryLabel(restaurant),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
+                      // Category Badges (แสดงเฉพาะประเภทที่ ร้านนั้นมี และผู้ใช้เลือกไว้)
+                      _buildCategoryBadges(restaurant),
                       const SizedBox(height: 8),
 
                       // Rating & Review Count
@@ -663,27 +661,49 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
     );
   }
 
+  Widget _buildCategoryBadges(RestaurantModel restaurant) {
+    final session = ref.watch(swipeSessionProvider);
+    final criteria = ref.watch(filterCriteriaProvider);
+
+    final matchedCategories = getMatchedCuisineLabelsForRestaurant(
+      restaurant,
+      sessionCuisineTypeIds: session.sessionCuisineTypeIds,
+      selectedCategories: criteria.selectedCategories,
+    );
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 4,
+      children: matchedCategories.map((catName) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppConstants.burgundyPrimary,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            catName,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   String _formatCategoryLabel(RestaurantModel restaurant) {
-    if (restaurant.id == 'rest_shabu_mouood') {
-      return 'ชาบู/หมูกระทะ';
-    }
-    if (restaurant.id == 'rest_rawtruckr') {
-      return 'อาหารเกาหลี';
-    }
-    if (restaurant.id == 'rest_teds_coffee') {
-      return 'ร้านกาแฟ/ขนมหวาน';
-    }
-    for (final cat in restaurant.categories) {
-      for (final fc in AppConstants.flowCategories) {
-        if (fc['id'] == cat) return fc['name'] as String;
-      }
-      if (cat.contains(RegExp(r'[\u0E00-\u0E7F]'))) {
-        return cat;
-      }
-    }
-    return restaurant.categories.isNotEmpty
-        ? restaurant.categories.first
-        : 'อาหารทั่วไป';
+    final session = ref.read(swipeSessionProvider);
+    final selectedCategories =
+        ref.read(filterCriteriaProvider).selectedCategories;
+    final matchedList = getMatchedCuisineLabelsForRestaurant(
+      restaurant,
+      sessionCuisineTypeIds: session.sessionCuisineTypeIds,
+      selectedCategories: selectedCategories,
+    );
+    return matchedList.join('/');
   }
 
   /// Bottom Controls: Dislike (X), Info (i), Like (Heart) and "ถัดไป >"

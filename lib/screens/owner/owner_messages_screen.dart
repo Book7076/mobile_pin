@@ -61,7 +61,9 @@ class _OwnerMessagesScreenState extends State<OwnerMessagesScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('แชทกับ $customerName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Expanded(
+                    child: Text('แชทกับ $customerName', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
                 ],
               ),
@@ -140,9 +142,11 @@ class _OwnerMessagesScreenState extends State<OwnerMessagesScreen> {
                 ),
               ],
             ),
-            child: ListTile(
-              onTap: () => _openChatDialog(chat['customerName']),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Material(
+              color: Colors.transparent,
+              child: ListTile(
+                onTap: () => _openChatDialog(chat['customerName']),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               leading: Stack(
                 children: [
                   CircleAvatar(
@@ -197,8 +201,9 @@ class _OwnerMessagesScreenState extends State<OwnerMessagesScreen> {
                 ),
               ),
             ),
-          );
-        },
+          ),
+        );
+      },
       ),
     );
   }

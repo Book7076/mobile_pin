@@ -15,9 +15,11 @@ class AdminSettingsScreen extends StatelessWidget {
           children: const [
             Icon(Icons.logout_rounded, color: AdminTheme.primaryMaroon, size: 26),
             SizedBox(width: 8),
-            Text(
-              'ยืนยันการออกจากระบบ',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            Expanded(
+              child: Text(
+                'ยืนยันการออกจากระบบ',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
             ),
           ],
         ),
@@ -133,38 +135,43 @@ class AdminSettingsScreen extends StatelessWidget {
                     const SizedBox(width: 16),
 
                     // ข้อมูลแอดมิน
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Admin',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1E1E1E),
-                            letterSpacing: -0.2,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Admin',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E1E1E),
+                              letterSpacing: -0.2,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: const [
-                            Icon(
-                              Icons.email_outlined,
-                              size: 14,
-                              color: Color(0xFF757575),
-                            ),
-                            SizedBox(width: 6),
-                            Text(
-                              'mealmate001@gmail.com',
-                              style: TextStyle(
-                                fontSize: 13,
+                          const SizedBox(height: 5),
+                          Row(
+                            children: const [
+                              Icon(
+                                Icons.email_outlined,
+                                size: 14,
                                 color: Color(0xFF757575),
-                                fontWeight: FontWeight.w400,
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
+                              SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'mealmate001@gmail.com',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF757575),
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

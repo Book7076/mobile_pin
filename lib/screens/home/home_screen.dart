@@ -448,13 +448,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'ปัดหาร้านอาหาร',
-                      style: TextStyle(
-                        fontSize: 25,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: -0.2,
+                    const Expanded(
+                      child: Text(
+                        'ปัดหาร้านอาหาร',
+                        style: TextStyle(
+                          fontSize: 25,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          letterSpacing: -0.2,
+                        ),
                       ),
                     ),
                     // White Play / Forward Icon
@@ -484,15 +486,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                query.isEmpty
-                    ? 'แนะนำร้านอาหารสำหรับคุณ !'
-                    : 'ร้านอาหารประเภท "$_searchQuery"',
-                style: const TextStyle(
-                  fontSize: 17.5,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF6E162B),
-                  letterSpacing: -0.2,
+              Expanded(
+                child: Text(
+                  query.isEmpty
+                      ? 'แนะนำร้านอาหารสำหรับคุณ !'
+                      : 'ร้านอาหารประเภท "$_searchQuery"',
+                  style: const TextStyle(
+                    fontSize: 17.5,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF6E162B),
+                    letterSpacing: -0.2,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               if (query.isNotEmpty)

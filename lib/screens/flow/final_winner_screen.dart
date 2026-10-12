@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../models/restaurant_model.dart';
+import '../../providers/restaurant_provider.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 
 /// Screen "ร้านที่ใช่ โดนใจคุณ" (Final Winner Screen)
@@ -12,28 +14,15 @@ import '../restaurants/restaurant_detail_screen.dart';
 ///   Rating ⭐ 4.5 (120 รีวิว), and Price ฿ 150-350 บาท
 /// - Tapping the card opens RestaurantDetailScreen
 /// - Bottom circular burgundy button with white "X" to dismiss and return
-class FinalWinnerScreen extends StatelessWidget {
+class FinalWinnerScreen extends ConsumerWidget {
   final RestaurantModel restaurant;
+  final String? categoryLabel;
 
   const FinalWinnerScreen({
     super.key,
     required this.restaurant,
+    this.categoryLabel,
   });
-
-  String _formatCategory(RestaurantModel r) {
-    if (r.id == 'rest_rawtruckr') return 'อาหารเกาหลี';
-    if (r.id == 'rest_krua_pinjieng') return 'อาหารไทย';
-    if (r.id == 'rest_kuay_tiew_khun_thep') return 'อาหารไทย/ก๋วยเตี๋ยว';
-    if (r.id == 'rest_teds_coffee') return 'ร้านกาแฟ/เบเกอรี่';
-    if (r.id == 'rest_khao_soi_mae_sai') return 'อาหารไทย';
-    if (r.categories.isNotEmpty) {
-      for (final fc in AppConstants.flowCategories) {
-        if (fc['id'] == r.categories.first) return fc['name'] as String;
-      }
-      return r.categories.first;
-    }
-    return 'อาหารทั่วไป';
-  }
 
   String _getLocationBadge(RestaurantModel r) {
     if (r.locationBadge != null && r.locationBadge!.isNotEmpty) {
@@ -48,10 +37,16 @@ class FinalWinnerScreen extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final screenSize = MediaQuery.of(context).size;
     final hasImage = restaurant.imageUrls.isNotEmpty;
-    final categoryLabel = _formatCategory(restaurant);
+    final selectedCategories =
+        ref.watch(filterCriteriaProvider).selectedCategories;
+    final effectiveCategoryLabel = categoryLabel ??
+        formatRestaurantCategory(
+          restaurant,
+          selectedCategories: selectedCategories,
+        );
     final locationBadge = _getLocationBadge(restaurant);
 
     return Scaffold(
@@ -242,7 +237,7 @@ class FinalWinnerScreen extends StatelessWidget {
                                                 BorderRadius.circular(14),
                                           ),
                                           child: Text(
-                                            categoryLabel,
+                                            effectiveCategoryLabel,
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontSize: 12,

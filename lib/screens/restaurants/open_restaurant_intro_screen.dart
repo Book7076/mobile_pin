@@ -255,30 +255,33 @@ class _OpenRestaurantIntroScreenState extends State<OpenRestaurantIntroScreen> {
           ),
         ],
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF6E162B),
-              letterSpacing: -0.5,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 23,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF6E162B),
+                letterSpacing: -0.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF555555),
-              height: 1.25,
+            const SizedBox(height: 4),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF555555),
+                height: 1.25,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

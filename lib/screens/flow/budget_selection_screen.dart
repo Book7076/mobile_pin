@@ -70,32 +70,95 @@ class _BudgetSelectionScreenState extends ConsumerState<BudgetSelectionScreen> {
     });
   }
 
-  void _confirmAndProceed() {
+  Future<void> _confirmAndProceed() async {
     HapticFeedback.mediumImpact();
 
-    // Save selected categories, minBudget, maxBudget & cuisineTypeId to filter criteria provider
-    final currentCriteria = ref.read(filterCriteriaProvider);
-    final cuisineTypeId = currentCriteria.cuisineTypeId ??
-        (widget.selectedCategories.isNotEmpty
-            ? mapCategoryToCuisineTypeId(widget.selectedCategories.first)
-            : null);
+    // ก่อนสร้าง session ให้เช็กว่าผู้ใช้เลือกอย่างน้อย 1 ประเภท
+    if (widget.selectedCategories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'กรุณาเลือกประเภทอาหารอย่างน้อย 1 ประเภทก่อนเริ่มปัด',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
 
+    final currentCriteria = ref.read(filterCriteriaProvider);
+    final cuisineTypeIds = widget.selectedCategories
+        .map((cat) => mapCategoryToCuisineTypeId(cat))
+        .whereType<int>()
+        .toSet()
+        .toList();
+
+    if (cuisineTypeIds.isEmpty) {
+      final fallbackSingle = currentCriteria.cuisineTypeId ?? 1;
+      cuisineTypeIds.add(fallbackSingle);
+    }
+    final primaryFallbackId = cuisineTypeIds.first;
+
+    // Save selected categories, minBudget, maxBudget & cuisineTypeId to filter criteria provider
     ref.read(filterCriteriaProvider.notifier).state = currentCriteria.copyWith(
       selectedCategories: widget.selectedCategories,
       minBudget: _minBudget,
       maxBudget: _currentBudget,
-      cuisineTypeId: cuisineTypeId,
+      cuisineTypeId: primaryFallbackId,
     );
 
     // Reset swipe session so new session starts fresh with filtered restaurants
     ref.read(swipeSessionProvider.notifier).reset();
 
-    // Initialize swipe session in Supabase & local state
-    ref.read(swipeSessionProvider.notifier).initSession(
-      cuisineTypeId: cuisineTypeId,
-      priceMin: _minBudget,
-      priceMax: _currentBudget,
-    );
+    // Initialize swipe session in Supabase (swipe_sessions + swipe_session_cuisines) & local state
+    try {
+      await ref.read(swipeSessionProvider.notifier).initSession(
+        cuisineTypeId: primaryFallbackId,
+        cuisineTypeIds: cuisineTypeIds,
+        priceMin: _minBudget,
+        priceMax: _currentBudget,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final errorMsg = e.toString().contains('42501')
+          ? 'เกิดข้อผิดพลาดเรื่องสิทธิ์ (RLS) ของ swipe_session_cuisines กรุณาลองใหม่อีกครั้ง'
+          : 'เกิดข้อผิดพลาดในการบันทึกประเภทอาหาร กรุณาลองใหม่อีกครั้ง';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  errorMsg,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
 
     // Navigate to FoodSwipeScreen
     Navigator.of(context).push(

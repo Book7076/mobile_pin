@@ -532,8 +532,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         const SizedBox(height: 20),
 
                         // Register Link (navigates to dedicated RegisterScreen)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             const Text(
                               'ยังไม่มีบัญชีใช่ไหม? ',

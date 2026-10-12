@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pin_mobile/core/mock_data.dart';
 import 'package:pin_mobile/models/filter_criteria_model.dart';
 import 'package:pin_mobile/models/restaurant_model.dart';
 import 'package:pin_mobile/models/swipe_session_model.dart';
@@ -11,6 +12,7 @@ import 'package:pin_mobile/screens/flow/budget_selection_screen.dart';
 import 'package:pin_mobile/screens/flow/category_selection_screen.dart';
 import 'package:pin_mobile/screens/flow/finish_transition_screen.dart';
 import 'package:pin_mobile/screens/flow/food_swipe_screen.dart';
+import 'package:pin_mobile/services/swipe_session_service.dart';
 
 // 1x1 transparent PNG for mock network images
 final List<int> _kTransparentImage = [
@@ -210,7 +212,8 @@ void main() {
       expect(session.cuisineTypeId, 3);
       expect(session.priceMin, 50.0);
       expect(session.priceMax, 500.0);
-      expect(session.targetRestaurantCount, 0);
+      expect(session.targetRestaurantCount, 5);
+      expect(session.swipedCount, 0);
       expect(session.status, 'กำลังใช้');
     });
 
@@ -240,7 +243,7 @@ void main() {
       expect(find.byType(FoodSwipeScreen), findsOneWidget);
     });
 
-    testWidgets('6. FoodSwipeScreen (Image 3) allows proceeding with 1 liked restaurant and updates status to ปัดเสร็จแล้ว', (tester) async {
+    testWidgets('6. FoodSwipeScreen (Image 3) allows proceeding with 1 liked restaurant and updates status to เสร็จสิ้น', (tester) async {
       final container = ProviderContainer();
 
       await tester.pumpWidget(
@@ -260,7 +263,8 @@ void main() {
       await tester.pumpAndSettle();
 
       final sessionAfterLike = container.read(swipeSessionProvider);
-      expect(sessionAfterLike.targetRestaurantCount, 1);
+      expect(sessionAfterLike.likedRestaurants.length, 1);
+      expect(sessionAfterLike.swipedCount, 1);
       expect(sessionAfterLike.status, 'กำลังใช้');
 
       // Now tap "ถัดไป >"
@@ -272,8 +276,8 @@ void main() {
       expect(find.text('จบแล้วจ้า'), findsOneWidget);
       final sessionAfterFinish = container.read(swipeSessionProvider);
       expect(sessionAfterFinish.isSessionFinished, true);
-      expect(sessionAfterFinish.status, 'ปัดเสร็จแล้ว');
-      expect(sessionAfterFinish.targetRestaurantCount, 1);
+      expect(sessionAfterFinish.isCompleted, true);
+      expect(sessionAfterFinish.status, SwipeSessionModel.statusCompleted);
     });
 
     testWidgets('7. FoodSwipeScreen automatically navigates to result transition when 5 restaurants are liked', (tester) async {
@@ -302,9 +306,241 @@ void main() {
       expect(find.text('จบแล้วจ้า'), findsOneWidget);
 
       final session = container.read(swipeSessionProvider);
-      expect(session.targetRestaurantCount, 5);
-      expect(session.status, 'ปัดเสร็จแล้ว');
+      expect(session.likedRestaurants.length, 5);
+      expect(session.swipedCount, 5);
+      expect(session.isCompleted, true);
+      expect(session.status, SwipeSessionModel.statusCompleted);
       expect(session.isSessionFinished, true);
+    });
+
+    test('8. Swipes table model (Image 1) and swiped_count synchronization test', () {
+      final swipeRecord = SwipeRecordModel(
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        sessionId: 'session-uuid-1',
+        userId: 'user-uuid-1',
+        restaurantId: 'rest-uuid-1',
+        direction: SwipeDirection.right,
+        createdAt: DateTime.now(),
+      );
+
+      final json = swipeRecord.toJson();
+      expect(json['session_id'], 'session-uuid-1');
+      expect(json['restaurant_id'], 'rest-uuid-1');
+      expect(json['direction'], 'right');
+
+      final deserialized = SwipeRecordModel.fromJson(json);
+      expect(deserialized.sessionId, 'session-uuid-1');
+      expect(deserialized.direction, SwipeDirection.right);
+
+      // Verify pass (left) increments swiped_count
+      final notifier = SwipeSessionNotifier();
+      expect(notifier.state.swipedCount, 0);
+
+      final dummyRestaurant = MockData.restaurants.first;
+
+      notifier.pass(dummyRestaurant);
+      expect(notifier.state.swipedCount, 1);
+      expect(notifier.state.passedRestaurants.length, 1);
+      expect(notifier.state.likedRestaurants.length, 0);
+
+      notifier.like(dummyRestaurant);
+      expect(notifier.state.swipedCount, 2);
+      expect(notifier.state.likedRestaurants.length, 1);
+    });
+
+    test('9. user_food_preferences table model (Image 2) serialization test', () {
+      final pref = UserFoodPreferenceModel(
+        id: 'pref-uuid-1',
+        userId: 'user-uuid-1',
+        foodTagId: 10,
+        prefType: FoodPreferenceType.like,
+      );
+
+      final json = pref.toJson();
+      expect(json['user_id'], 'user-uuid-1');
+      expect(json['food_tag_id'], 10);
+      expect(json['pref_type'], 'like');
+
+      final parsed = UserFoodPreferenceModel.fromJson(json);
+      expect(parsed.foodTagId, 10);
+      expect(parsed.prefType, 'like');
+
+      final dislikePref = UserFoodPreferenceModel(
+        userId: 'user-uuid-2',
+        foodTagId: 4,
+        prefType: FoodPreferenceType.dislike,
+      );
+      expect(dislikePref.prefType, 'dislike');
+    });
+
+    test('10. selected_restaurants table model (Image 3) and winner is_final_choice test', () {
+      final selected = SelectedRestaurantModel(
+        sessionId: 'session-uuid-1',
+        restaurantId: 'rest_winner',
+        isFinalChoice: false,
+      );
+
+      final json = selected.toJson();
+      expect(json['session_id'], 'session-uuid-1');
+      expect(json['restaurant_id'], 'rest_winner');
+      expect(json['is_final_choice'], false);
+
+      final parsed = SelectedRestaurantModel.fromJson(json);
+      expect(parsed.isFinalChoice, false);
+
+      // Test setWinner in SwipeSessionNotifier
+      final notifier = SwipeSessionNotifier();
+      final winner = MockData.restaurants[1];
+
+      notifier.setWinner(winner);
+      expect(notifier.state.selectedWinner?.id, winner.id);
+      expect(notifier.state.isSessionFinished, true);
+      expect(notifier.state.status, SwipeSessionModel.statusCompleted);
+    });
+
+    test('11. swipe_session_cuisines table model serialization test', () {
+      final cuisineModel = SwipeSessionCuisineModel(
+        sessionId: 'session-uuid-test',
+        cuisineTypeId: 10,
+      );
+
+      final json = cuisineModel.toJson();
+      expect(json['session_id'], 'session-uuid-test');
+      expect(json['cuisine_type_id'], 10);
+
+      final parsed = SwipeSessionCuisineModel.fromJson(json);
+      expect(parsed.sessionId, 'session-uuid-test');
+      expect(parsed.cuisineTypeId, 10);
+    });
+
+    test('12. Point 1: Validation requires at least 1 cuisine type before creating session', () async {
+      expect(
+        () => SwipeSessionService.createSession(
+          cuisineTypeIds: [],
+          priceMin: 50,
+          priceMax: 300,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('13. Point 1: SwipeSessionNotifier.initSession stores multiple sessionCuisineTypeIds', () async {
+      final notifier = SwipeSessionNotifier();
+      await notifier.initSession(
+        cuisineTypeIds: [10, 15, 1], // noodles, northern_thai, thai
+        priceMin: 50,
+        priceMax: 500,
+      );
+
+      expect(notifier.state.sessionCuisineTypeIds, [10, 15, 1]);
+      // First category serves as fallback backup in cuisineTypeId
+      expect(notifier.state.cuisineTypeId, 10);
+      expect(notifier.state.priceMin, 50);
+      expect(notifier.state.priceMax, 500);
+      expect(notifier.state.status, SwipeSessionModel.statusInProgress);
+    });
+
+    test('14. Point 2: getMatchedCuisineLabelsForRestaurant displays only categories restaurant has AND user selected', () {
+      final dualRestaurant = RestaurantModel(
+        id: 'rest_dual',
+        ownerId: 'owner_1',
+        name: 'ร้านข้าวซอยป้าสาย (ก๋วยเตี๋ยวและอาหารเหนือ)',
+        address: 'เชียงใหม่',
+        lat: 18.79,
+        lng: 98.96,
+        phone: '0812345678',
+        status: 'approved',
+        categories: ['noodles', 'northern_thai', 'thai'],
+      );
+
+      final singleRestaurant = RestaurantModel(
+        id: 'rest_single',
+        ownerId: 'owner_2',
+        name: 'ร้านก๋วยเตี๋ยวเรือคุณเทพ',
+        address: 'เชียงใหม่',
+        lat: 18.79,
+        lng: 98.96,
+        phone: '0812345678',
+        status: 'approved',
+        categories: ['noodles'],
+      );
+
+      // User selected noodles (10) and northern_thai (15)
+      final userSelectedCuisineIds = [10, 15];
+
+      // Dual restaurant matches BOTH: shows both badges
+      final dualLabels = getMatchedCuisineLabelsForRestaurant(
+        dualRestaurant,
+        sessionCuisineTypeIds: userSelectedCuisineIds,
+      );
+      expect(dualLabels, contains('ก๋วยเตี๋ยว'));
+      expect(dualLabels, contains('อาหารเหนือ'));
+      expect(dualLabels.length, 2);
+
+      // Single restaurant matches ONLY noodles: shows only noodles badge
+      final singleLabels = getMatchedCuisineLabelsForRestaurant(
+        singleRestaurant,
+        sessionCuisineTypeIds: userSelectedCuisineIds,
+      );
+      expect(singleLabels, ['ก๋วยเตี๋ยว']);
+      expect(singleLabels.length, 1);
+    });
+
+    testWidgets('15. Point 2 Widget: FoodSwipeScreen displays both badges when restaurant has both matched cuisines',
+        (WidgetTester tester) async {
+      final dualRestaurant = RestaurantModel(
+        id: 'rest_dual_card',
+        ownerId: 'owner_1',
+        name: 'ร้านอาหารล้านนา ก๋วยเตี๋ยวและอาหารเหนือ',
+        address: 'เชียงใหม่',
+        lat: 18.79,
+        lng: 98.96,
+        phone: '0812345678',
+        status: 'approved',
+        categories: ['noodles', 'northern_thai'],
+        imageUrls: ['https://example.com/food.jpg'],
+        priceRange: '฿ 60 - 150',
+        rating: 4.8,
+        reviewCount: 42,
+      );
+
+      final container = ProviderContainer(
+        overrides: [
+          restaurantsProvider.overrideWith(
+              (ref) => RestaurantsNotifier()..state = [dualRestaurant]),
+          filterCriteriaProvider.overrideWith((ref) => FilterCriteriaModel(
+                selectedCategories: ['noodles', 'northern_thai'],
+                minBudget: 50.0,
+                maxBudget: 500.0,
+              )),
+          swipeSessionProvider.overrideWith((ref) {
+            final notifier = SwipeSessionNotifier();
+            notifier.state = SwipeSessionState(
+              currentSessionDbId: 'mock-session-id',
+              cuisineTypeId: 10,
+              sessionCuisineTypeIds: [10, 15],
+              priceMin: 50,
+              priceMax: 500,
+            );
+            return notifier;
+          }),
+        ],
+      );
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: const MaterialApp(
+            home: FoodSwipeScreen(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Both badges under restaurant name must be visible in UI
+      expect(find.text('ก๋วยเตี๋ยว'), findsOneWidget);
+      expect(find.text('อาหารเหนือ'), findsOneWidget);
     });
   });
 }

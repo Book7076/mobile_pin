@@ -110,8 +110,8 @@ void main() {
     // Verify prominent categories
     expect(find.text('อาหารไทย'), findsOneWidget);
     expect(find.text('อาหารญี่ปุ่น'), findsOneWidget);
-    expect(find.text('ชาบู/ฮอกพอด'), findsOneWidget);
-    expect(find.text('หมูกระทะ'), findsOneWidget);
+    expect(find.text('ปิ้งย่าง/ชาบู'), findsOneWidget);
+    expect(find.text('อาหารเหนือ'), findsOneWidget);
 
     // Tap on "อาหารไทย"
     await tester.tap(find.text('อาหารไทย'));

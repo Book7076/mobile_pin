@@ -31,9 +31,19 @@ class _SelectedRestaurantsScreenState
     final index = _selectedIndex.clamp(0, liked.length - 1);
     final winner = liked[index];
 
+    // Persist winner in swipe session and Supabase:
+    // marks `is_final_choice = true` in `selected_restaurants`
+    // and `status = 'เสร็จสิ้น'` in `swipe_sessions`
+    ref.read(swipeSessionProvider.notifier).setWinner(winner);
+
+    final categoryLabel = _formatCategoryLabel(winner);
+
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => FinalWinnerScreen(restaurant: winner),
+        builder: (_) => FinalWinnerScreen(
+          restaurant: winner,
+          categoryLabel: categoryLabel,
+        ),
       ),
     );
   }
@@ -302,21 +312,15 @@ class _SelectedRestaurantsScreenState
   }
 
   String _formatCategoryLabel(RestaurantModel restaurant) {
-    if (restaurant.id == 'rest_rawtruckr') return 'อาหารเกาหลี';
-    if (restaurant.id == 'rest_krua_pinjieng') return 'อาหารไทย/อาหารตามสั่ง';
-    if (restaurant.id == 'rest_kuay_tiew_khun_thep') return 'อาหารไทย/ก๋วยเตี๋ยว';
-    if (restaurant.id == 'rest_teds_coffee') return 'ร้านกาแฟ/เบเกอรี่';
-    if (restaurant.id == 'rest_khao_soi_mae_sai') return 'อาหารไทย';
-    if (restaurant.categories.isNotEmpty) {
-      final names = restaurant.categories.map((c) {
-        for (final fc in AppConstants.flowCategories) {
-          if (fc['id'] == c) return fc['name'] as String;
-        }
-        return c;
-      }).toList();
-      return names.join('/');
-    }
-    return 'อาหารทั่วไป';
+    final session = ref.read(swipeSessionProvider);
+    final selectedCategories =
+        ref.read(filterCriteriaProvider).selectedCategories;
+    final matched = getMatchedCuisineLabelsForRestaurant(
+      restaurant,
+      sessionCuisineTypeIds: session.sessionCuisineTypeIds,
+      selectedCategories: selectedCategories,
+    );
+    return matched.join(' • ');
   }
 
   String _formatPriceLabel(RestaurantModel restaurant) {
