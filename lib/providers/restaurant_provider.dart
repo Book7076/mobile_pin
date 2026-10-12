@@ -6,6 +6,7 @@ import '../models/filter_criteria_model.dart';
 import '../models/restaurant_model.dart';
 import '../models/review_model.dart';
 import '../models/swipe_session_model.dart';
+import '../services/review_service.dart';
 import '../services/swipe_session_service.dart';
 
 // 1. Master Restaurants List
@@ -372,6 +373,11 @@ class SwipeSessionNotifier extends StateNotifier<SwipeSessionState> {
         targetRestaurantCount: newCount,
         status: newStatus,
       );
+      SwipeSessionService.recordSwipe(
+        restaurantId: restaurant.id,
+        direction: 'right',
+        sessionId: state.currentSessionDbId,
+      );
     }
   }
 
@@ -379,6 +385,14 @@ class SwipeSessionNotifier extends StateNotifier<SwipeSessionState> {
     state = state.copyWith(
       passedRestaurants: [...state.passedRestaurants, restaurant],
     );
+
+    if (state.currentSessionDbId != null) {
+      SwipeSessionService.recordSwipe(
+        restaurantId: restaurant.id,
+        direction: 'left',
+        sessionId: state.currentSessionDbId,
+      );
+    }
   }
 
   void finishSession() {
@@ -411,10 +425,23 @@ final swipeSessionProvider =
 
 // 5. Reviews Provider
 class ReviewsNotifier extends StateNotifier<List<ReviewModel>> {
-  ReviewsNotifier() : super(MockData.reviews);
+  ReviewsNotifier() : super(const []);
+
+  Future<void> loadReviewsForRestaurant(String restaurantId) async {
+    try {
+      final dbReviews =
+          await ReviewService.fetchReviewsForRestaurant(restaurantId);
+      if (dbReviews.isNotEmpty) {
+        final others =
+            state.where((r) => r.restaurantId != restaurantId).toList();
+        state = [...dbReviews, ...others];
+      }
+    } catch (_) {}
+  }
 
   void addReview(ReviewModel review) {
-    state = [review, ...state];
+    final filtered = state.where((r) => r.id != review.id).toList();
+    state = [review, ...filtered];
   }
 
   List<ReviewModel> getReviewsForRestaurant(String restaurantId) {

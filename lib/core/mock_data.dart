@@ -559,57 +559,6 @@ class MockData {
     ),
   ];
 
-  // Initial Mock Reviews
-  static List<ReviewModel> reviews = [
-    ReviewModel(
-      id: 'rev_shabu_01',
-      restaurantId: 'rest_shabu_mouood',
-      userId: 'u_userA',
-      userName: 'UserA',
-      userAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80',
-      rating: 5.0,
-      comment: 'ร้านสะอาด มีห้องน้ำที่สะอาด สะดวกสบาย มีที่จอดรถเยอะ......',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-    ReviewModel(
-      id: 'rev_shabu_02',
-      restaurantId: 'rest_shabu_mouood',
-      userId: 'u_userB',
-      userName: 'UserB',
-      userAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80',
-      rating: 4.0,
-      comment: 'อาหารอร่อยแต่รออาหารค่อนข้างนาน......',
-      createdAt: DateTime.now().subtract(const Duration(days: 3)),
-    ),
-    ReviewModel(
-      id: 'rev_01',
-      restaurantId: 'rest_01',
-      userId: 'u_1',
-      userName: 'คุณต้น นักชิม',
-      userAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80',
-      rating: 5.0,
-      comment: 'ส้มตำไทยอร่อยมาก มะละกอกรอบสุดๆ คอหมูย่างนุ่มมาก แนะนำเลยครับ!',
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-    ),
-    ReviewModel(
-      id: 'rev_02',
-      restaurantId: 'rest_01',
-      userId: 'u_2',
-      userName: 'น้องเมย์ สายแซ่บ',
-      userAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80',
-      rating: 4.5,
-      comment: 'ต้มแซ่บรสชาติดีมากค่ะ เปรี้ยวเผ็ดกำลังดี ที่จอดรถสะดวกสบาย',
-      createdAt: DateTime.now().subtract(const Duration(days: 5)),
-    ),
-    ReviewModel(
-      id: 'rev_03',
-      restaurantId: 'rest_02',
-      userId: 'u_3',
-      userName: 'Ramen Lover',
-      userAvatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&q=80',
-      rating: 5.0,
-      comment: 'น้ำซุปกระดูกหมูเข้มข้นที่สุดในย่านทองหล่อ ชาชูพ่นไฟหอมมาก',
-      createdAt: DateTime.now().subtract(const Duration(days: 1)),
-    ),
-  ];
+  // Reviews (No mock reviews - fetched from Supabase)
+  static List<ReviewModel> reviews = [];
 }

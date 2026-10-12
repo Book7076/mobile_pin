@@ -1,10 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../models/restaurant_model.dart';
-import '../../models/review_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/restaurant_provider.dart';
+import '../../services/review_service.dart';
 
 class ReviewRestaurantScreen extends ConsumerStatefulWidget {
   final RestaurantModel restaurant;
@@ -18,18 +18,23 @@ class ReviewRestaurantScreen extends ConsumerStatefulWidget {
 class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen> {
   double _rating = 5.0;
   final _commentController = TextEditingController();
+  final _photoUrlController = TextEditingController();
   bool _isLoading = false;
 
   @override
   void dispose() {
     _commentController.dispose();
+    _photoUrlController.dispose();
     super.dispose();
   }
 
-  void _submitReview() {
+  Future<void> _submitReview() async {
     if (_commentController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาเขียนข้อความรีวิวสักนิดนึงนะ')),
+        const SnackBar(
+          content: Text('กรุณาเขียนข้อความรีวิวสักนิดนึงนะ'),
+          backgroundColor: AppConstants.burgundyPrimary,
+        ),
       );
       return;
     }
@@ -38,39 +43,64 @@ class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen>
 
     final currentUser = ref.read(authProvider);
 
-    final newReview = ReviewModel(
-      id: 'rev_${DateTime.now().millisecondsSinceEpoch}',
-      restaurantId: widget.restaurant.id,
-      userId: currentUser?.id ?? 'anon',
-      userName: currentUser?.name ?? 'นักชิม Mealmate',
-      userAvatar: currentUser?.avatarUrl,
-      rating: _rating,
-      comment: _commentController.text.trim(),
-      createdAt: DateTime.now(),
-    );
+    try {
+      final newReview = await ReviewService.submitReview(
+        restaurantId: widget.restaurant.id,
+        rating: _rating,
+        comment: _commentController.text.trim(),
+        photoUrl: _photoUrlController.text.trim().isNotEmpty
+            ? _photoUrlController.text.trim()
+            : null,
+        explicitUserId: currentUser?.id,
+        explicitUserName: currentUser?.name,
+      );
 
-    ref.read(reviewsProvider.notifier).addReview(newReview);
+      if (newReview != null) {
+        ref.read(reviewsProvider.notifier).addReview(newReview);
+      }
+    } catch (e) {
+      debugPrint('Note: Error submitting review: $e');
+    }
 
+    if (!mounted) return;
     setState(() => _isLoading = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('ขอบคุณสำหรับการรีวิว! ความคิดเห็นของคุณช่วยเหลือนักชิมท่านอื่น'),
-        backgroundColor: Colors.green,
+        backgroundColor: Color(0xFF10B981),
       ),
     );
 
-    Navigator.of(context).pop();
+    Navigator.of(context).pop(true);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('รีวิวร้านอาหาร'),
+        title: const Text(
+          'รีวิวร้านอาหาร',
+          style: TextStyle(
+            color: AppConstants.burgundyPrimary,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
         backgroundColor: Colors.white,
-        foregroundColor: AppConstants.textPrimary,
-        elevation: 0.5,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppConstants.burgundyPrimary,
+            size: 20,
+          ),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: const Color(0xFFF1F5F9), height: 1),
+        ),
       ),
       backgroundColor: const Color(0xFFF8F9FA),
       body: SingleChildScrollView(
@@ -84,6 +114,7 @@ class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen>
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Row(
                 children: [
@@ -95,8 +126,19 @@ class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen>
                             width: 60,
                             height: 60,
                             fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              width: 60,
+                              height: 60,
+                              color: const Color(0xFFF1F5F9),
+                              child: const Icon(Icons.storefront_rounded, color: AppConstants.burgundyPrimary),
+                            ),
                           )
-                        : Container(width: 60, height: 60, color: Colors.grey[200]),
+                        : Container(
+                            width: 60,
+                            height: 60,
+                            color: const Color(0xFFF1F5F9),
+                            child: const Icon(Icons.storefront_rounded, color: AppConstants.burgundyPrimary),
+                          ),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -121,7 +163,7 @@ class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen>
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             // Rating Stars
             Container(
@@ -129,6 +171,7 @@ class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen>
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Column(
                 children: [
@@ -145,12 +188,13 @@ class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen>
                         iconSize: 38,
                         icon: Icon(
                           starVal <= _rating ? Icons.star_rounded : Icons.star_border_rounded,
-                          color: Colors.amber,
+                          color: const Color(0xFFF59E0B),
                         ),
                         onPressed: () => setState(() => _rating = starVal),
                       );
                     }),
                   ),
+                  const SizedBox(height: 4),
                   Text(
                     _rating == 5.0
                         ? 'ยอดเยี่ยม ประทับใจมาก ⭐⭐⭐⭐⭐'
@@ -173,6 +217,7 @@ class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen>
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,7 +230,49 @@ class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen>
                     decoration: InputDecoration(
                       hintText: 'เมนูที่ชอบ, รสชาติ, บรรยากาศ, การบริการ...',
                       hintStyle: const TextStyle(fontSize: 13, color: AppConstants.textMuted),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppConstants.burgundyPrimary, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Optional Photo URL Box
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('รูปภาพประกอบ (ถ้ามี)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _photoUrlController,
+                    decoration: InputDecoration(
+                      hintText: 'ใส่ลิงก์รูปภาพ เช่น https://...',
+                      hintStyle: const TextStyle(fontSize: 13, color: AppConstants.textMuted),
+                      prefixIcon: const Icon(Icons.image_outlined, color: Color(0xFF8E8E93), size: 20),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: AppConstants.burgundyPrimary, width: 1.5),
+                      ),
                     ),
                   ),
                 ],
@@ -198,13 +285,18 @@ class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen>
             ElevatedButton(
               onPressed: _isLoading ? null : _submitReview,
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppConstants.primaryColor,
+                backgroundColor: AppConstants.burgundyPrimary,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
               ),
               child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                    )
                   : const Text('ส่งรีวิวร้านอาหาร', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ],

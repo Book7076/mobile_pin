@@ -2,60 +2,63 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pin_mobile/screens/admin/admin_dashboard.dart';
-import 'package:pin_mobile/screens/restaurants/restaurant_detail_screen.dart';
+import 'package:pin_mobile/services/admin_overview_service.dart';
 
 void main() {
-  testWidgets('AdminDashboard renders stats, popular restaurants list, and bottom navigation', (WidgetTester tester) async {
-    // Set a large enough surface size so all items fit
-    tester.view.physicalSize = const Size(1080, 2400);
-    tester.view.devicePixelRatio = 2.0;
+  testWidgets(
+    'AdminDashboard renders Supabase overview counts and no mock content',
+    (WidgetTester tester) async {
+      // Set a large enough surface size so all items fit
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.0;
 
-    addTearDown(() {
-      tester.view.resetPhysicalSize();
-      tester.view.resetDevicePixelRatio();
-    });
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
 
-    await tester.pumpWidget(
-      const ProviderScope(
-        child: MaterialApp(
-          home: AdminDashboard(),
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            adminOverviewStatsProvider.overrideWith(
+              (ref) async => const AdminOverviewStats(
+                approvedRestaurants: 12,
+                rejectedRestaurants: 3,
+                pendingRestaurants: 7,
+                totalUsers: 42,
+              ),
+            ),
+          ],
+          child: const MaterialApp(home: AdminDashboard()),
         ),
-      ),
-    );
+      );
+      await tester.pumpAndSettle();
 
-    // Verify Screen Title
-    expect(find.text('ภาพรวมสถิติ'), findsOneWidget);
+      // Verify Screen Title
+      expect(find.text('ภาพรวมระบบ'), findsOneWidget);
+      expect(find.text('ข้อมูลล่าสุดจาก Supabase'), findsOneWidget);
 
-    // Verify 4 Metric Cards
-    expect(find.text('อัตราการปัดขวา'), findsOneWidget);
-    expect(find.text('จำนวนผู้ใช้งานขณะนี้'), findsOneWidget);
-    expect(find.text('จำนวนการปัดทั้งหมด'), findsOneWidget);
-    expect(find.text('จำนวนที่จับคู่สำเร็จ'), findsOneWidget);
+      // Verify 4 Metric Cards
+      expect(find.text('ร้านที่อนุมัติ'), findsOneWidget);
+      expect(find.text('ร้านที่ปฏิเสธ'), findsOneWidget);
+      expect(find.text('ร้านรออนุมัติ'), findsOneWidget);
+      expect(find.text('ผู้ใช้ทั้งหมด'), findsOneWidget);
 
-    // Verify Values and Units
-    expect(find.text('คน'), findsOneWidget);
-    expect(find.text('ครั้ง'), findsNWidgets(2));
+      // Verify values returned by the data provider
+      expect(find.text('12'), findsOneWidget);
+      expect(find.text('3'), findsOneWidget);
+      expect(find.text('7'), findsOneWidget);
+      expect(find.text('42'), findsOneWidget);
+      expect(find.text('ร้าน'), findsNWidgets(3));
+      expect(find.text('คน'), findsOneWidget);
+      expect(find.text('รายการยอดฮิต'), findsNothing);
+      expect(find.text('อัตราการปัดขวา'), findsNothing);
 
-    // Verify Popular Section Title
-    expect(find.text('รายการยอดฮิต'), findsOneWidget);
-
-    // Verify Top Restaurants are listed
-    expect(find.text('RawTruckr'), findsOneWidget);
-    expect(find.text('ครัวปันเจียง'), findsOneWidget);
-    expect(find.text('ก๋วยเตี๋ยวเรือขั้นเทพ'), findsOneWidget);
-
-    // Verify Floating Bottom Navigation Bar has 4 icons
-    expect(find.byIcon(Icons.grid_view_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.storefront_outlined), findsOneWidget);
-    expect(find.byIcon(Icons.people_outline_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
-
-    // Tap on RawTruckr and verify navigation to RestaurantDetailScreen
-    await tester.tap(find.text('RawTruckr'));
-    await tester.pumpAndSettle();
-
-    expect(find.byType(RestaurantDetailScreen), findsOneWidget);
-    expect(find.text('รายละเอียดร้านค้า'), findsOneWidget);
-    expect(find.text('อันดับที่ 1'), findsOneWidget);
-  });
+      // Verify Floating Bottom Navigation Bar has 4 icons
+      expect(find.byIcon(Icons.grid_view_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.storefront_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.people_outline_rounded), findsNWidgets(2));
+      expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+    },
+  );
 }

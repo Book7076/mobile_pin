@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/approval_restaurant.dart';
 import '../../providers/restaurant_approval_provider.dart';
+import '../../services/admin_restaurant_service.dart';
 import 'approval_action_success_screen.dart';
 import 'confirm_revoke_screen.dart';
 
@@ -136,6 +137,12 @@ class RestaurantApprovalDetailScreen extends ConsumerWidget {
                           onPressed: () {
                             Navigator.pop(dialogContext); // Close dialog
                             ref.read(restaurantApprovalProvider.notifier).approveRestaurant(restaurant.id);
+                            try {
+                              final adminMatch = ref.read(adminRestaurantProvider).where((a) => a.id == restaurant.id || a.name == restaurant.name).firstOrNull;
+                              if (adminMatch != null) {
+                                ref.read(adminRestaurantProvider.notifier).approveRestaurant(adminMatch.id);
+                              }
+                            } catch (_) {}
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(
@@ -470,6 +477,12 @@ class RestaurantApprovalDetailScreen extends ConsumerWidget {
                                               selectedReason!,
                                               details: detailsController.text.trim(),
                                             );
+                                        try {
+                                          final adminMatch = ref.read(adminRestaurantProvider).where((a) => a.id == restaurant.id || a.name == restaurant.name).firstOrNull;
+                                          if (adminMatch != null) {
+                                            ref.read(adminRestaurantProvider.notifier).rejectRestaurant(adminMatch.id, selectedReason!);
+                                          }
+                                        } catch (_) {}
                                         Navigator.pushReplacement(
                                           context,
                                           MaterialPageRoute(
@@ -559,18 +572,31 @@ class RestaurantApprovalDetailScreen extends ConsumerWidget {
                             width: 80,
                             height: 80,
                             color: const Color(0xFFF9EEF2),
-                            child: Image.asset(
-                              restaurant.imageAsset,
-                              width: 80,
-                              height: 80,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                width: 80,
-                                height: 80,
-                                color: const Color(0xFFF9EEF2),
-                                child: const Icon(Icons.storefront_rounded, color: primaryBurgundy, size: 36),
-                              ),
-                            ),
+                            child: restaurant.imageAsset.startsWith('http')
+                                ? Image.network(
+                                    restaurant.imageAsset,
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      width: 80,
+                                      height: 80,
+                                      color: const Color(0xFFF9EEF2),
+                                      child: const Icon(Icons.storefront_rounded, color: primaryBurgundy, size: 36),
+                                    ),
+                                  )
+                                : Image.asset(
+                                    restaurant.imageAsset,
+                                    width: 80,
+                                    height: 80,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      width: 80,
+                                      height: 80,
+                                      color: const Color(0xFFF9EEF2),
+                                      child: const Icon(Icons.storefront_rounded, color: primaryBurgundy, size: 36),
+                                    ),
+                                  ),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -765,16 +791,27 @@ class RestaurantApprovalDetailScreen extends ConsumerWidget {
                                 width: 72,
                                 height: 72,
                                 color: const Color(0xFFF9EEF2),
-                                child: Image.asset(
-                                  menu.imageAsset,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => Container(
-                                    width: 72,
-                                    height: 72,
-                                    color: const Color(0xFFF9EEF2),
-                                    child: const Icon(Icons.fastfood_rounded, color: primaryBurgundy, size: 30),
-                                  ),
-                                ),
+                                child: menu.imageAsset.startsWith('http')
+                                    ? Image.network(
+                                        menu.imageAsset,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => Container(
+                                          width: 72,
+                                          height: 72,
+                                          color: const Color(0xFFF9EEF2),
+                                          child: const Icon(Icons.fastfood_rounded, color: primaryBurgundy, size: 30),
+                                        ),
+                                      )
+                                    : Image.asset(
+                                        menu.imageAsset,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) => Container(
+                                          width: 72,
+                                          height: 72,
+                                          color: const Color(0xFFF9EEF2),
+                                          child: const Icon(Icons.fastfood_rounded, color: primaryBurgundy, size: 30),
+                                        ),
+                                      ),
                               ),
                             ),
                             const SizedBox(width: 14),

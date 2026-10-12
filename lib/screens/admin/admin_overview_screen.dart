@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../services/admin_restaurant_service.dart';
+import '../../services/admin_overview_service.dart';
 import 'admin_theme.dart';
 
 class AdminOverviewScreen extends ConsumerWidget {
@@ -15,11 +15,12 @@ class AdminOverviewScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final restaurants = ref.watch(adminRestaurantProvider);
+    final stats = ref.watch(adminOverviewStatsProvider).asData?.value;
 
-    final pendingCount = restaurants.where((r) => r.status == 'pending').length;
-    final approvedCount = restaurants.where((r) => r.status == 'approved').length;
-    final rejectedCount = restaurants.where((r) => r.status == 'rejected').length;
+    final pendingCount = stats?.pendingRestaurants ?? 0;
+    final approvedCount = stats?.approvedRestaurants ?? 0;
+    final rejectedCount = stats?.rejectedRestaurants ?? 0;
+    final totalUsers = stats?.totalUsers ?? 0;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -47,13 +48,19 @@ class AdminOverviewScreen extends ConsumerWidget {
                       SizedBox(height: 4),
                       Text(
                         'ภาพรวมระบบแอปพลิเคชัน Meaimate',
-                        style: TextStyle(fontSize: 13, color: AdminTheme.textSecondary),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AdminTheme.textSecondary,
+                        ),
                       ),
                     ],
                   ),
                   CircleAvatar(
                     backgroundColor: AdminTheme.accentPink,
-                    child: const Icon(Icons.security_rounded, color: AdminTheme.primaryMaroon),
+                    child: const Icon(
+                      Icons.security_rounded,
+                      color: AdminTheme.primaryMaroon,
+                    ),
                   ),
                 ],
               ),
@@ -85,7 +92,11 @@ class AdminOverviewScreen extends ConsumerWidget {
                           color: Colors.white.withOpacity(0.18),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 24),
+                        child: const Icon(
+                          Icons.notifications_active_rounded,
+                          color: Colors.white,
+                          size: 24,
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -103,7 +114,10 @@ class AdminOverviewScreen extends ConsumerWidget {
                             const SizedBox(height: 2),
                             const Text(
                               'กรุณาตรวจสอบและอนุมัติร้านค้าใหม่',
-                              style: TextStyle(color: Colors.white70, fontSize: 12.5),
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12.5,
+                              ),
                             ),
                           ],
                         ),
@@ -113,10 +127,18 @@ class AdminOverviewScreen extends ConsumerWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: AdminTheme.primaryMaroon,
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
-                        child: const Text('ตรวจสอบ', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'ตรวจสอบ',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),
@@ -183,7 +205,7 @@ class AdminOverviewScreen extends ConsumerWidget {
                 title: 'จัดการผู้ใช้งาน',
                 subtitle: 'ดูรายชื่อและจัดการสิทธิ์การเข้าใช้งาน',
                 icon: Icons.group_rounded,
-                badgeText: '5 บัญชี',
+                badgeText: '$totalUsers บัญชี',
                 onTap: onNavigateToUsers,
               ),
             ],
@@ -227,7 +249,10 @@ class AdminOverviewScreen extends ConsumerWidget {
               const SizedBox(height: 4),
               Text(
                 title,
-                style: const TextStyle(fontSize: 12, color: AdminTheme.textSecondary),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AdminTheme.textSecondary,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],

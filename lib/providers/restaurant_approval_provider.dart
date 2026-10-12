@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/approval_restaurant.dart';
+import '../models/restaurant_admin_model.dart';
 
 class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>> {
   RestaurantApprovalNotifier() : super(_initialRestaurants);
@@ -330,22 +333,33 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
 
   /// Approve a pending restaurant.
   /// Moves status from 'pending' to 'approved'.
-  void approveRestaurant(String restaurantId) {
+  Future<void> approveRestaurant(String restaurantId) async {
     state = [
       for (final r in state)
         if (r.id == restaurantId || (restaurantId == 'res-01' && r.name == 'Kohatsu Matcha'))
           r.copyWith(
             status: 'approved',
-            lastUpdated: '2 ส.ค. 2569',
+            rejectionReason: null,
+            rejectionDetails: null,
+            lastUpdated: 'วันนี้',
           )
         else
           r,
     ];
+
+    try {
+      await Supabase.instance.client
+          .from('restaurants')
+          .update({'status': 'approved', 'rejection_reason': null})
+          .eq('id', restaurantId);
+    } catch (e) {
+      debugPrint('Note: Error updating approved status in Supabase: $e');
+    }
   }
 
   /// Reject a pending restaurant with reason and optional details.
   /// Moves status from 'pending' to 'rejected'.
-  void rejectRestaurant(String restaurantId, String reason, {String? details}) {
+  Future<void> rejectRestaurant(String restaurantId, String reason, {String? details}) async {
     state = [
       for (final r in state)
         if (r.id == restaurantId ||
@@ -356,16 +370,28 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
             status: 'rejected',
             rejectionReason: reason.trim(),
             rejectionDetails: details?.trim(),
-            lastUpdated: '09.00 น.',
+            lastUpdated: 'วันนี้',
             revokedAt: DateTime.now(),
           )
         else
           r,
     ];
+
+    try {
+      await Supabase.instance.client
+          .from('restaurants')
+          .update({
+            'status': 'rejected',
+            'rejection_reason': reason.trim(),
+          })
+          .eq('id', restaurantId);
+    } catch (e) {
+      debugPrint('Note: Error updating rejected status in Supabase: $e');
+    }
   }
 
   /// Revoke approval for an already approved restaurant.
-  void revokeApproval(String restaurantId, String reason) {
+  Future<void> revokeApproval(String restaurantId, String reason) async {
     state = [
       for (final r in state)
         if (r.id == restaurantId ||
@@ -374,16 +400,28 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
           r.copyWith(
             status: 'rejected',
             rejectionReason: reason.trim(),
-            lastUpdated: '09.00 น.',
+            lastUpdated: 'วันนี้',
             revokedAt: DateTime.now(),
           )
         else
           r,
     ];
+
+    try {
+      await Supabase.instance.client
+          .from('restaurants')
+          .update({
+            'status': 'rejected',
+            'rejection_reason': reason.trim(),
+          })
+          .eq('id', restaurantId);
+    } catch (e) {
+      debugPrint('Note: Error updating revoke status in Supabase: $e');
+    }
   }
 
   /// Cancel rejection (moves from rejected back to pending).
-  void cancelRejection(String restaurantId) {
+  Future<void> cancelRejection(String restaurantId) async {
     state = [
       for (final r in state)
         if (r.id == restaurantId ||
@@ -394,11 +432,66 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
             status: 'pending',
             rejectionReason: null,
             rejectionDetails: null,
-            lastUpdated: '3 ส.ค. 2569',
+            lastUpdated: 'วันนี้',
           )
         else
           r,
     ];
+
+    try {
+      await Supabase.instance.client
+          .from('restaurants')
+          .update({
+            'status': 'pending',
+            'rejection_reason': null,
+          })
+          .eq('id', restaurantId);
+    } catch (e) {
+      debugPrint('Note: Error cancelling rejection in Supabase: $e');
+    }
+  }
+
+  /// Refresh / Load real restaurant data from Supabase
+  Future<void> loadFromSupabase() async {
+    try {
+      const selectQuery =
+          '*, restaurant_images(*), cuisine_types(*), users!owner_id(first_name, last_name, email, phone), operating_hours(*), menu_items(*)';
+      dynamic response;
+      try {
+        response = await Supabase.instance.client
+            .from('restaurants')
+            .select(selectQuery)
+            .order('crated_at', ascending: false);
+      } catch (_) {
+        try {
+          response = await Supabase.instance.client
+              .from('restaurants')
+              .select(selectQuery)
+              .order('created_at', ascending: false);
+        } catch (_) {
+          try {
+            response = await Supabase.instance.client
+                .from('restaurants')
+                .select(selectQuery);
+          } catch (_) {
+            response = await Supabase.instance.client.from('restaurants').select();
+          }
+        }
+      }
+
+      if (response != null && response is List && response.isNotEmpty) {
+        final List<ApprovalRestaurant> loaded = [];
+        for (final item in response) {
+          final adminModel = RestaurantAdminModel.fromJson(Map<String, dynamic>.from(item));
+          loaded.add(ApprovalRestaurant.fromAdminModel(adminModel));
+        }
+        if (loaded.isNotEmpty) {
+          state = loaded;
+        }
+      }
+    } catch (e) {
+      debugPrint('Note: Error fetching approval restaurants from Supabase: $e');
+    }
   }
 
   /// Reset state to initial mock data
@@ -409,7 +502,9 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
 
 final restaurantApprovalProvider =
     StateNotifierProvider<RestaurantApprovalNotifier, List<ApprovalRestaurant>>((ref) {
-  return RestaurantApprovalNotifier();
+  final notifier = RestaurantApprovalNotifier();
+  notifier.loadFromSupabase();
+  return notifier;
 });
 
 /// Search filter provider for store management tab

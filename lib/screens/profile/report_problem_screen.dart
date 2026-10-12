@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../core/mock_data.dart';
 import '../../main.dart';
+import '../../services/report_service.dart';
 import 'report_problem_success_screen.dart';
 
 /// Data model representing each of the 4 problem categories
@@ -29,10 +30,10 @@ class ReportProblemScreen extends StatefulWidget {
   final String? initialCategory;
   final String? initialRestaurant;
 
-  /// The 4 standard, professional problem categories for MealMate
+  /// The 4 standard, professional problem categories matching Supabase `report_types.code`
   static const List<ReportCategory> categories = [
     ReportCategory(
-      id: 'store_info',
+      id: 'wrong_info',
       title: 'ข้อมูลร้านค้าไม่ถูกต้อง',
       subtitle: 'ชื่อร้าน เมนู ราคา เวลาเปิด-ปิด พิกัด หรือเบอร์โทรศัพท์',
       icon: Icons.storefront_outlined,
@@ -41,7 +42,7 @@ class ReportProblemScreen extends StatefulWidget {
       isRestaurantRecommended: true,
     ),
     ReportCategory(
-      id: 'store_closed',
+      id: 'not_found',
       title: 'ร้านค้าปิดหรือไม่พบร้าน',
       subtitle: 'ร้านปิดถาวร ปิดชั่วคราว ย้ายที่ตั้ง หรือค้นหาตามพิกัดไม่พบ',
       icon: Icons.location_off_outlined,
@@ -98,7 +99,11 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     final initial = widget.initialCategory;
     if (initial != null && initial.isNotEmpty) {
       _selectedCategory = ReportProblemScreen.categories.firstWhere(
-        (c) => c.title == initial || c.id == initial,
+        (c) =>
+            c.title == initial ||
+            c.id == initial ||
+            (initial == 'store_info' && c.id == 'wrong_info') ||
+            (initial == 'store_closed' && c.id == 'not_found'),
         orElse: () => ReportProblemScreen.categories[0],
       );
     } else {
@@ -465,7 +470,7 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   }
 
   /// Submit problem report with validation & confirmation dialog
-  void _submitReport() {
+  Future<void> _submitReport() async {
     FocusScope.of(context).unfocus();
 
     if (_detailController.text.trim().isEmpty) {
@@ -493,21 +498,28 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
 
     setState(() => _isSubmitting = true);
 
-    // Simulate quick professional submission delay
-    Future.delayed(const Duration(milliseconds: 350), () {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-
-      // Navigate to full-screen ReportProblemSuccessScreen matching the reference design
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => ReportProblemSuccessScreen(
-            category: _selectedCategory.title,
-            restaurant: _restaurantController.text.trim(),
-          ),
-        ),
+    try {
+      await ReportService.submitReport(
+        category: _selectedCategory.id,
+        description: _detailController.text.trim(),
+        restaurantName: _restaurantController.text.trim(),
       );
-    });
+    } catch (e) {
+      debugPrint('Note: Error submitting report to DB: $e');
+    }
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    // Navigate to full-screen ReportProblemSuccessScreen matching the reference design
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ReportProblemSuccessScreen(
+          category: _selectedCategory.title,
+          restaurant: _restaurantController.text.trim(),
+        ),
+      ),
+    );
   }
 
   @override

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/admin_restaurant_service.dart';
+import '../../services/report_service.dart';
 import 'admin_theme.dart';
 import 'restaurant_detail_screen.dart';
 
@@ -57,9 +58,13 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
   // ค้นหา
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  bool _isLoading = false;
 
-  // รายการ Mockup รายงานปัญหาจากผู้ใช้งาน 5 รายการที่สมจริง ครบทุกหมวดหมู่และสถานะ
-  final List<AdminProblemReport> _reports = [
+  // รายการรายงานปัญหาจากฐานข้อมูลจริง
+  final List<AdminProblemReport> _reports = [];
+
+  // ข้อมูลตั้งต้นสำหรับ Offline / Test Environment
+  static final List<AdminProblemReport> _mockFallbackReports = [
     AdminProblemReport(
       id: 'REP-2026-001',
       userName: 'Kodomo',
@@ -136,6 +141,73 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
       adminNote: '',
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    if (!ReportService.isSupabaseAvailable) {
+      _reports.addAll(_mockFallbackReports);
+    } else {
+      _loadReportsFromDatabase();
+    }
+  }
+
+  /// โหลดข้อมูลรายงานปัญหาจริงจาก Supabase
+  Future<void> _loadReportsFromDatabase() async {
+    if (!ReportService.isSupabaseAvailable) return;
+    if (mounted) setState(() => _isLoading = true);
+
+    try {
+      final dbReports = await ReportService.fetchReports();
+      if (mounted) {
+        setState(() {
+          _reports.clear();
+          for (final r in dbReports) {
+            final categoryTitle = r.categoryDisplayTitle;
+            final icon = r.categoryIcon;
+
+            final dateStr = r.createAt != null
+                ? _formatThaiDateTime(r.createAt!)
+                : 'ไม่ระบุเวลา';
+
+            _reports.add(AdminProblemReport(
+              id: r.id,
+              userName: r.userName ?? (r.contactEmail?.isNotEmpty == true ? r.contactEmail! : 'ผู้ใช้งาน'),
+              userEmail: r.contactEmail ?? '',
+              userPhone: r.userPhone ?? '-',
+              categoryId: r.category,
+              categoryTitle: categoryTitle,
+              categoryIcon: icon,
+              restaurantName: r.restaurantName ?? '-',
+              restaurantId: r.restaurantId,
+              description: r.description,
+              reportedAt: dateStr,
+              status: r.status,
+              adminNote: r.adminNote ?? '',
+            ));
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Note: Error loading reports from DB: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  static String _formatThaiDateTime(DateTime dt) {
+    const months = [
+      'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+      'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'
+    ];
+    final thaiYear = dt.year > 2500 ? dt.year : dt.year + 543;
+    final monthName = (dt.month >= 1 && dt.month <= 12) ? months[dt.month - 1] : '';
+    final timeStr =
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')} น.';
+    return '${dt.day} $monthName $thaiYear • $timeStr';
+  }
 
   @override
   void dispose() {
@@ -451,6 +523,11 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
             report.status = newStatus;
             report.adminNote = newNote;
           });
+          ReportService.updateReportStatus(
+            reportId: report.id,
+            status: newStatus,
+            adminNote: newNote,
+          );
         },
       ),
     );
@@ -608,48 +685,72 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
 
             // 4. รายการการ์ดรายงานปัญหา (Report Cards List)
             Expanded(
-              child: filtered.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.assignment_turned_in_outlined,
-                            size: 56,
-                            color: Colors.grey.shade400,
-                          ),
-                          const SizedBox(height: 12),
-                          const Text(
-                            'ไม่พบรายงานปัญหาในหมวดหมู่นี้',
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              color: Color(0xFF757575),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          if (_searchQuery.isNotEmpty)
-                            TextButton(
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _searchQuery = '';
-                                  _selectedStatusFilter = 'all';
-                                });
-                              },
-                              child: const Text('ล้างการค้นหา'),
-                            ),
-                        ],
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AdminTheme.primaryMaroon,
                       ),
                     )
-                  : ListView.builder(
-                      padding: const EdgeInsets.only(top: 4, bottom: 95),
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        final report = filtered[index];
-                        return _buildReportCard(report);
-                      },
+                  : filtered.isEmpty
+                      ? RefreshIndicator(
+                          color: AdminTheme.primaryMaroon,
+                          onRefresh: _loadReportsFromDatabase,
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(
+                              parent: BouncingScrollPhysics(),
+                            ),
+                            children: [
+                              SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+                              Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.assignment_turned_in_outlined,
+                                      size: 56,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'ไม่พบรายงานปัญหาในหมวดหมู่นี้',
+                                      style: TextStyle(
+                                        fontSize: 14.5,
+                                        color: Color(0xFF757575),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    if (_searchQuery.isNotEmpty)
+                                      TextButton(
+                                        onPressed: () {
+                                          _searchController.clear();
+                                          setState(() {
+                                            _searchQuery = '';
+                                            _selectedStatusFilter = 'all';
+                                          });
+                                        },
+                                        child: const Text('ล้างการค้นหา'),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : RefreshIndicator(
+                          color: AdminTheme.primaryMaroon,
+                          onRefresh: _loadReportsFromDatabase,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.only(top: 4, bottom: 95),
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        itemCount: filtered.length,
+                        itemBuilder: (context, index) {
+                          final report = filtered[index];
+                          return _buildReportCard(report);
+                        },
+                      ),
                     ),
             ),
           ],

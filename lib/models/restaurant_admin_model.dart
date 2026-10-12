@@ -186,6 +186,30 @@ class RestaurantAdminModel {
     Map<String, String>? parsedOpeningHours;
     if (json['opening_hours'] != null && json['opening_hours'] is Map) {
       parsedOpeningHours = Map<String, String>.from(json['opening_hours'] as Map);
+    } else if (json['operating_hours'] != null && json['operating_hours'] is List) {
+      parsedOpeningHours = {};
+      const dayNames = {
+        1: 'จันทร์',
+        2: 'อังคาร',
+        3: 'พุธ',
+        4: 'พฤหัสบดี',
+        5: 'ศุกร์',
+        6: 'เสาร์',
+        7: 'อาทิตย์',
+      };
+      for (final h in (json['operating_hours'] as List)) {
+        if (h is Map) {
+          final dayNum = h['day_of_week'] as int? ?? 1;
+          final dayName = dayNames[dayNum] ?? 'วัน $dayNum';
+          if (h['is_closed'] == true) {
+            parsedOpeningHours[dayName] = 'ปิดทำการ';
+          } else {
+            final openStr = (h['open_time']?.toString() ?? '08:00').substring(0, 5).replaceAll(':', '.');
+            final closeStr = (h['close_time']?.toString() ?? '20:00').substring(0, 5).replaceAll(':', '.');
+            parsedOpeningHours[dayName] = '$openStr - $closeStr';
+          }
+        }
+      }
     }
 
     List<String>? parsedAmenities;
@@ -193,20 +217,80 @@ class RestaurantAdminModel {
       parsedAmenities = List<String>.from(json['amenities'] as List);
     }
 
+    // Resolve ownerName from users relation if needed
+    String ownerName = json['owner_name'] as String? ?? '';
+    if (ownerName.isEmpty && json['users'] != null && json['users'] is Map) {
+      final u = json['users'] as Map;
+      final first = u['first_name']?.toString() ?? '';
+      final last = u['last_name']?.toString() ?? '';
+      ownerName = '$first $last'.trim();
+    }
+    if (ownerName.isEmpty) ownerName = 'ผู้ประกอบการ';
+
+    // Resolve category from cuisine_types relation if needed
+    String? category = json['category'] as String?;
+    if (category == null || category.isEmpty) {
+      if (json['cuisine_types'] != null && json['cuisine_types'] is Map) {
+        category = json['cuisine_types']['name']?.toString();
+      }
+    }
+
+    // Resolve imageUrl from restaurant_images relation if needed
+    String? imageUrl = json['image_url'] as String?;
+    if (imageUrl == null || imageUrl.isEmpty) {
+      if (json['restaurant_images'] != null && json['restaurant_images'] is List) {
+        final imgList = (json['restaurant_images'] as List).whereType<Map>().toList();
+        final logo = imgList.firstWhere(
+          (m) => m['is_logo'] == true || m['is_logo'] == 1,
+          orElse: () => imgList.isNotEmpty ? imgList.first : {},
+        );
+        imageUrl = logo['image_url']?.toString();
+        if (imageUrl == null || imageUrl.isEmpty) {
+          if (imgList.isNotEmpty) {
+            imageUrl = imgList.first['image_url']?.toString();
+          }
+        }
+      }
+    }
+    if (imageUrl == null || imageUrl.isEmpty) {
+      if (parsedMenuItems.isNotEmpty && parsedMenuItems.first.imageUrl != null) {
+        imageUrl = parsedMenuItems.first.imageUrl;
+      }
+    }
+
+    // Resolve phone & email from users if empty
+    String phone = json['phone'] as String? ?? '';
+    if (phone.isEmpty && json['users'] != null && json['users'] is Map) {
+      phone = json['users']['phone']?.toString() ?? '';
+    }
+    String? email = json['email'] as String?;
+    if ((email == null || email.isEmpty) && json['users'] != null && json['users'] is Map) {
+      email = json['users']['email']?.toString();
+    }
+
+    // Resolve store code
+    String? storeCode = json['store_code'] as String?;
+    if (storeCode == null || storeCode.isEmpty) {
+      final idStr = json['id']?.toString() ?? '';
+      if (idStr.isNotEmpty) {
+        storeCode = '111U${idStr.length >= 4 ? idStr.substring(0, 4).toUpperCase() : '0000'}';
+      }
+    }
+
     return RestaurantAdminModel(
       id: json['id'] as String? ?? '',
       ownerId: json['owner_id'] as String? ?? '',
-      ownerName: json['owner_name'] as String? ?? 'ผู้ประกอบการ',
+      ownerName: ownerName,
       name: json['name'] as String? ?? '',
-      storeCode: json['store_code'] as String?,
+      storeCode: storeCode,
       address: json['address'] as String? ?? '',
       mapUrl: (json['google_maps_url'] ?? json['map_url'])?.toString(),
       lat: (json['lat'] as num?)?.toDouble() ?? 18.7883,
       lng: (json['lng'] as num?)?.toDouble() ?? 98.9853,
-      phone: json['phone'] as String? ?? '',
-      email: json['email'] as String?,
+      phone: phone,
+      email: email,
       menu: json['menu'] as String?,
-      imageUrl: json['image_url'] as String?,
+      imageUrl: imageUrl,
       status: json['status'] as String? ?? 'pending',
       createdAt: (json['crated_at'] != null
               ? DateTime.tryParse(json['crated_at'].toString())
@@ -220,7 +304,7 @@ class RestaurantAdminModel {
       requestSubmittedDate: json['request_submitted_date'] != null
           ? DateTime.tryParse(json['request_submitted_date'] as String)
           : null,
-      category: json['category'] as String?,
+      category: category,
       documentUrl: json['document_url'] as String?,
       openingHours: parsedOpeningHours,
       amenities: parsedAmenities,
