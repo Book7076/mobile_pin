@@ -219,12 +219,11 @@ void main() {
     expect(find.text('฿249'), findsOneWidget);
     expect(find.text('กุ้งดอง'), findsOneWidget);
 
-    // 7. Reviews Section
+    // 7. Reviews Section (Mock reviews removed -> displays empty state card matching Image 1)
     expect(find.text('รีวิวร้านอาหาร'), findsOneWidget);
-    expect(find.text('UserA'), findsOneWidget);
-    expect(find.textContaining('ร้านสะอาด มีห้องน้ำที่สะอาด'), findsOneWidget);
-    expect(find.text('UserB'), findsOneWidget);
-    expect(find.textContaining('อาหารอร่อยแต่รออาหารค่อนข้างนาน'), findsOneWidget);
+    expect(find.text('ยังไม่มีรีวิวสำหรับร้านนี้ เป็นคนแรกที่รีวิวเลย!'), findsOneWidget);
+    expect(find.text('UserA'), findsNothing);
+    expect(find.text('UserB'), findsNothing);
   });
 
   testWidgets('RestaurantDetailScreen tapping "เมนูทั้งหมด" navigates to RestaurantAllMenuScreen', (tester) async {

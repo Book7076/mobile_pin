@@ -7,6 +7,7 @@ import '../models/filter_criteria_model.dart';
 import '../models/restaurant_model.dart';
 import '../models/review_model.dart';
 import '../models/swipe_session_model.dart';
+import '../services/review_service.dart';
 import '../services/swipe_session_service.dart';
 
 // 1. Master Restaurants List
@@ -27,13 +28,17 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
         try {
           response = await supabase
               .from('restaurants')
-              .select('*, restaurant_images(*), cuisine_types(*), menu_items(*)')
+              .select(
+                '*, restaurant_images(*), cuisine_types(*), menu_items(*)',
+              )
               .order('created_at', ascending: false);
         } catch (_) {
           try {
             response = await supabase
                 .from('restaurants')
-                .select('*, restaurant_images(*), cuisine_types(*), menu_items(*)');
+                .select(
+                  '*, restaurant_images(*), cuisine_types(*), menu_items(*)',
+                );
           } catch (_) {
             try {
               response = await supabase
@@ -70,7 +75,7 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
   Future<void> updateRestaurant(RestaurantModel updated) async {
     state = [
       for (final r in state)
-        if (r.id == updated.id) updated else r
+        if (r.id == updated.id) updated else r,
     ];
     try {
       await supabase
@@ -80,13 +85,17 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
     } catch (_) {}
   }
 
-  Future<void> updateRestaurantStatus(String id, String newStatus, {String? rejectionReason}) async {
+  Future<void> updateRestaurantStatus(
+    String id,
+    String newStatus, {
+    String? rejectionReason,
+  }) async {
     state = [
       for (final r in state)
         if (r.id == id)
           r.copyWith(status: newStatus, rejectionReason: rejectionReason)
         else
-          r
+          r,
     ];
     try {
       final updateData = <String, dynamic>{'status': newStatus};
@@ -100,7 +109,7 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
   void toggleFavorite(String id) {
     state = [
       for (final r in state)
-        if (r.id == id) r.copyWith(isFavorite: !r.isFavorite) else r
+        if (r.id == id) r.copyWith(isFavorite: !r.isFavorite) else r,
     ];
   }
 
@@ -110,7 +119,7 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
         if (r.id == restaurantId)
           r.copyWith(signatureDishes: [...r.signatureDishes, dish])
         else
-          r
+          r,
     ];
   }
 
@@ -121,23 +130,24 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
           r.copyWith(
             signatureDishes: [
               for (int i = 0; i < r.signatureDishes.length; i++)
-                if (i != dishIndex) r.signatureDishes[i]
+                if (i != dishIndex) r.signatureDishes[i],
             ],
           )
         else
-          r
+          r,
     ];
   }
 }
 
 final restaurantsProvider =
     StateNotifierProvider<RestaurantsNotifier, List<RestaurantModel>>((ref) {
-  return RestaurantsNotifier();
-});
+      return RestaurantsNotifier();
+    });
 
 // 2. Filter Criteria Provider
-final filterCriteriaProvider =
-    StateProvider<FilterCriteriaModel>((ref) => FilterCriteriaModel());
+final filterCriteriaProvider = StateProvider<FilterCriteriaModel>(
+  (ref) => FilterCriteriaModel(),
+);
 
 // 3. Filtered Restaurants for Swipe & Discover
 bool checkCategoryMatch(String selectedCat, List<String> restaurantCategories) {
@@ -148,33 +158,175 @@ bool checkCategoryMatch(String selectedCat, List<String> restaurantCategories) {
 
   // Category alias mappings between Flow categories and database cuisine types
   const aliases = <String, List<String>>{
-    'thai': ['อาหารไทย', 'thai', 'somtum_isan', 'northern_thai', 'southern_thai', 'a_la_carte', 'street_food', 'made_to_order', 'อาหารอีสาน', 'อาหารเหนือ', 'อาหารใต้'],
-    'อาหารไทย': ['thai', 'somtum_isan', 'northern_thai', 'southern_thai', 'a_la_carte', 'street_food', 'made_to_order', 'อาหารอีสาน', 'อาหารเหนือ', 'อาหารใต้'],
+    'thai': [
+      'อาหารไทย',
+      'thai',
+      'somtum_isan',
+      'northern_thai',
+      'southern_thai',
+      'a_la_carte',
+      'street_food',
+      'made_to_order',
+      'อาหารอีสาน',
+      'อาหารเหนือ',
+      'อาหารใต้',
+    ],
+    'อาหารไทย': [
+      'thai',
+      'somtum_isan',
+      'northern_thai',
+      'southern_thai',
+      'a_la_carte',
+      'street_food',
+      'made_to_order',
+      'อาหารอีสาน',
+      'อาหารเหนือ',
+      'อาหารใต้',
+    ],
     'japanese': ['อาหารญี่ปุ่น', 'japanese'],
     'อาหารญี่ปุ่น': ['japanese'],
     'chinese': ['อาหารจีน', 'chinese'],
     'อาหารจีน': ['chinese'],
     'korean': ['อาหารเกาหลี', 'korean'],
     'อาหารเกาหลี': ['korean'],
-    'shabu_hotpot': ['ชาบู/ฮอกพอด', 'ปิ้งย่าง/ชาบู', 'shabu_grill', 'mookata', 'buffet', 'shabu_hotpot', 'หมูกระทะ', 'ชาบู / ปิ้งย่าง / หมูกระทะ'],
-    'ชาบู/ฮอกพอด': ['shabu_hotpot', 'ปิ้งย่าง/ชาบู', 'shabu_grill', 'mookata', 'buffet', 'หมูกระทะ'],
-    'mookata': ['หมูกระทะ', 'ปิ้งย่าง/ชาบู', 'shabu_grill', 'shabu_hotpot', 'buffet', 'mookata', 'ชาบู/ฮอกพอด', 'ชาบู / ปิ้งย่าง / หมูกระทะ'],
-    'หมูกระทะ': ['mookata', 'ปิ้งย่าง/ชาบู', 'shabu_grill', 'shabu_hotpot', 'buffet', 'ชาบู/ฮอกพอด'],
-    'healthy': ['อาหารสุขภาพ', 'อาหารมังสวิรัติ', 'อาหารฮาลาล', 'healthy_clean', 'healthy', 'vegetarian', 'halal', 'อาหารคลีน / สุขภาพ'],
-    'อาหารสุขภาพ': ['healthy', 'อาหารมังสวิรัติ', 'อาหารฮาลาล', 'healthy_clean', 'vegetarian'],
-    'fast_food': ['ฟาสต์ฟู้ด', 'อาหารฟาสฟู้ด', 'อาหารอิตาเลียน', 'fastfood', 'fast_food', 'italian_western', 'ฟาสต์ฟู้ด / เบอร์เกอร์'],
-    'ฟาสต์ฟู้ด': ['fast_food', 'อาหารฟาสฟู้ด', 'อาหารอิตาเลียน', 'fastfood', 'italian_western'],
+    'shabu_hotpot': [
+      'ชาบู/ฮอกพอด',
+      'ปิ้งย่าง/ชาบู',
+      'shabu_grill',
+      'mookata',
+      'buffet',
+      'shabu_hotpot',
+      'หมูกระทะ',
+      'ชาบู / ปิ้งย่าง / หมูกระทะ',
+    ],
+    'ชาบู/ฮอกพอด': [
+      'shabu_hotpot',
+      'ปิ้งย่าง/ชาบู',
+      'shabu_grill',
+      'mookata',
+      'buffet',
+      'หมูกระทะ',
+    ],
+    'mookata': [
+      'หมูกระทะ',
+      'ปิ้งย่าง/ชาบู',
+      'shabu_grill',
+      'shabu_hotpot',
+      'buffet',
+      'mookata',
+      'ชาบู/ฮอกพอด',
+      'ชาบู / ปิ้งย่าง / หมูกระทะ',
+    ],
+    'หมูกระทะ': [
+      'mookata',
+      'ปิ้งย่าง/ชาบู',
+      'shabu_grill',
+      'shabu_hotpot',
+      'buffet',
+      'ชาบู/ฮอกพอด',
+    ],
+    'healthy': [
+      'อาหารสุขภาพ',
+      'อาหารมังสวิรัติ',
+      'อาหารฮาลาล',
+      'healthy_clean',
+      'healthy',
+      'vegetarian',
+      'halal',
+      'อาหารคลีน / สุขภาพ',
+    ],
+    'อาหารสุขภาพ': [
+      'healthy',
+      'อาหารมังสวิรัติ',
+      'อาหารฮาลาล',
+      'healthy_clean',
+      'vegetarian',
+    ],
+    'fast_food': [
+      'ฟาสต์ฟู้ด',
+      'อาหารฟาสฟู้ด',
+      'อาหารอิตาเลียน',
+      'fastfood',
+      'fast_food',
+      'italian_western',
+      'ฟาสต์ฟู้ด / เบอร์เกอร์',
+    ],
+    'ฟาสต์ฟู้ด': [
+      'fast_food',
+      'อาหารฟาสฟู้ด',
+      'อาหารอิตาเลียน',
+      'fastfood',
+      'italian_western',
+    ],
     'noodles': ['ก๋วยเตี๋ยว', 'ก๋วยเตี๋ยว / บะหมี่', 'noodles', 'บะหมี่'],
     'ก๋วยเตี๋ยว': ['noodles', 'ก๋วยเตี๋ยว / บะหมี่', 'บะหมี่'],
-    'a_la_carte': ['อาหารตามสั่ง', 'ตามสั่ง / สตรีทฟู้ด', 'made_to_order', 'street_food', 'a_la_carte', 'thai', 'อาหารไทย', 'อาหารเช้า', 'breakfast'],
-    'อาหารตามสั่ง': ['a_la_carte', 'made_to_order', 'street_food', 'thai', 'ตามสั่ง / สตรีทฟู้ด'],
-    'dessert_bakery': ['ขนมหวาน/เบเกอรี่', 'ของหวาน', 'อาหารเช้า', 'cafe_dessert', 'dessert_bakery', 'breakfast', 'คาเฟ่ / ของหวาน', 'เบเกอรี่'],
-    'ขนมหวาน/เบเกอรี่': ['dessert_bakery', 'ของหวาน', 'อาหารเช้า', 'cafe_dessert', 'เบเกอรี่'],
-    'cafe_beverage': ['คาเฟ่/เครื่องดื่ม', 'คาเฟ่', 'cafe_dessert', 'cafe_beverage', 'cafe', 'คาเฟ่ / ของหวาน', 'เครื่องดื่ม'],
-    'คาเฟ่/เครื่องดื่ม': ['cafe_beverage', 'คาเฟ่', 'cafe_dessert', 'cafe', 'เครื่องดื่ม'],
-    'italian_western': ['อาหารอิตาเลียน', 'fast_food', 'italian_western', 'พิซซ่า', 'สเต็ก'],
+    'a_la_carte': [
+      'อาหารตามสั่ง',
+      'ตามสั่ง / สตรีทฟู้ด',
+      'made_to_order',
+      'street_food',
+      'a_la_carte',
+      'thai',
+      'อาหารไทย',
+      'อาหารเช้า',
+      'breakfast',
+    ],
+    'อาหารตามสั่ง': [
+      'a_la_carte',
+      'made_to_order',
+      'street_food',
+      'thai',
+      'ตามสั่ง / สตรีทฟู้ด',
+    ],
+    'dessert_bakery': [
+      'ขนมหวาน/เบเกอรี่',
+      'ของหวาน',
+      'อาหารเช้า',
+      'cafe_dessert',
+      'dessert_bakery',
+      'breakfast',
+      'คาเฟ่ / ของหวาน',
+      'เบเกอรี่',
+    ],
+    'ขนมหวาน/เบเกอรี่': [
+      'dessert_bakery',
+      'ของหวาน',
+      'อาหารเช้า',
+      'cafe_dessert',
+      'เบเกอรี่',
+    ],
+    'cafe_beverage': [
+      'คาเฟ่/เครื่องดื่ม',
+      'คาเฟ่',
+      'cafe_dessert',
+      'cafe_beverage',
+      'cafe',
+      'คาเฟ่ / ของหวาน',
+      'เครื่องดื่ม',
+    ],
+    'คาเฟ่/เครื่องดื่ม': [
+      'cafe_beverage',
+      'คาเฟ่',
+      'cafe_dessert',
+      'cafe',
+      'เครื่องดื่ม',
+    ],
+    'italian_western': [
+      'อาหารอิตาเลียน',
+      'fast_food',
+      'italian_western',
+      'พิซซ่า',
+      'สเต็ก',
+    ],
     'อาหารอิตาเลียน': ['italian_western', 'fast_food', 'พิซซ่า', 'สเต็ก'],
-    'somtum_isan': ['อาหารอีสาน', 'somtum_isan', 'thai', 'อาหารไทย', 'ส้มตำ / ยำ / อาหารอีสาน', 'ส้มตำ'],
+    'somtum_isan': [
+      'อาหารอีสาน',
+      'somtum_isan',
+      'thai',
+      'อาหารไทย',
+      'ส้มตำ / ยำ / อาหารอีสาน',
+      'ส้มตำ',
+    ],
     'อาหารอีสาน': ['somtum_isan', 'thai', 'ส้มตำ'],
     'northern_thai': ['อาหารเหนือ', 'northern_thai', 'thai', 'อาหารไทย'],
     'อาหารเหนือ': ['northern_thai', 'อาหารเหนือ', 'thai', 'อาหารไทย'],
@@ -195,8 +347,10 @@ bool checkCategoryMatch(String selectedCat, List<String> restaurantCategories) {
 }
 
 // Backward-compatible alias
-bool _checkCategoryMatch(String selectedCat, List<String> restaurantCategories) =>
-    checkCategoryMatch(selectedCat, restaurantCategories);
+bool _checkCategoryMatch(
+  String selectedCat,
+  List<String> restaurantCategories,
+) => checkCategoryMatch(selectedCat, restaurantCategories);
 
 /// Converts any category slug or name into a clean Thai display label
 String formatCategoryDisplayName(String cat) {
@@ -251,8 +405,12 @@ String formatCategoryDisplayName(String cat) {
 }
 
 /// Checks if a restaurant matches a specific cuisine_type_id (1..17) from database
-bool doesRestaurantMatchCuisineTypeId(RestaurantModel restaurant, int cuisineTypeId) {
-  if (restaurant.cuisineTypeId != null && restaurant.cuisineTypeId == cuisineTypeId) {
+bool doesRestaurantMatchCuisineTypeId(
+  RestaurantModel restaurant,
+  int cuisineTypeId,
+) {
+  if (restaurant.cuisineTypeId != null &&
+      restaurant.cuisineTypeId == cuisineTypeId) {
     return true;
   }
   final slugs = mapCuisineTypeIdToSlugs(cuisineTypeId);
@@ -395,13 +553,15 @@ final filteredRestaurantsProvider = Provider<List<RestaurantModel>>((ref) {
         !criteria.selectedCategories.contains('all')) {
       if (criteria.matchAllCategories) {
         // AND match: restaurant must contain ALL selected categories
-        final hasAll = criteria.selectedCategories
-            .every((cat) => _checkCategoryMatch(cat, restaurant.categories));
+        final hasAll = criteria.selectedCategories.every(
+          (cat) => _checkCategoryMatch(cat, restaurant.categories),
+        );
         if (!hasAll) return false;
       } else {
         // OR match: restaurant must contain AT LEAST ONE of selected categories
-        final hasAny = criteria.selectedCategories
-            .any((cat) => _checkCategoryMatch(cat, restaurant.categories));
+        final hasAny = criteria.selectedCategories.any(
+          (cat) => _checkCategoryMatch(cat, restaurant.categories),
+        );
         if (!hasAny) return false;
       }
     }
@@ -418,8 +578,9 @@ final filteredRestaurantsProvider = Provider<List<RestaurantModel>>((ref) {
       final budget = criteria.maxBudget!;
       if (restaurant.signatureDishes.isNotEmpty) {
         // Direct match: has at least one dish within budget
-        final hasDirectMatch = restaurant.signatureDishes
-            .any((dish) => dish.price > 0 && dish.price <= budget);
+        final hasDirectMatch = restaurant.signatureDishes.any(
+          (dish) => dish.price > 0 && dish.price <= budget,
+        );
         if (!hasDirectMatch) {
           // If no direct dish, allow slight flexibility (+15% or +10 THB)
           final minDishPrice = restaurant.signatureDishes
@@ -457,7 +618,6 @@ final filteredRestaurantsProvider = Provider<List<RestaurantModel>>((ref) {
   }).toList();
 });
 
-
 // 4. Current Swipe Session Notifier
 class SwipeSessionState {
   final List<RestaurantModel> likedRestaurants;
@@ -466,7 +626,8 @@ class SwipeSessionState {
   final bool isSessionFinished;
   final String? currentSessionDbId;
   final int? cuisineTypeId; // Fallback backup
-  final List<int> sessionCuisineTypeIds; // Real data from swipe_session_cuisines
+  final List<int>
+  sessionCuisineTypeIds; // Real data from swipe_session_cuisines
   final double? priceMin;
   final double? priceMax;
   final int targetRestaurantCount;
@@ -610,14 +771,11 @@ class SwipeSessionNotifier extends StateNotifier<SwipeSessionState> {
         direction: SwipeDirection.right,
         currentSwipedCount: state.swipedCount - 1,
       );
-
-      if (isFinished) {
-        SwipeSessionService.completeSession(
-          sessionId: state.currentSessionDbId,
-          targetRestaurantCount: newCount,
-          swipedCount: newSwipedCount,
-        );
-      }
+      SwipeSessionService.recordSwipe(
+        restaurantId: restaurant.id,
+        direction: 'right',
+        sessionId: state.currentSessionDbId,
+      );
     }
   }
 
@@ -628,13 +786,11 @@ class SwipeSessionNotifier extends StateNotifier<SwipeSessionState> {
       swipedCount: newSwipedCount,
     );
 
-    // Sync to Supabase: inserts into `swipes` (Image 1) and increments `swiped_count` (Image 4)
     if (state.currentSessionDbId != null) {
       SwipeSessionService.recordSwipe(
-        sessionId: state.currentSessionDbId,
         restaurantId: restaurant.id,
-        direction: SwipeDirection.left,
-        currentSwipedCount: state.swipedCount - 1,
+        direction: 'left',
+        sessionId: state.currentSessionDbId,
       );
     }
   }
@@ -678,15 +834,30 @@ class SwipeSessionNotifier extends StateNotifier<SwipeSessionState> {
 
 final swipeSessionProvider =
     StateNotifierProvider<SwipeSessionNotifier, SwipeSessionState>((ref) {
-  return SwipeSessionNotifier();
-});
+      return SwipeSessionNotifier();
+    });
 
 // 5. Reviews Provider
 class ReviewsNotifier extends StateNotifier<List<ReviewModel>> {
-  ReviewsNotifier() : super(MockData.reviews);
+  ReviewsNotifier() : super(const []);
+
+  Future<void> loadReviewsForRestaurant(String restaurantId) async {
+    try {
+      final dbReviews = await ReviewService.fetchReviewsForRestaurant(
+        restaurantId,
+      );
+      if (dbReviews.isNotEmpty) {
+        final others = state
+            .where((r) => r.restaurantId != restaurantId)
+            .toList();
+        state = [...dbReviews, ...others];
+      }
+    } catch (_) {}
+  }
 
   void addReview(ReviewModel review) {
-    state = [review, ...state];
+    final filtered = state.where((r) => r.id != review.id).toList();
+    state = [review, ...filtered];
   }
 
   List<ReviewModel> getReviewsForRestaurant(String restaurantId) {
@@ -696,5 +867,5 @@ class ReviewsNotifier extends StateNotifier<List<ReviewModel>> {
 
 final reviewsProvider =
     StateNotifierProvider<ReviewsNotifier, List<ReviewModel>>((ref) {
-  return ReviewsNotifier();
-});
+      return ReviewsNotifier();
+    });

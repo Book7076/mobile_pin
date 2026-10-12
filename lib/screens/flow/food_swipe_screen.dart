@@ -448,6 +448,8 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
 
                             if (newFav) {
                               FavoriteManager.addFavorite({
+                                'id': restaurant.id,
+                                'restaurant_id': restaurant.id,
                                 'name': restaurant.name,
                                 'category': _formatCategoryLabel(restaurant),
                                 'price': restaurant.priceRange,
@@ -460,7 +462,10 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
                                 'isFavorite': true,
                               });
                             } else {
-                              FavoriteManager.removeFavorite(restaurant.name);
+                              FavoriteManager.removeFavorite(
+                                  restaurant.id.isNotEmpty
+                                      ? restaurant.id
+                                      : restaurant.name);
                             }
 
                             setState(() {});

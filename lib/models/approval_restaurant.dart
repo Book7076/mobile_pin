@@ -1,3 +1,5 @@
+import 'restaurant_admin_model.dart';
+
 class ApprovalMenuItem {
   final String name;
   final String ingredients;
@@ -50,6 +52,41 @@ class ApprovalRestaurant {
     this.rejectionDetails,
     this.revokedAt,
   });
+
+  factory ApprovalRestaurant.fromAdminModel(RestaurantAdminModel model) {
+    return ApprovalRestaurant(
+      id: model.id,
+      name: model.name,
+      code: model.storeCode ?? '111U0000',
+      category: model.category ?? 'อาหารทั่วไป',
+      lastUpdated: model.formattedThaiTime,
+      requestDate: model.formattedThaiDate,
+      address: model.address,
+      mapUrl: model.mapUrl ?? 'www.googlemap.com',
+      phone: model.phone,
+      imageAsset: (model.imageUrl != null && model.imageUrl!.isNotEmpty)
+          ? model.imageUrl!
+          : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400',
+      openingHours: model.openingHours ?? const {},
+      amenities: model.amenities ?? const ['มีที่จอดรถ', 'มีอินเทอร์เน็ต'],
+      menuItems: model.menuItems
+          .map((m) => ApprovalMenuItem(
+                name: m.name,
+                ingredients: m.description ?? '',
+                price: '฿${m.price}',
+                imageAsset: m.imageUrl ?? '',
+              ))
+          .toList(),
+      status: model.status,
+      rejectionReason: model.rejectionReason,
+      rejectionDetails: null,
+      revokedAt: null,
+    );
+  }
+
+  factory ApprovalRestaurant.fromJson(Map<String, dynamic> json) {
+    return ApprovalRestaurant.fromAdminModel(RestaurantAdminModel.fromJson(json));
+  }
 
   ApprovalRestaurant copyWith({
     String? id,

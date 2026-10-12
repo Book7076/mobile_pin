@@ -19,8 +19,11 @@ class SwipeSessionService {
 
       // Fallback: check users table if any user exists
       try {
-        final userRow =
-            await client.from('users').select('id').limit(1).maybeSingle();
+        final userRow = await client
+            .from('users')
+            .select('id')
+            .limit(1)
+            .maybeSingle();
         if (userRow != null && userRow['id'] != null) {
           return userRow['id'].toString();
         }
@@ -53,7 +56,9 @@ class SwipeSessionService {
 
     // Check that at least 1 cuisine type is selected
     if (effectiveCuisineIds.isEmpty) {
-      throw ArgumentError('กรุณาเลือกประเภทอาหารอย่างน้อย 1 ประเภทก่อนเริ่มปัด');
+      throw ArgumentError(
+        'กรุณาเลือกประเภทอาหารอย่างน้อย 1 ประเภทก่อนเริ่มปัด',
+      );
     }
 
     final generatedId = generateClientUuidV4();
@@ -90,25 +95,39 @@ class SwipeSessionService {
           ? res['id'].toString()
           : generatedId;
 
-      debugPrint('Step 1: Created swipe_sessions row $createdSessionId with fallback cuisine $fallbackFirstCuisineId');
+      debugPrint(
+        'Step 1: Created swipe_sessions row $createdSessionId with fallback cuisine $fallbackFirstCuisineId',
+      );
 
       // Step 2: Insert into swipe_session_cuisines for all selected categories in a single batch
-      final cuisinesBatch = effectiveCuisineIds.map((cid) => {
-        'session_id': createdSessionId,
-        'cuisine_type_id': cid,
-      }).toList();
+      final cuisinesBatch = effectiveCuisineIds
+          .map(
+            (cid) => {'session_id': createdSessionId, 'cuisine_type_id': cid},
+          )
+          .toList();
 
       try {
         await client.from('swipe_session_cuisines').insert(cuisinesBatch);
-        debugPrint('Step 2: Successfully saved ${cuisinesBatch.length} cuisines to swipe_session_cuisines for session $createdSessionId');
+        debugPrint(
+          'Step 2: Successfully saved ${cuisinesBatch.length} cuisines to swipe_session_cuisines for session $createdSessionId',
+        );
       } catch (cuisineError) {
-        debugPrint('Step 2 FAILED (swipe_session_cuisines insert error): $cuisineError');
+        debugPrint(
+          'Step 2 FAILED (swipe_session_cuisines insert error): $cuisineError',
+        );
         // Rollback: delete the session that was just created to prevent orphan sessions
         try {
-          await client.from('swipe_sessions').delete().eq('id', createdSessionId);
-          debugPrint('Rollback successful: Deleted orphan swipe_sessions $createdSessionId');
+          await client
+              .from('swipe_sessions')
+              .delete()
+              .eq('id', createdSessionId);
+          debugPrint(
+            'Rollback successful: Deleted orphan swipe_sessions $createdSessionId',
+          );
         } catch (deleteError) {
-          debugPrint('Rollback error deleting session $createdSessionId: $deleteError');
+          debugPrint(
+            'Rollback error deleting session $createdSessionId: $deleteError',
+          );
         }
         rethrow;
       }
@@ -119,7 +138,9 @@ class SwipeSessionService {
         // Step 2 failed after Step 1 was successfully created -> rethrow to notify UI
         rethrow;
       }
-      debugPrint('Error creating swipe session in Supabase (fallback to local id): $e');
+      debugPrint(
+        'Error creating swipe session in Supabase (fallback to local id): $e',
+      );
     }
 
     return generatedId;
@@ -141,7 +162,9 @@ class SwipeSessionService {
             .map((row) => (row['cuisine_type_id'] as num?)?.toInt())
             .whereType<int>()
             .toList();
-        debugPrint('Fetched ${ids.length} cuisines from swipe_session_cuisines for session $sessionId: $ids');
+        debugPrint(
+          'Fetched ${ids.length} cuisines from swipe_session_cuisines for session $sessionId: $ids',
+        );
         return ids;
       }
     } catch (e) {
@@ -184,13 +207,18 @@ class SwipeSessionService {
       }
 
       await client.from('swipes').insert(swipePayload);
-      debugPrint('Recorded swipe $direction for restaurant $restaurantId in session $sessionId');
+      debugPrint(
+        'Recorded swipe $direction for restaurant $restaurantId in session $sessionId',
+      );
 
       // 2b. Increment `swiped_count` in `swipe_sessions` (Image 4)
-      await client.from('swipe_sessions').update({
-        'swiped_count': resolvedSwipedCount,
-      }).eq('id', sessionId);
-      debugPrint('Updated swipe_sessions $sessionId: swiped_count=$resolvedSwipedCount');
+      await client
+          .from('swipe_sessions')
+          .update({'swiped_count': resolvedSwipedCount})
+          .eq('id', sessionId);
+      debugPrint(
+        'Updated swipe_sessions $sessionId: swiped_count=$resolvedSwipedCount',
+      );
 
       // 2c. If liked (direction == 'right'), insert into `selected_restaurants` (Image 3)
       if (direction == SwipeDirection.right) {
@@ -200,7 +228,9 @@ class SwipeSessionService {
           'restaurant_id': restaurantId,
           'is_final_choice': false,
         });
-        debugPrint('Added $restaurantId to selected_restaurants for session $sessionId');
+        debugPrint(
+          'Added $restaurantId to selected_restaurants for session $sessionId',
+        );
       }
     } catch (e) {
       debugPrint('Error recording swipe in Supabase: $e');
@@ -219,16 +249,21 @@ class SwipeSessionService {
       final client = Supabase.instance.client;
 
       // 3a. Update `selected_restaurants`: set is_final_choice = true
-      await client.from('selected_restaurants').update({
-        'is_final_choice': true,
-      }).eq('session_id', sessionId).eq('restaurant_id', restaurantId);
+      await client
+          .from('selected_restaurants')
+          .update({'is_final_choice': true})
+          .eq('session_id', sessionId)
+          .eq('restaurant_id', restaurantId);
 
       // 3b. Update `swipe_sessions`: status = 'เสร็จสิ้น'
-      await client.from('swipe_sessions').update({
-        'status': SwipeSessionModel.statusCompleted,
-      }).eq('id', sessionId);
+      await client
+          .from('swipe_sessions')
+          .update({'status': SwipeSessionModel.statusCompleted})
+          .eq('id', sessionId);
 
-      debugPrint('Marked restaurant $restaurantId as final choice and completed session $sessionId');
+      debugPrint(
+        'Marked restaurant $restaurantId as final choice and completed session $sessionId',
+      );
     } catch (e) {
       debugPrint('Error marking final choice in Supabase: $e');
     }
@@ -254,7 +289,9 @@ class SwipeSessionService {
       }
 
       await client.from('swipe_sessions').update(payload).eq('id', sessionId);
-      debugPrint('Swipe session $sessionId updated: count=$targetRestaurantCount, status=$status');
+      debugPrint(
+        'Swipe session $sessionId updated: count=$targetRestaurantCount, status=$status',
+      );
     } catch (e) {
       debugPrint('Error updating swipe session in Supabase: $e');
     }
@@ -274,47 +311,53 @@ class SwipeSessionService {
     );
   }
 
-  /// 5. Fetches long-term preferences from `user_food_preferences` (Image 2)
-  static Future<List<UserFoodPreferenceModel>> fetchUserFoodPreferences(
-      String? userId) async {
-    if (userId == null || userId.isEmpty) return [];
-
-    try {
-      final client = Supabase.instance.client;
-      final res = await client
-          .from('user_food_preferences')
-          .select()
-          .eq('user_id', userId);
-
-      if (res is List) {
-        return res
-            .map((item) => UserFoodPreferenceModel.fromJson(item as Map<String, dynamic>))
-            .toList();
-      }
-    } catch (e) {
-      debugPrint('Note: Error loading user_food_preferences: $e');
-    }
-
-    return [];
-  }
-
-  /// 6. Saves long-term preference to `user_food_preferences` (Image 2)
-  static Future<void> saveUserFoodPreference({
-    required String userId,
-    required int foodTagId,
-    required String prefType, // 'like' or 'dislike'
+  /// Records a swipe action ('right' for like, 'left' for dislike) in Supabase `swipes` table
+  static Future<void> recordSwipe({
+    required String restaurantId,
+    required String direction, // 'right' or 'left'
+    String? sessionId,
+    String? explicitUserId,
   }) async {
     try {
       final client = Supabase.instance.client;
-      await client.from('user_food_preferences').upsert({
-        'id': generateClientUuidV4(),
+      final userId = explicitUserId ?? await getCurrentUserId();
+
+      var targetRestaurantId = restaurantId;
+      if (!targetRestaurantId.contains('-')) {
+        try {
+          final res = await client
+              .from('restaurants')
+              .select('id')
+              .ilike('name', '%$restaurantId%')
+              .limit(1)
+              .maybeSingle();
+          if (res != null && res['id'] != null) {
+            targetRestaurantId = res['id'].toString();
+          }
+        } catch (_) {}
+      }
+
+      if (sessionId == null ||
+          sessionId.isEmpty ||
+          userId == null ||
+          userId.isEmpty) {
+        return;
+      }
+
+      final payload = <String, dynamic>{
+        'session_id': sessionId,
         'user_id': userId,
-        'food_tag_id': foodTagId,
-        'pref_type': prefType,
-      });
-      debugPrint('Saved user food preference: tag=$foodTagId, type=$prefType for user $userId');
+        'restaurant_id': targetRestaurantId,
+        'direction': direction,
+        'created_at': DateTime.now().toIso8601String(),
+      };
+
+      await client.from('swipes').insert(payload);
+      debugPrint(
+        'Recorded swipe in Supabase: restaurant=$targetRestaurantId direction=$direction',
+      );
     } catch (e) {
-      debugPrint('Error saving user food preference in Supabase: $e');
+      debugPrint('Note: Error recording swipe in Supabase: $e');
     }
   }
 }

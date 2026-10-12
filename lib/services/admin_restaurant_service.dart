@@ -210,22 +210,30 @@ class AdminRestaurantNotifier extends StateNotifier<List<RestaurantAdminModel>> 
     ),
   ];
 
+  Future<void> refresh() async => _fetchFromSupabase();
+
   Future<void> _fetchFromSupabase() async {
     try {
       dynamic response;
+      const selectQuery =
+          '*, restaurant_images(*), cuisine_types(*), users!owner_id(first_name, last_name, email, phone), operating_hours(*), menu_items(*)';
       try {
         response = await supabase
             .from('restaurants')
-            .select()
+            .select(selectQuery)
             .order('crated_at', ascending: false);
       } catch (_) {
         try {
           response = await supabase
               .from('restaurants')
-              .select()
+              .select(selectQuery)
               .order('created_at', ascending: false);
         } catch (_) {
-          response = await supabase.from('restaurants').select();
+          try {
+            response = await supabase.from('restaurants').select(selectQuery);
+          } catch (_) {
+            response = await supabase.from('restaurants').select();
+          }
         }
       }
 

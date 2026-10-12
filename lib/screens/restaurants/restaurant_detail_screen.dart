@@ -9,7 +9,9 @@ import '../../models/favorite_manager.dart';
 import '../../models/restaurant_model.dart';
 import '../../models/review_model.dart';
 import '../../providers/restaurant_provider.dart';
+import '../../services/review_service.dart';
 import 'restaurant_all_menu_screen.dart';
+import 'review_restaurant_screen.dart';
 
 /// Restaurant Detail Screen matching Mockup Image 4:
 /// - Header: Back arrow (<) + "รายละเอียดร้านอาหาร" in Burgundy
@@ -59,12 +61,15 @@ class _RestaurantDetailScreenState
   bool? _isBookmarked;
   List<SignatureDish> _databaseDishes = [];
   String? _lastLoadedRestaurantId;
+  List<ReviewModel>? _databaseReviews;
+  String? _lastLoadedReviewRestaurantId;
 
   @override
   void initState() {
     super.initState();
     _initBookmarkState();
     _loadDishesFromDatabase();
+    _loadReviewsFromDatabase();
   }
 
   Future<void> _loadDishesFromDatabase([String? overrideId, String? overrideName]) async {
@@ -136,9 +141,68 @@ class _RestaurantDetailScreenState
     }
   }
 
+  Future<void> _loadReviewsFromDatabase([String? overrideId, String? overrideName]) async {
+    if (!ReviewService.isSupabaseAvailable) return;
+
+    final effectiveId = overrideId ??
+        widget.restaurantId ??
+        widget.restaurantData?['id']?.toString();
+    final effectiveName = overrideName ??
+        widget.name ??
+        widget.restaurantData?['name']?.toString();
+
+    String? targetRestaurantId = effectiveId;
+
+    try {
+      if (targetRestaurantId == null || !targetRestaurantId.contains('-')) {
+        if (effectiveName != null && effectiveName.isNotEmpty && ReviewService.isSupabaseAvailable) {
+          try {
+            final resRows = await Supabase.instance.client
+                .from('restaurants')
+                .select('id')
+                .ilike('name', '%$effectiveName%')
+                .limit(1);
+            if (resRows is List && resRows.isNotEmpty) {
+              targetRestaurantId = resRows.first['id']?.toString();
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (targetRestaurantId != null && targetRestaurantId.isNotEmpty) {
+        final dbReviews =
+            await ReviewService.fetchReviewsForRestaurant(targetRestaurantId);
+        if (mounted) {
+          setState(() {
+            _databaseReviews = dbReviews;
+            _lastLoadedReviewRestaurantId = targetRestaurantId;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Note: Error loading reviews in RestaurantDetailScreen: $e');
+    }
+  }
+
+  Future<void> _openReviewScreen(RestaurantModel restaurant) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ReviewRestaurantScreen(restaurant: restaurant),
+      ),
+    );
+    if (result == true && mounted) {
+      await _loadReviewsFromDatabase(restaurant.id, restaurant.name);
+      ref.read(reviewsProvider.notifier).loadReviewsForRestaurant(restaurant.id);
+    }
+  }
+
   void _initBookmarkState() {
     final effectiveName = widget.name ??
         widget.restaurantData?['name']?.toString() ??
+        '';
+    final effectiveId = widget.restaurantId ??
+        widget.restaurantData?['id']?.toString() ??
+        widget.restaurantData?['restaurant_id']?.toString() ??
         '';
 
     bool initialFav = false;
@@ -147,6 +211,9 @@ class _RestaurantDetailScreenState
           widget.restaurantData!['isFavorite'] == true) {
         initialFav = true;
       }
+    }
+    if (!initialFav && effectiveId.isNotEmpty) {
+      initialFav = FavoriteManager.isFavorite(effectiveId);
     }
     if (!initialFav && effectiveName.isNotEmpty) {
       initialFav = FavoriteManager.isFavorite(effectiveName);
@@ -161,6 +228,16 @@ class _RestaurantDetailScreenState
       } catch (_) {}
     }
     _isBookmarked = initialFav;
+
+    if (effectiveId.isNotEmpty) {
+      FavoriteManager.checkIsFavoriteInDb(effectiveId).then((isFav) {
+        if (mounted && isFav != null && isFav != _isBookmarked) {
+          setState(() {
+            _isBookmarked = isFav;
+          });
+        }
+      });
+    }
   }
 
   void _toggleBookmark(RestaurantModel restaurant) {
@@ -171,10 +248,21 @@ class _RestaurantDetailScreenState
     });
 
     final name = restaurant.name;
+    final restId = restaurant.id.isNotEmpty
+        ? restaurant.id
+        : (widget.restaurantId ??
+            widget.restaurantData?['id']?.toString() ??
+            widget.restaurantData?['restaurant_id']?.toString() ??
+            '');
+
     if (newFav) {
       final favItem = widget.restaurantData != null
           ? Map<String, dynamic>.from(widget.restaurantData!)
           : <String, dynamic>{};
+      if (restId.isNotEmpty) {
+        favItem['id'] = restId;
+        favItem['restaurant_id'] = restId;
+      }
       favItem['name'] = favItem['name'] ?? restaurant.name;
       favItem['category'] = favItem['category'] ??
           (restaurant.categories.isNotEmpty
@@ -205,7 +293,7 @@ class _RestaurantDetailScreenState
         ),
       );
     } else {
-      FavoriteManager.removeFavorite(name);
+      FavoriteManager.removeFavorite(restId.isNotEmpty ? restId : name);
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -316,6 +404,9 @@ class _RestaurantDetailScreenState
 
     if (_databaseDishes.isEmpty && _lastLoadedRestaurantId != restaurant.id) {
       _loadDishesFromDatabase(restaurant.id, restaurant.name);
+    }
+    if (_databaseReviews == null && _lastLoadedReviewRestaurantId != restaurant.id) {
+      _loadReviewsFromDatabase(restaurant.id, restaurant.name);
     }
 
     if (restaurant.id.isEmpty) {
@@ -985,12 +1076,17 @@ class _RestaurantDetailScreenState
   Widget _buildReviewsSection(
     BuildContext context,
     RestaurantModel restaurant,
-    List<ReviewModel> reviews,
+    List<ReviewModel> fallbackReviews,
   ) {
+    final reviews = _databaseReviews ?? fallbackReviews;
+    final avgRating = reviews.isNotEmpty
+        ? ReviewService.calculateAverageRating(reviews, defaultRating: restaurant.rating)
+        : restaurant.rating;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header Row: รีวิวร้านอาหาร + Star + Rating (Matching Mockup Image 4)
+        // Header Row: รีวิวร้านอาหาร ★ 4.5 (ตรงตามรูปที่ 1)
         Row(
           children: [
             const Text(
@@ -1007,9 +1103,9 @@ class _RestaurantDetailScreenState
               color: AppConstants.burgundyPrimary,
               size: 20,
             ),
-            const SizedBox(width: 3),
+            const SizedBox(width: 4),
             Text(
-              '${restaurant.rating}',
+              '$avgRating',
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
@@ -1020,87 +1116,175 @@ class _RestaurantDetailScreenState
         ),
         const SizedBox(height: 12),
 
-        // Reviews Cards
+        // Reviews Cards (รูปที่ 1: การ์ดยังไม่มีรีวิวสำหรับร้านนี้)
         if (reviews.isEmpty)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              key: const Key('empty_reviews_card'),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: const Text(
-              'ยังไม่มีรีวิวสำหรับร้านนี้ เป็นคนแรกที่รีวิวเลย!',
-              style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
-              textAlign: TextAlign.center,
+              onTap: () => _openReviewScreen(restaurant),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: const Text(
+                  'ยังไม่มีรีวิวสำหรับร้านนี้ เป็นคนแรกที่รีวิวเลย!',
+                  style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
           )
         else
           Column(
-            children: reviews.map((rev) {
-              return Container(
-                width: double.infinity,
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: const Color(0xFFF1F5F9),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+            children: [
+              for (final rev in reviews)
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFF1F5F9),
+                      width: 1.2,
                     ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          rev.userName,
-                          style: const TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1E293B),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.04),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 14,
+                            backgroundColor: AppConstants.burgundyPrimary,
+                            backgroundImage: rev.userAvatar != null &&
+                                    rev.userAvatar!.isNotEmpty
+                                ? NetworkImage(rev.userAvatar!)
+                                : null,
+                            child: rev.userAvatar == null || rev.userAvatar!.isEmpty
+                                ? Text(
+                                    rev.userName.isNotEmpty
+                                        ? rev.userName[0].toUpperCase()
+                                        : 'U',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
                           ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  rev.userName,
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1E293B),
+                                  ),
+                                ),
+                                Text(
+                                  '${rev.createdAt.day}/${rev.createdAt.month}/${rev.createdAt.year}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFF94A3B8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Color(0xFFF59E0B),
+                                size: 16,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                rev.rating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF1E293B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        rev.comment,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF475569),
+                          height: 1.4,
                         ),
-                        const SizedBox(width: 10),
-                        const Icon(
-                          Icons.star_rounded,
-                          color: AppConstants.burgundyPrimary,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 2),
-                        Text(
-                          rev.rating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF1E293B),
+                      ),
+                      if (rev.photoUrl != null && rev.photoUrl!.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            rev.photoUrl!,
+                            height: 130,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
                           ),
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      rev.comment,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF475569),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              );
-            }).toList(),
+              const SizedBox(height: 4),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  key: const Key('write_review_button'),
+                  onPressed: () => _openReviewScreen(restaurant),
+                  icon: const Icon(
+                    Icons.edit_note_rounded,
+                    color: AppConstants.burgundyPrimary,
+                    size: 20,
+                  ),
+                  label: const Text(
+                    'เขียนรีวิวร้านนี้',
+                    style: TextStyle(
+                      color: AppConstants.burgundyPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppConstants.burgundyPrimary, width: 1.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                ),
+              ),
+            ],
           ),
       ],
     );
@@ -1119,7 +1303,7 @@ class _RestaurantDetailScreenState
           width: 90,
           height: 75,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildNoDishPhoto(),
+          errorBuilder: (context, error, stackTrace) => _buildNoDishPhoto(),
         );
       } catch (_) {}
     }
@@ -1128,7 +1312,7 @@ class _RestaurantDetailScreenState
       width: 90,
       height: 75,
       fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => _buildNoDishPhoto(),
+      errorBuilder: (context, error, stackTrace) => _buildNoDishPhoto(),
     );
   }
 

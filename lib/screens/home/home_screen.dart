@@ -47,9 +47,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final FocusNode _favoriteFocusNode = FocusNode();
   String _favoriteSearchQuery = '';
   bool _isFavoriteFocused = false;
+  bool _isLoadingFavorites = false;
 
   // Favorite Restaurants synced with FavoriteManager
   List<Map<String, dynamic>> get _favoriteRestaurants => FavoriteManager.favorites;
+
+  Future<void> _loadFavoritesFromSupabase() async {
+    if (!mounted) return;
+    setState(() => _isLoadingFavorites = true);
+    try {
+      await FavoriteManager.fetchFavorites();
+    } catch (_) {}
+    if (mounted) {
+      setState(() => _isLoadingFavorites = false);
+    }
+  }
 
   // Curated recommended & searchable restaurants matching the design
   final List<Map<String, dynamic>> _curatedRestaurants = [
@@ -135,6 +147,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     _currentTab = widget.initialIndex ?? widget.initialTab;
     _fetchUserType();
+    _loadFavoritesFromSupabase();
     _searchFocusNode.addListener(() {
       if (mounted) {
         setState(() {
@@ -744,7 +757,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }) {
     final bool isSelected = _currentTab == index;
     return GestureDetector(
-      onTap: () => setState(() => _currentTab = index),
+      onTap: () {
+        setState(() => _currentTab = index);
+        if (index == 1) {
+          _loadFavoritesFromSupabase();
+        }
+      },
       behavior: HitTestBehavior.opaque,
       child: Container(
         width: 48,
@@ -903,25 +921,112 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         // Favorite Cards List
         Expanded(
-          child: list.isEmpty
+          child: _isLoadingFavorites && list.isEmpty
               ? const Center(
-                  child: Text(
-                    'ไม่พบร้านค้าในรายการโปรด',
-                    style: TextStyle(color: Color(0xFF8E888B), fontSize: 14.5),
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF6E162B),
                   ),
                 )
-              : ListView.builder(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.only(
-                    left: 20,
-                    right: 20,
-                    top: 2,
-                    bottom: 100, // Room for bottom dock
-                  ),
-                  itemCount: list.length,
-                  itemBuilder: (context, index) {
-                    return _buildFavoriteCard(list[index]);
-                  },
+              : RefreshIndicator(
+                  color: const Color(0xFF6E162B),
+                  onRefresh: _loadFavoritesFromSupabase,
+                  child: list.isEmpty
+                      ? ListView(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          children: [
+                            SizedBox(
+                              height: MediaQuery.of(context).size.height * 0.15,
+                            ),
+                            Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 76,
+                                    height: 76,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFF7EFF1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.favorite_border_rounded,
+                                      size: 40,
+                                      color: Color(0xFF6E162B),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    _favoriteSearchQuery.isNotEmpty
+                                        ? 'ไม่พบร้านค้าที่ค้นหา'
+                                        : 'ยังไม่มีร้านอาหารในรายการโปรด',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF221F21),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _favoriteSearchQuery.isNotEmpty
+                                        ? 'ลองค้นหาด้วยคำอื่น หรือชื่อประเภทอาหาร'
+                                        : 'กดบันทึกร้านอาหารที่คุณชอบเพื่อดูที่นี่ได้ตลอดเวลา',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF8E888B),
+                                    ),
+                                  ),
+                                  if (_favoriteSearchQuery.isEmpty) ...[
+                                    const SizedBox(height: 20),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        setState(() => _currentTab = 0);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor:
+                                            const Color(0xFF6E162B),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 22,
+                                          vertical: 11,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'สำรวจร้านอาหาร',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(
+                            parent: BouncingScrollPhysics(),
+                          ),
+                          padding: const EdgeInsets.only(
+                            left: 20,
+                            right: 20,
+                            top: 2,
+                            bottom: 100, // Room for bottom dock
+                          ),
+                          itemCount: list.length,
+                          itemBuilder: (context, index) {
+                            return _buildFavoriteCard(list[index]);
+                          },
+                        ),
                 ),
         ),
       ],
@@ -960,7 +1065,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onTap: () async {
             final bool? isBookmarked = await Navigator.of(context).push<bool>(
               MaterialPageRoute(
-                builder: (_) => RestaurantDetailScreen(restaurantData: item),
+                builder: (_) => RestaurantDetailScreen(
+                  restaurantData: item,
+                  restaurantId: item['id']?.toString() ??
+                      item['restaurant_id']?.toString(),
+                ),
               ),
             );
             if (mounted) {
@@ -969,7 +1078,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   item['isBookmarked'] = isBookmarked;
                   item['isFavorite'] = isBookmarked;
                   if (!isBookmarked) {
-                    FavoriteManager.removeFavorite(item['name']?.toString() ?? '');
+                    FavoriteManager.removeFavorite(
+                        item['restaurant_id']?.toString() ??
+                            item['id']?.toString() ??
+                            item['name']?.toString() ??
+                            '');
                   } else {
                     FavoriteManager.addFavorite(item);
                   }
@@ -989,13 +1102,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     width: 86,
                     height: 86,
                     child: () {
-                      final imageStr = item['image']?.toString() ?? '';
-                      final isAsset = item['isAsset'] == true || imageStr.startsWith('assets/');
+                      final imageStr = item['image']?.toString() ??
+                          item['image_url']?.toString() ??
+                          '';
+                      final isAsset = item['isAsset'] == true ||
+                          imageStr.startsWith('assets/');
                       if (isAsset && imageStr.isNotEmpty) {
                         return Image.asset(
                           imageStr,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
                             color: const Color(0xFFEFECEF),
                             child: const Icon(
                               Icons.restaurant_rounded,
@@ -1008,7 +1125,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         return Image.network(
                           imageStr,
                           fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
+                          errorBuilder: (context, error, stackTrace) =>
+                              Container(
                             color: const Color(0xFFEFECEF),
                             child: const Icon(
                               Icons.restaurant_rounded,
@@ -1054,10 +1172,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               ),
                             ),
                           ),
-                          const Icon(
-                            Icons.bookmark_rounded,
-                            color: Color(0xFF6E162B),
-                            size: 26,
+                          InkWell(
+                            onTap: () {
+                              final name = item['name']?.toString() ?? '';
+                              final restId = (item['restaurant_id'] ??
+                                      item['id'])
+                                  ?.toString();
+                              FavoriteManager.removeFavorite(restId ?? name);
+                              setState(() {});
+                              ScaffoldMessenger.of(context)
+                                  .hideCurrentSnackBar();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                      'นำ "$name" ออกจากรายการโปรดแล้ว'),
+                                  backgroundColor: const Color(0xFF4A4447),
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  action: SnackBarAction(
+                                    label: 'เลิกทำ',
+                                    textColor: const Color(0xFFFFB4AB),
+                                    onPressed: () {
+                                      FavoriteManager.addFavorite(item);
+                                      setState(() {});
+                                    },
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: const Padding(
+                              padding: EdgeInsets.all(4),
+                              child: Icon(
+                                Icons.bookmark_rounded,
+                                color: Color(0xFF6E162B),
+                                size: 26,
+                              ),
+                            ),
                           ),
                         ],
                       ),

@@ -75,6 +75,8 @@ class _RestaurantManagementScreenState extends ConsumerState<RestaurantManagemen
   Widget build(BuildContext context) {
     final restaurants = ref.watch(adminRestaurantProvider);
 
+    final pendingCount = _filterRestaurants(restaurants, 'pending').length;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -107,25 +109,26 @@ class _RestaurantManagementScreenState extends ConsumerState<RestaurantManagemen
                         ),
                         onPressed: () {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('คุณมีคำขอเปิดร้านใหม่ที่รอการตรวจสอบ 3 รายการ'),
-                              duration: Duration(seconds: 2),
+                            SnackBar(
+                              content: Text('คุณมีคำขอเปิดร้านใหม่ที่รอการตรวจสอบ $pendingCount รายการ'),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                         },
                       ),
-                      Positioned(
-                        right: 12,
-                        top: 10,
-                        child: Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: AdminTheme.statusRejected,
-                            shape: BoxShape.circle,
+                      if (pendingCount > 0)
+                        Positioned(
+                          right: 12,
+                          top: 10,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: AdminTheme.statusRejected,
+                              shape: BoxShape.circle,
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ],
@@ -214,53 +217,69 @@ class _RestaurantManagementScreenState extends ConsumerState<RestaurantManagemen
     required String emptyMessage,
   }) {
     if (list.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.storefront_outlined,
-                size: 64,
-                color: Colors.grey.shade300,
-              ),
-              const SizedBox(height: 12),
-              Text(
-                emptyMessage,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14.5,
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
+      return RefreshIndicator(
+        color: AdminTheme.primaryMaroon,
+        onRefresh: () => ref.read(adminRestaurantProvider.notifier).refresh(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: 380,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.storefront_outlined,
+                      size: 64,
+                      color: Colors.grey.shade300,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      emptyMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       );
     }
 
-    return ListView.builder(
-      // เว้นขอบล่าง 90px เพื่อไม่ให้ Floating Bottom Navigation Bar บัง
-      padding: const EdgeInsets.only(top: 4, bottom: 95),
-      physics: const BouncingScrollPhysics(),
-      itemCount: list.length,
-      itemBuilder: (context, index) {
-        final restaurant = list[index];
-        return RestaurantCard(
-          restaurant: restaurant,
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => RestaurantDetailScreen(
-                  restaurantId: restaurant.id,
+    return RefreshIndicator(
+      color: AdminTheme.primaryMaroon,
+      onRefresh: () => ref.read(adminRestaurantProvider.notifier).refresh(),
+      child: ListView.builder(
+        // เว้นขอบล่าง 90px เพื่อไม่ให้ Floating Bottom Navigation Bar บัง
+        padding: const EdgeInsets.only(top: 4, bottom: 95),
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
+        ),
+        itemCount: list.length,
+        itemBuilder: (context, index) {
+          final restaurant = list[index];
+          return RestaurantCard(
+            restaurant: restaurant,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RestaurantDetailScreen(
+                    restaurantId: restaurant.id,
+                  ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

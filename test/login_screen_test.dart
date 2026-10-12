@@ -43,7 +43,7 @@ void main() {
     expect(find.text('เข้าสู่ระบบสำหรับแอดมิน (Admin Portal)'), findsNothing);
   });
 
-  testWidgets('Tapping สมัครสมาชิก opens RegisterScreen with all 7 fields and back button', (WidgetTester tester) async {
+  testWidgets('Tapping สมัครสมาชิก opens RegisterScreen with all 6 fields and back button', (WidgetTester tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(
@@ -75,8 +75,8 @@ void main() {
     expect(find.text('ชื่อ'), findsOneWidget);
     expect(find.text('ชื่อจริง'), findsOneWidget);
     expect(find.text('นามสกุล'), findsNWidgets(2)); // Label and hint are both 'นามสกุล'
-    expect(find.text('เลขบัตรประชาชน'), findsOneWidget);
-    expect(find.text('กรุณากรอกเลขบัตรประชาชน'), findsOneWidget);
+    expect(find.text('เลขบัตรประชาชน'), findsNothing);
+    expect(find.text('กรุณากรอกเลขบัตรประชาชน'), findsNothing);
     expect(find.text('เบอร์โทรศัพท์'), findsOneWidget);
     expect(find.text('กรุณากรอกเบอร์โทรศัพท์'), findsOneWidget);
     expect(find.text('อีเมล'), findsOneWidget);
@@ -110,10 +110,9 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(RegisterScreen), findsOneWidget);
 
-    // Fill all 7 form fields
+    // Fill all 6 form fields
     await tester.enterText(find.descendant(of: find.byKey(const Key('first_name_field')), matching: find.byType(TextField)), 'สมชาย');
     await tester.enterText(find.descendant(of: find.byKey(const Key('last_name_field')), matching: find.byType(TextField)), 'ใจดี');
-    await tester.enterText(find.descendant(of: find.byKey(const Key('citizen_id_field')), matching: find.byType(TextField)), '1234567890123');
     await tester.enterText(find.descendant(of: find.byKey(const Key('phone_field')), matching: find.byType(TextField)), '0812345678');
     await tester.enterText(find.descendant(of: find.byKey(const Key('email_field')), matching: find.byType(TextField)), 'test@test.com');
     await tester.enterText(find.descendant(of: find.byKey(const Key('password_field')), matching: find.byType(TextField)), '123456');
