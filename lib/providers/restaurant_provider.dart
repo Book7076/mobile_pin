@@ -781,6 +781,7 @@ class SwipeSessionNotifier extends StateNotifier<SwipeSessionState> {
       swipedCount: newSwipedCount,
     );
 
+    // Sync to Supabase: inserts into `swipes` (Image 1) and increments `swiped_count` (Image 4)
     if (state.currentSessionDbId != null) {
       SwipeSessionService.recordSwipe(
         sessionId: state.currentSessionDbId,

@@ -166,7 +166,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       // Type comment
-      final commentField = find.byType(TextField);
+      final commentField = find.byType(TextField).first;
       expect(commentField, findsOneWidget);
       await tester.enterText(commentField, 'ไก่ทอดอร่อยมาก กรอบนอกนุ่มใน!');
       await tester.pump(const Duration(milliseconds: 300));

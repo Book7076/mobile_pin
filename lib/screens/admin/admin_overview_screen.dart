@@ -46,16 +46,16 @@ class AdminOverviewScreen extends ConsumerWidget {
                             color: AdminTheme.primaryMaroon,
                           ),
                         ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        'ภาพรวมระบบแอปพลิเคชัน Meaimate',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AdminTheme.textSecondary,
+                        SizedBox(height: 4),
+                        Text(
+                          'ภาพรวมระบบแอปพลิเคชัน Meaimate',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AdminTheme.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                   CircleAvatar(
                     backgroundColor: AdminTheme.accentPink,
