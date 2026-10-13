@@ -771,11 +771,6 @@ class SwipeSessionNotifier extends StateNotifier<SwipeSessionState> {
         direction: SwipeDirection.right,
         currentSwipedCount: state.swipedCount - 1,
       );
-      SwipeSessionService.recordSwipe(
-        restaurantId: restaurant.id,
-        direction: 'right',
-        sessionId: state.currentSessionDbId,
-      );
     }
   }
 
@@ -788,9 +783,10 @@ class SwipeSessionNotifier extends StateNotifier<SwipeSessionState> {
 
     if (state.currentSessionDbId != null) {
       SwipeSessionService.recordSwipe(
-        restaurantId: restaurant.id,
-        direction: 'left',
         sessionId: state.currentSessionDbId,
+        restaurantId: restaurant.id,
+        direction: SwipeDirection.left,
+        currentSwipedCount: state.swipedCount - 1,
       );
     }
   }
