@@ -7,6 +7,7 @@ import 'package:pin_mobile/screens/owner/owner_stats_screen.dart';
 import 'package:pin_mobile/screens/owner/owner_messages_screen.dart';
 import 'package:pin_mobile/screens/admin/admin_overview_screen.dart';
 import 'package:pin_mobile/screens/admin/admin_settings_screen.dart';
+import 'package:pin_mobile/services/owner_stats_service.dart';
 
 // 1x1 transparent PNG for mock network images
 final List<int> _kTransparentImage = [
@@ -78,17 +79,32 @@ void main() {
       addTearDown(() => tester.view.resetPhysicalSize());
 
       await tester.pumpWidget(
-        const MaterialApp(
-          home: OwnerStatsScreen(restaurantName: 'The CHICKEN'),
+        ProviderScope(
+          overrides: [
+            ownerReviewStatsProvider.overrideWith(
+              (ref, query) async => const OwnerReviewStats(
+                totalReviews: 8,
+                averageRating: 4.5,
+                fiveStarReviews: 5,
+                ratingCounts: {1: 0, 2: 0, 3: 1, 4: 2, 5: 5},
+                trend: [],
+              ),
+            ),
+          ],
+          child: const MaterialApp(
+            home: OwnerStatsScreen(
+              restaurantId: 'restaurant-1',
+              restaurantName: 'The CHICKEN',
+            ),
+          ),
         ),
       );
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
 
       expect(find.text('สถิติ'), findsOneWidget);
-      expect(find.text('5 วันที่ผ่านมา'), findsOneWidget);
-      expect(find.text('ผู้เข้าชม'), findsWidgets);
-      expect(find.text('ถูกใจ'), findsWidgets);
-      expect(find.text('ไม่ถูกใจ'), findsWidgets);
+      expect(find.text('ภาพรวมรีวิว'), findsOneWidget);
+      expect(find.text('รีวิวทั้งหมด'), findsOneWidget);
+      expect(find.text('คะแนนเฉลี่ย'), findsOneWidget);
     });
 
     testWidgets('2. OwnerMessagesScreen renders customer inquiries and opens reply sheet', (tester) async {

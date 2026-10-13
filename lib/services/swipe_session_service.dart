@@ -194,11 +194,26 @@ class SwipeSessionService {
       final client = Supabase.instance.client;
       final userId = explicitUserId ?? await getCurrentUserId();
 
+      var targetRestaurantId = restaurantId;
+      if (!targetRestaurantId.contains('-')) {
+        try {
+          final res = await client
+              .from('restaurants')
+              .select('id')
+              .ilike('name', '%$restaurantId%')
+              .limit(1)
+              .maybeSingle();
+          if (res != null && res['id'] != null) {
+            targetRestaurantId = res['id'].toString();
+          }
+        } catch (_) {}
+      }
+
       // 2a. Insert row into `swipes` table (Image 1)
       final swipePayload = <String, dynamic>{
         'id': generateClientUuidV4(),
         'session_id': sessionId,
-        'restaurant_id': restaurantId,
+        'restaurant_id': targetRestaurantId,
         'direction': direction,
         'created_at': DateTime.now().toIso8601String(),
       };
@@ -208,7 +223,7 @@ class SwipeSessionService {
 
       await client.from('swipes').insert(swipePayload);
       debugPrint(
-        'Recorded swipe $direction for restaurant $restaurantId in session $sessionId',
+        'Recorded swipe $direction for restaurant $targetRestaurantId in session $sessionId',
       );
 
       // 2b. Increment `swiped_count` in `swipe_sessions` (Image 4)
@@ -225,11 +240,11 @@ class SwipeSessionService {
         await client.from('selected_restaurants').insert({
           'id': generateClientUuidV4(),
           'session_id': sessionId,
-          'restaurant_id': restaurantId,
+          'restaurant_id': targetRestaurantId,
           'is_final_choice': false,
         });
         debugPrint(
-          'Added $restaurantId to selected_restaurants for session $sessionId',
+          'Added $targetRestaurantId to selected_restaurants for session $sessionId',
         );
       }
     } catch (e) {
@@ -310,54 +325,5 @@ class SwipeSessionService {
       status: SwipeSessionModel.statusCompleted,
     );
   }
-
-  /// Records a swipe action ('right' for like, 'left' for dislike) in Supabase `swipes` table
-  static Future<void> recordSwipe({
-    required String restaurantId,
-    required String direction, // 'right' or 'left'
-    String? sessionId,
-    String? explicitUserId,
-  }) async {
-    try {
-      final client = Supabase.instance.client;
-      final userId = explicitUserId ?? await getCurrentUserId();
-
-      var targetRestaurantId = restaurantId;
-      if (!targetRestaurantId.contains('-')) {
-        try {
-          final res = await client
-              .from('restaurants')
-              .select('id')
-              .ilike('name', '%$restaurantId%')
-              .limit(1)
-              .maybeSingle();
-          if (res != null && res['id'] != null) {
-            targetRestaurantId = res['id'].toString();
-          }
-        } catch (_) {}
-      }
-
-      if (sessionId == null ||
-          sessionId.isEmpty ||
-          userId == null ||
-          userId.isEmpty) {
-        return;
-      }
-
-      final payload = <String, dynamic>{
-        'session_id': sessionId,
-        'user_id': userId,
-        'restaurant_id': targetRestaurantId,
-        'direction': direction,
-        'created_at': DateTime.now().toIso8601String(),
-      };
-
-      await client.from('swipes').insert(payload);
-      debugPrint(
-        'Recorded swipe in Supabase: restaurant=$targetRestaurantId direction=$direction',
-      );
-    } catch (e) {
-      debugPrint('Note: Error recording swipe in Supabase: $e');
-    }
-  }
 }
+
