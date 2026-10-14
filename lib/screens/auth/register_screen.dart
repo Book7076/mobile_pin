@@ -8,10 +8,11 @@ import 'login_screen.dart';
 /// Pixel-perfect implementation matching design mockup:
 /// 1. ชื่อ (ชื่อจริง)
 /// 2. นามสกุล (นามสกุล)
-/// 3. เบอร์โทรศัพท์ (กรุณากรอกเบอร์โทรศัพท์)
-/// 4. อีเมล (กรุณากรอกอีเมล)
-/// 5. รหัสผ่าน (กรุณากรอกรหัสผ่าน)
-/// 6. ยืนยันรหัสผ่าน (กรุณากรอกเพื่อยืนยันรหัสผ่าน)
+/// 3. ชื่อผู้ใช้ (กรุณากรอกชื่อผู้ใช้)
+/// 4. เบอร์โทรศัพท์ (กรุณากรอกเบอร์โทรศัพท์)
+/// 5. อีเมล (กรุณากรอกอีเมล)
+/// 6. รหัสผ่าน (กรุณากรอกรหัสผ่าน)
+/// 7. ยืนยันรหัสผ่าน (กรุณากรอกเพื่อยืนยันรหัสผ่าน)
 /// With top back arrow "<" returning to login screen,
 /// and returning to login screen upon successful sign up.
 class RegisterScreen extends StatefulWidget {
@@ -24,6 +25,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -49,6 +51,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _usernameController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -59,12 +62,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _submitRegister() async {
     final firstName = _firstNameController.text.trim();
     final lastName = _lastNameController.text.trim();
+    final username = _usernameController.text.trim();
     final phone = _phoneController.text.trim();
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final confirmPassword = _confirmPasswordController.text.trim();
 
-    // Validations
+    // Validations (ทุกช่องในหน้าสมัครสมาชิกต้องกรอกทั้งหมด)
     if (firstName.isEmpty) {
       _showMessage('กรุณากรอกชื่อจริง');
       return;
@@ -75,23 +79,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    if (username.isEmpty) {
+      _showMessage('กรุณากรอกชื่อผู้ใช้');
+      return;
+    }
+
     if (phone.isEmpty) {
       _showMessage('กรุณากรอกเบอร์โทรศัพท์');
       return;
     }
 
-    if (phone.length < 9 || !RegExp(r'^0[0-9]{8,9}$').hasMatch(phone)) {
-      _showMessage('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง');
+    if (email.isEmpty) {
+      _showMessage('กรุณากรอกอีเมล');
       return;
     }
 
-    if (email.isEmpty || !email.contains('@')) {
+    if (!email.contains('@')) {
       _showMessage('กรุณากรอกอีเมลให้ถูกต้อง');
       return;
     }
 
     if (password.isEmpty) {
       _showMessage('กรุณากรอกรหัสผ่าน');
+      return;
+    }
+
+    if (confirmPassword.isEmpty) {
+      _showMessage('กรุณากรอกเพื่อยืนยันรหัสผ่าน');
+      return;
+    }
+
+    if (phone.length < 9 || !RegExp(r'^0[0-9]{8,9}$').hasMatch(phone)) {
+      _showMessage('กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง');
       return;
     }
 
@@ -108,12 +127,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // ตรวจสอบชื่อผู้ใช้และเบอร์โทรที่มีคนใช้แล้วต้องแจ้งเตือน
+      final existingUsername = await supabase
+          .from('users')
+          .select('id')
+          .eq('username', username)
+          .maybeSingle();
+
+      if (existingUsername != null) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _showMessage('ชื่อผู้ใช้นี้ถูกใช้งานแล้ว');
+        }
+        return;
+      }
+
+      final existingPhone = await supabase
+          .from('users')
+          .select('id')
+          .eq('phone', phone)
+          .maybeSingle();
+
+      if (existingPhone != null) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _showMessage('เบอร์โทรศัพท์นี้ถูกใช้งานแล้ว');
+        }
+        return;
+      }
+    } catch (dbCheckError) {
+      debugPrint('Duplicate check error in Supabase: $dbCheckError');
+    }
+
+    try {
       final response = await supabase.auth.signUp(
         email: email,
         password: password,
         data: {
           'first_name': firstName,
           'last_name': lastName,
+          'username': username,
           'phone': phone,
         },
       );
@@ -121,13 +174,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final user = response.user ?? supabase.auth.currentUser;
       if (user != null) {
         try {
+          // นำข้อมูลเข้า database โดย id แถวใหม่ใน users ใช้ id เดียวกับ auth.uid()
           await supabase.from('users').upsert({
-            'id': user.id,
+            'id': user.id, // auth.uid()
             'email': email,
             'user_type': 'customer',
+            'role': 'customer',
             'first_name': firstName,
             'last_name': lastName,
+            'username': username,
             'phone': phone,
+            'password': password,
             'swipe_count': 0,
           });
         } catch (_) {
@@ -330,7 +387,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         const SizedBox(height: 14),
 
-                        // 3. เบอร์โทรศัพท์
+                        // 3. ชื่อผู้ใช้
+                        _buildInputLabel('ชื่อผู้ใช้'),
+                        const SizedBox(height: 6),
+                        _buildTextField(
+                          fieldKey: const Key('username_field'),
+                          controller: _usernameController,
+                          hintText: 'กรุณากรอกชื่อผู้ใช้',
+                          inputBg: inputBg,
+                          hintColor: hintColor,
+                          textColor: textColor,
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // 4. เบอร์โทรศัพท์
                         _buildInputLabel('เบอร์โทรศัพท์'),
                         const SizedBox(height: 6),
                         _buildTextField(
@@ -349,7 +420,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         const SizedBox(height: 14),
 
-                        // 4. อีเมล
+                        // 5. อีเมล
                         _buildInputLabel('อีเมล'),
                         const SizedBox(height: 6),
                         _buildTextField(
@@ -364,7 +435,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         const SizedBox(height: 14),
 
-                        // 5. รหัสผ่าน
+                        // 6. รหัสผ่าน
                         _buildInputLabel('รหัสผ่าน'),
                         const SizedBox(height: 6),
                         _buildTextField(
@@ -379,7 +450,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         const SizedBox(height: 14),
 
-                        // 6. ยืนยันรหัสผ่าน
+                        // 7. ยืนยันรหัสผ่าน
                         _buildInputLabel('ยืนยันรหัสผ่าน'),
                         const SizedBox(height: 6),
                         _buildTextField(
@@ -394,7 +465,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                         const SizedBox(height: 24),
 
-                        // 7. Submit Button: "สมัครสมาชิก"
+                        // 8. Submit Button: "สมัครสมาชิก"
                         SizedBox(
                           height: 50,
                           child: DecoratedBox(

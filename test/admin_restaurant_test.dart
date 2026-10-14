@@ -373,7 +373,7 @@ void main() {
   });
 
   group('6-Screen Cancel Rejection Flow Tests (Images 1, 2, 3)', () {
-    test('Unit Test: cancelRejection moves restaurant from rejected to pending', () async {
+    test('Unit Test: cancelRejection moves restaurant from rejected to approved', () async {
       final notifier = AdminRestaurantNotifier();
       // ค้นหาร้านเตาอุ่นที่มีสถานะ rejected
       final target = notifier.state.firstWhere((r) => r.id == 'res-rejected-01');
@@ -385,7 +385,7 @@ void main() {
       expect(success, true);
 
       final updated = notifier.state.firstWhere((r) => r.id == target.id);
-      expect(updated.status, 'pending');
+      expect(updated.status, 'approved');
       expect(updated.rejectionReason, isNull);
       expect(updated.reviewerName, isNull);
     });
@@ -480,6 +480,12 @@ void main() {
       // ยังคงมีร้าน KAME KAFE และ สุกี้ช้างเผือก อยู่ในแท็บไม่อนุมัติ
       expect(find.text('KAME KAFE'), findsWidgets);
       expect(find.text('สุกี้ช้างเผือก'), findsWidgets);
+
+      // สลับไปที่แท็บ "อนุมัติ" และต้องแสดงร้าน "เตาอุ่น" ด้วยเหมือนร้านอื่นๆ
+      await tester.tap(find.text('อนุมัติ'));
+      await tester.pumpAndSettle();
+      expect(find.text('เตาอุ่น'), findsOneWidget);
     });
+
   });
 }

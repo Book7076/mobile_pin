@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../models/restaurant_model.dart';
 import '../../providers/restaurant_provider.dart';
+import '../../services/review_service.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 
 /// Screen "ร้านที่ใช่ โดนใจคุณ" (Final Winner Screen)
@@ -48,6 +49,12 @@ class FinalWinnerScreen extends ConsumerWidget {
           selectedCategories: selectedCategories,
         );
     final locationBadge = _getLocationBadge(restaurant);
+
+    final dbReviews = ref.watch(reviewsProvider.notifier).getReviewsForRestaurant(restaurant.id);
+    final effectiveRating = dbReviews.isNotEmpty
+        ? ReviewService.calculateAverageRating(dbReviews, defaultRating: restaurant.rating)
+        : restaurant.rating;
+    final effectiveReviewCount = dbReviews.isNotEmpty ? dbReviews.length : restaurant.reviewCount;
 
     return Scaffold(
       backgroundColor: AppConstants.backgroundWarm,
@@ -258,7 +265,11 @@ class FinalWinnerScreen extends ConsumerWidget {
                                         ),
                                         const SizedBox(width: 6),
                                         Text(
-                                          '${restaurant.rating.toStringAsFixed(1)}  (${restaurant.reviewCount} รีวิว)',
+                                          effectiveReviewCount > 0
+                                              ? '${effectiveRating.toStringAsFixed(1)}  ($effectiveReviewCount รีวิว)'
+                                              : (effectiveRating > 0
+                                                  ? '${effectiveRating.toStringAsFixed(1)}  ($effectiveReviewCount รีวิว)'
+                                                  : '0.0  (ยังไม่มีรีวิว)'),
                                           style: const TextStyle(
                                             fontSize: 14,
                                             fontWeight: FontWeight.w700,

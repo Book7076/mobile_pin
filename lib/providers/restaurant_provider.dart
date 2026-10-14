@@ -7,8 +7,10 @@ import '../models/filter_criteria_model.dart';
 import '../models/restaurant_model.dart';
 import '../models/review_model.dart';
 import '../models/swipe_session_model.dart';
+import '../models/user_model.dart';
 import '../services/review_service.dart';
 import '../services/swipe_session_service.dart';
+import 'auth_provider.dart';
 
 // 1. Master Restaurants List
 class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
@@ -23,6 +25,7 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
         response = await supabase
             .from('restaurants')
             .select('*, restaurant_images(*), cuisine_types(*), menu_items(*)')
+            .eq('status', 'approved')
             .order('crated_at', ascending: false);
       } catch (_) {
         try {
@@ -31,6 +34,7 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
               .select(
                 '*, restaurant_images(*), cuisine_types(*), menu_items(*)',
               )
+              .eq('status', 'approved')
               .order('created_at', ascending: false);
         } catch (_) {
           try {
@@ -38,14 +42,23 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
                 .from('restaurants')
                 .select(
                   '*, restaurant_images(*), cuisine_types(*), menu_items(*)',
-                );
+                )
+                .eq('status', 'approved');
           } catch (_) {
             try {
               response = await supabase
                   .from('restaurants')
-                  .select('*, restaurant_images(*)');
+                  .select('*, restaurant_images(*)')
+                  .eq('status', 'approved');
             } catch (_) {
-              response = await supabase.from('restaurants').select();
+              try {
+                response = await supabase
+                    .from('restaurants')
+                    .select()
+                    .eq('status', 'approved');
+              } catch (_) {
+                response = await supabase.from('restaurants').select();
+              }
             }
           }
         }
@@ -54,8 +67,29 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
       if (response != null && response is List && response.isNotEmpty) {
         final List<RestaurantModel> loaded = [];
         for (final item in response) {
-          loaded.add(RestaurantModel.fromJson(Map<String, dynamic>.from(item)));
+          final model = RestaurantModel.fromJson(Map<String, dynamic>.from(item));
+          // Strict customer filter: only approved restaurants can be displayed
+          if (model.status == 'approved') {
+            loaded.add(model);
+          }
         }
+
+        // อิงคะแนนรีวิวจริงจากตาราง reviews ใน database (รูปที่ 1)
+        try {
+          final stats = await ReviewService.fetchAllRestaurantReviewStats();
+          for (int i = 0; i < loaded.length; i++) {
+            final r = loaded[i];
+            final stat = stats[r.id];
+            if (stat != null) {
+              loaded[i] = r.copyWith(rating: stat.rating, reviewCount: stat.reviewCount);
+            } else {
+              loaded[i] = r.copyWith(rating: 0.0, reviewCount: 0);
+            }
+          }
+        } catch (e) {
+          debugPrint('Note: Error updating review stats from reviews table: $e');
+        }
+
         if (loaded.isNotEmpty) {
           state = loaded;
         }
@@ -103,7 +137,9 @@ class RestaurantsNotifier extends StateNotifier<List<RestaurantModel>> {
         updateData['rejection_reason'] = rejectionReason;
       }
       await supabase.from('restaurants').update(updateData).eq('id', id);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Supabase updateRestaurantStatus note: $e');
+    }
   }
 
   void toggleFavorite(String id) {
@@ -511,10 +547,17 @@ String formatRestaurantCategory(
   }
 
   // Fallback to restaurant's own categories when no filter criteria was selected
+  // ประเภทอาหารของแต่ละร้านคือ cuisine_type_id อิงตาม database (รูปที่ 2 และ 3)
   if (restaurant.id == 'rest_shabu_mouood' ||
       (restaurant.categories.contains('shabu_hotpot') &&
           restaurant.categories.contains('mookata'))) {
     return 'ชาบู/หมูกระทะ';
+  }
+  if (restaurant.cuisineTypeName != null && restaurant.cuisineTypeName!.isNotEmpty) {
+    return restaurant.cuisineTypeName!;
+  }
+  if (restaurant.cuisineTypeId != null) {
+    return mapCuisineTypeIdToName(restaurant.cuisineTypeId!);
   }
   if (restaurant.id == 'rest_teds_coffee') {
     return 'ร้านกาแฟ/ขนมหวาน';
@@ -533,14 +576,66 @@ String formatRestaurantCategory(
       : 'อาหารทั่วไป';
 }
 
+/// Checks if the given restaurant belongs to the user (based on database restaurants.owner_id == users.id)
+bool isUserOwnerOfRestaurant({
+  required RestaurantModel restaurant,
+  UserModel? currentUser,
+  String? authUserId,
+}) {
+  final currentUserId = currentUser?.id.trim();
+  final resolvedAuthId = authUserId?.trim();
+  final ownedRestaurantId = currentUser?.ownedRestaurantId?.trim();
+  final restOwnerId = restaurant.ownerId.trim();
+  final restId = restaurant.id.trim();
+
+  // 1. Primary check: Database restaurants.owner_id matches users.id
+  if (restOwnerId.isNotEmpty) {
+    if (currentUserId != null && currentUserId.isNotEmpty) {
+      if (restOwnerId.toLowerCase() == currentUserId.toLowerCase()) {
+        return true;
+      }
+    }
+    if (resolvedAuthId != null && resolvedAuthId.isNotEmpty) {
+      if (restOwnerId.toLowerCase() == resolvedAuthId.toLowerCase()) {
+        return true;
+      }
+    }
+  }
+
+  // 2. Secondary check: User ownedRestaurantId matches restaurants.id
+  if (ownedRestaurantId != null && ownedRestaurantId.isNotEmpty) {
+    if (restId.toLowerCase() == ownedRestaurantId.toLowerCase()) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 final filteredRestaurantsProvider = Provider<List<RestaurantModel>>((ref) {
   final allRestaurants = ref.watch(restaurantsProvider);
   final criteria = ref.watch(filterCriteriaProvider);
   final session = ref.watch(swipeSessionProvider);
+  final currentUser = ref.watch(authProvider);
+  String? authUserId;
+  try {
+    authUserId = supabase.auth.currentUser?.id;
+  } catch (_) {
+    authUserId = null;
+  }
 
   return allRestaurants.where((restaurant) {
     // Only approved restaurants in discovery/swipe
     if (restaurant.status != 'approved') return false;
+
+    // เจ้าของร้านต้องไม่ปัดเจอร้านของตัวเอง (อิงตาม database restaurants.owner_id == users.id)
+    if (isUserOwnerOfRestaurant(
+      restaurant: restaurant,
+      currentUser: currentUser,
+      authUserId: authUserId,
+    )) {
+      return false;
+    }
 
     // Filter by session cuisines (from swipe_session_cuisines - real source of truth)
     // เอาร้านที่มีประเภทใดประเภทหนึ่งตรงกับที่ผู้ใช้เลือก

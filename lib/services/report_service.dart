@@ -290,3 +290,32 @@ class ReportService {
     ),
   ];
 }
+
+/// จัดการสถานะการเปิดดู/รับทราบรายงานปัญหาสำหรับไอคอนกระดิ่งการแจ้งเตือนของแอดมิน
+class ReportNotificationManager {
+  static final Set<String> _seenReportIds = <String>{};
+
+  /// ตรวจสอบว่าแอดมินเคยกดดูรายงานนี้แล้วหรือไม่
+  static bool isSeen(String reportId) => _seenReportIds.contains(reportId);
+
+  /// ทำเครื่องหมายว่าเปิดดูรายงานนี้แล้ว
+  static void markAsSeen(String reportId) {
+    _seenReportIds.add(reportId);
+  }
+
+  /// ทำเครื่องหมายว่าเปิดดูรายงานทั้งหมดแล้ว (เมื่อกดดูกระดิ่ง)
+  static void markAllAsSeen(Iterable<String> reportIds) {
+    _seenReportIds.addAll(reportIds);
+  }
+
+  /// จำนวนรายงานใหม่ (status == 'pending') ที่ยังไม่ได้ถูกกดดู
+  static int countUnseenNewReports(Iterable<ReportModel> reports) {
+    return reports.where((r) => r.status == 'pending' && !isSeen(r.id)).length;
+  }
+
+  /// ล้างประวัติการดู (สำหรับการทดสอบหรือรีเซ็ตระบบ)
+  static void clear() {
+    _seenReportIds.clear();
+  }
+}
+

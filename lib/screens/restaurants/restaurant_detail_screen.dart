@@ -8,6 +8,7 @@ import '../../core/constants.dart';
 import '../../models/favorite_manager.dart';
 import '../../models/restaurant_model.dart';
 import '../../models/review_model.dart';
+import '../../models/swipe_session_model.dart';
 import '../../providers/restaurant_provider.dart';
 import '../../services/review_service.dart';
 import 'restaurant_all_menu_screen.dart';
@@ -63,6 +64,8 @@ class _RestaurantDetailScreenState
   String? _lastLoadedRestaurantId;
   List<ReviewModel>? _databaseReviews;
   String? _lastLoadedReviewRestaurantId;
+  Map<int, String>? _databaseOperatingHours;
+  String? _lastLoadedHoursRestaurantId;
 
   @override
   void initState() {
@@ -70,6 +73,7 @@ class _RestaurantDetailScreenState
     _initBookmarkState();
     _loadDishesFromDatabase();
     _loadReviewsFromDatabase();
+    _loadOperatingHoursFromDatabase();
   }
 
   Future<void> _loadDishesFromDatabase([String? overrideId, String? overrideName]) async {
@@ -181,6 +185,73 @@ class _RestaurantDetailScreenState
       }
     } catch (e) {
       debugPrint('Note: Error loading reviews in RestaurantDetailScreen: $e');
+    }
+  }
+
+  Future<void> _loadOperatingHoursFromDatabase([String? overrideId, String? overrideName]) async {
+    final effectiveId = overrideId ??
+        widget.restaurantId ??
+        widget.restaurantData?['id']?.toString();
+    final effectiveName = overrideName ??
+        widget.name ??
+        widget.restaurantData?['name']?.toString();
+
+    if (effectiveId != null && effectiveId == _lastLoadedHoursRestaurantId && _databaseOperatingHours != null) {
+      return;
+    }
+    _lastLoadedHoursRestaurantId = effectiveId;
+
+    String? targetRestaurantId = effectiveId;
+
+    try {
+      if (targetRestaurantId == null || !targetRestaurantId.contains('-')) {
+        if (effectiveName != null && effectiveName.isNotEmpty) {
+          try {
+            final resRows = await Supabase.instance.client
+                .from('restaurants')
+                .select('id')
+                .ilike('name', '%$effectiveName%')
+                .limit(1);
+            if (resRows is List && resRows.isNotEmpty) {
+              targetRestaurantId = resRows.first['id']?.toString();
+            }
+          } catch (_) {}
+        }
+      }
+
+      if (targetRestaurantId != null && targetRestaurantId.isNotEmpty) {
+        final rows = await Supabase.instance.client
+            .from('operating_hours')
+            .select()
+            .eq('restaurant_id', targetRestaurantId)
+            .order('day_of_week', ascending: true);
+
+        if (rows is List && rows.isNotEmpty && mounted) {
+          final Map<int, String> hoursMap = {};
+          for (final row in rows) {
+            final rawDay = (row['day_of_week'] as num?)?.toInt();
+            if (rawDay != null) {
+              final isClosed = row['is_closed'] as bool? ?? false;
+              if (isClosed) {
+                hoursMap[rawDay] = 'ปิดทำการ';
+              } else {
+                final o = row['open_time']?.toString() ?? '10:00';
+                final c = row['close_time']?.toString() ?? '21:00';
+                final cleanO = o.length >= 5 ? o.substring(0, 5) : o;
+                final cleanC = c.length >= 5 ? c.substring(0, 5) : c;
+                hoursMap[rawDay] = '$cleanO - $cleanC';
+              }
+            }
+          }
+          if (hoursMap.isNotEmpty && mounted) {
+            setState(() {
+              _databaseOperatingHours = hoursMap;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Note: Error loading operating_hours in RestaurantDetailScreen: $e');
     }
   }
 
@@ -314,13 +385,17 @@ class _RestaurantDetailScreenState
     }
   }
 
-  Future<void> _openMap(String address, double lat, double lng) async {
-    final googleMapsUrl = Uri.parse(
+  Future<void> _openMap(String address, double lat, double lng, [String? googleMapsUrl]) async {
+    Uri? targetUrl;
+    if (googleMapsUrl != null && googleMapsUrl.isNotEmpty) {
+      targetUrl = Uri.tryParse(googleMapsUrl);
+    }
+    targetUrl ??= Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$lat,$lng',
     );
     try {
-      if (await canLaunchUrl(googleMapsUrl)) {
-        await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(targetUrl)) {
+        await launchUrl(targetUrl, mode: LaunchMode.externalApplication);
       }
     } catch (_) {}
   }
@@ -407,6 +482,9 @@ class _RestaurantDetailScreenState
     }
     if (_databaseReviews == null && _lastLoadedReviewRestaurantId != restaurant.id) {
       _loadReviewsFromDatabase(restaurant.id, restaurant.name);
+    }
+    if (_databaseOperatingHours == null && _lastLoadedHoursRestaurantId != restaurant.id) {
+      _loadOperatingHoursFromDatabase(restaurant.id, restaurant.name);
     }
 
     if (restaurant.id.isEmpty) {
@@ -668,6 +746,13 @@ class _RestaurantDetailScreenState
     if (restaurant.id == 'rest_shabu_mouood') {
       return 'ชาบู, หมูกระทะ';
     }
+    // ประเภทอาหารของแต่ละร้านคือ cuisine_type_id อิงตาม database (รูปที่ 2 และ 3)
+    if (restaurant.cuisineTypeName != null && restaurant.cuisineTypeName!.isNotEmpty) {
+      return restaurant.cuisineTypeName!;
+    }
+    if (restaurant.cuisineTypeId != null) {
+      return mapCuisineTypeIdToName(restaurant.cuisineTypeId!);
+    }
     if (restaurant.id == 'rest_rawtruckr') {
       return 'อาหารเกาหลี';
     }
@@ -734,10 +819,13 @@ class _RestaurantDetailScreenState
                       restaurant.address,
                       restaurant.lat,
                       restaurant.lng,
+                      restaurant.googleMapsUrl,
                     ),
-                    child: const Text(
-                      'www.googlemap.com',
-                      style: TextStyle(
+                    child: Text(
+                      (restaurant.googleMapsUrl != null && restaurant.googleMapsUrl!.isNotEmpty)
+                          ? (restaurant.googleMapsUrl!.contains('google') ? 'www.googlemap.com' : restaurant.googleMapsUrl!)
+                          : 'www.googlemap.com',
+                      style: const TextStyle(
                         fontSize: 13,
                         color: Color(0xFF1D4ED8),
                         decoration: TextDecoration.underline,
@@ -782,17 +870,18 @@ class _RestaurantDetailScreenState
 
   /// 3. เวลาเปิด-ปิด Schedule
   Widget _buildOpeningHoursSection(RestaurantModel restaurant) {
-    final days = [
-      'อาทิตย์',
-      'จันทร์',
-      'อังคาร',
-      'พุธ',
-      'พฤหัสบดี',
-      'ศุกร์',
-      'เสาร์',
+    // 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat (also support 7=Sun)
+    final scheduleDays = [
+      {'name': 'อาทิตย์', 'dow': [0, 7]},
+      {'name': 'จันทร์', 'dow': [1]},
+      {'name': 'อังคาร', 'dow': [2]},
+      {'name': 'พุธ', 'dow': [3]},
+      {'name': 'พฤหัสบดี', 'dow': [4]},
+      {'name': 'ศุกร์', 'dow': [5]},
+      {'name': 'เสาร์', 'dow': [6]},
     ];
 
-    final hours = restaurant.openHours.isNotEmpty
+    final defaultHours = restaurant.openHours.isNotEmpty
         ? restaurant.openHours.replaceAll(' น.', '')
         : '11.00 - 23.00';
 
@@ -809,21 +898,34 @@ class _RestaurantDetailScreenState
         ),
         const SizedBox(height: 10),
         Column(
-          children: days.map((day) {
+          children: scheduleDays.map((item) {
+            final dayName = item['name'] as String;
+            final dows = item['dow'] as List<int>;
+            String? dayHours;
+            if (_databaseOperatingHours != null) {
+              for (final d in dows) {
+                if (_databaseOperatingHours!.containsKey(d)) {
+                  dayHours = _databaseOperatingHours![d];
+                  break;
+                }
+              }
+            }
+            final displayHours = dayHours ?? defaultHours;
+
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 3.5),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    day,
+                    dayName,
                     style: const TextStyle(
                       fontSize: 13.5,
                       color: Color(0xFF475569),
                     ),
                   ),
                   Text(
-                    hours,
+                    displayHours,
                     style: const TextStyle(
                       fontSize: 13.5,
                       color: Color(0xFF334155),
@@ -1078,16 +1180,20 @@ class _RestaurantDetailScreenState
     RestaurantModel restaurant,
     List<ReviewModel> fallbackReviews,
   ) {
+    // อิงตามรีวิวจริงใน database reviews table เท่านั้น ห้ามสมมติข้อมูล
     final reviews = _databaseReviews ?? fallbackReviews;
-    final avgRating = reviews.isNotEmpty
-        ? ReviewService.calculateAverageRating(reviews, defaultRating: restaurant.rating)
-        : restaurant.rating;
+    final hasReviews = reviews.isNotEmpty;
+    final avgRating = hasReviews
+        ? ReviewService.calculateAverageRating(reviews, defaultRating: 0.0)
+        : 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header Row: รีวิวร้านอาหาร ★ 4.5 (ตรงตามรูปที่ 1)
-        Row(
+        // Header Row: รีวิวร้านอาหาร ★ X.X (ตามรีวิวจริงใน database reviews table)
+        Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
           children: [
             const Text(
               'รีวิวร้านอาหาร',
@@ -1097,27 +1203,31 @@ class _RestaurantDetailScreenState
                 color: Color(0xFF1E293B),
               ),
             ),
-            const SizedBox(width: 8),
-            const Icon(
-              Icons.star_rounded,
-              color: AppConstants.burgundyPrimary,
-              size: 20,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              '$avgRating',
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF1E293B),
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.star_rounded,
+                  color: AppConstants.burgundyPrimary,
+                  size: 20,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  avgRating.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
         const SizedBox(height: 12),
 
         // Reviews Cards (รูปที่ 1: การ์ดยังไม่มีรีวิวสำหรับร้านนี้)
-        if (reviews.isEmpty)
+        if (!hasReviews)
           Material(
             color: Colors.transparent,
             child: InkWell(

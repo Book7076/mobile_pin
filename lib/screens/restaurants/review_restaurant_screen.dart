@@ -57,6 +57,7 @@ class _ReviewRestaurantScreenState extends ConsumerState<ReviewRestaurantScreen>
 
       if (newReview != null) {
         ref.read(reviewsProvider.notifier).addReview(newReview);
+        ref.read(restaurantsProvider.notifier).loadRestaurants();
       }
     } catch (e) {
       debugPrint('Note: Error submitting review: $e');

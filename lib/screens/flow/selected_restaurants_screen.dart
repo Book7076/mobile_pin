@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants.dart';
 import '../../models/restaurant_model.dart';
 import '../../providers/restaurant_provider.dart';
+import '../../services/review_service.dart';
 import '../restaurants/restaurant_detail_screen.dart';
 import 'final_winner_screen.dart';
 
@@ -24,6 +25,17 @@ class SelectedRestaurantsScreen extends ConsumerStatefulWidget {
 class _SelectedRestaurantsScreenState
     extends ConsumerState<SelectedRestaurantsScreen> {
   int _selectedIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final liked = ref.read(swipeSessionProvider).likedRestaurants;
+      for (final r in liked) {
+        ref.read(reviewsProvider.notifier).loadReviewsForRestaurant(r.id);
+      }
+    });
+  }
 
   void _openWinnerScreen(List<RestaurantModel> liked) {
     if (liked.isEmpty) return;
@@ -156,11 +168,15 @@ class _SelectedRestaurantsScreenState
     );
   }
 
-  /// Restaurant card matching Figma Mockup Image 3
   Widget _buildMockupRestaurantCard(
       BuildContext context, RestaurantModel restaurant, int index) {
     final hasImage = restaurant.imageUrls.isNotEmpty;
     final isSelected = index == _selectedIndex;
+    final dbReviews = ref.watch(reviewsProvider.notifier).getReviewsForRestaurant(restaurant.id);
+    final effectiveRating = dbReviews.isNotEmpty
+        ? ReviewService.calculateAverageRating(dbReviews, defaultRating: restaurant.rating)
+        : restaurant.rating;
+    final displayRating = effectiveRating > 0 ? effectiveRating.toStringAsFixed(1) : '0.0';
 
     return InkWell(
       key: ValueKey('restaurant_item_$index'),
@@ -294,7 +310,7 @@ class _SelectedRestaurantsScreenState
                     ),
                     const SizedBox(width: 2),
                     Text(
-                      restaurant.rating.toStringAsFixed(1),
+                      displayRating,
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w800,

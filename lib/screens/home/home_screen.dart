@@ -145,7 +145,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _currentTab = widget.initialIndex ?? widget.initialTab;
+    _currentTab = (widget.initialIndex ?? widget.initialTab).clamp(0, 2);
     _fetchUserType();
     _loadFavoritesFromSupabase();
     _searchFocusNode.addListener(() {
@@ -186,6 +186,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     try {
       final user = supabase.auth.currentUser;
       if (user != null) {
+        // Check restaurant status for user in Supabase
+        // Step 1: When user registers a restaurant (status: pending), user_type remains 'customer'
+        // Step 2: When admin approves -> status approved, user_type becomes 'owner'
+        //         When admin rejects -> status rejected, user_type becomes 'owner'
+        try {
+          final anyRestaurants = await supabase
+              .from('restaurants')
+              .select('id, status')
+              .eq('owner_id', user.id);
+
+          if (anyRestaurants is List && anyRestaurants.isNotEmpty) {
+            final hasApprovedOrRejected = anyRestaurants.any((r) =>
+                r['status'] == 'approved' || r['status'] == 'rejected');
+            final isOnlyPending = anyRestaurants.every((r) => r['status'] == 'pending');
+
+            if (hasApprovedOrRejected) {
+              // Admin decided (approved or rejected): user_type = owner
+              try {
+                await supabase
+                    .from('users')
+                    .update({'user_type': 'owner', 'role': 'owner'})
+                    .eq('id', user.id);
+              } catch (_) {}
+
+              if (mounted) {
+                setState(() {
+                  _currentUserType = 'owner';
+                });
+              }
+              return;
+            } else if (isOnlyPending) {
+              // Pending review: user_type remains customer
+              try {
+                await supabase
+                    .from('users')
+                    .update({'user_type': 'customer', 'role': 'user'})
+                    .eq('id', user.id);
+              } catch (_) {}
+
+              if (mounted) {
+                setState(() {
+                  _currentUserType = 'customer';
+                });
+              }
+              return;
+            }
+          }
+        } catch (_) {}
+
         final metaType = user.userMetadata?['user_type'] ??
             user.userMetadata?['role'] ??
             user.appMetadata['user_type'] ??
@@ -198,7 +247,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         final userData = await supabase
             .from('users')
-            .select('user_type')
+            .select('user_type, role')
             .eq('id', user.id)
             .maybeSingle();
 

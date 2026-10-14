@@ -5,6 +5,8 @@ import '../main.dart';
 class AuthSessionManager {
   static String? _overrideProvider;
   static String? _overrideSocialName;
+  static bool _pendingSocialRegistration = false;
+  static String? _pendingSocialProvider;
 
   /// Sets an explicit provider and name (used after social login or during testing)
   static void setProvider(String provider, {String? socialName}) {
@@ -18,6 +20,20 @@ class AuthSessionManager {
   static void clearOverride() {
     _overrideProvider = null;
     _overrideSocialName = null;
+  }
+
+  /// Flag indicating user clicked register from account not found dialog
+  static bool get isPendingSocialRegistration => _pendingSocialRegistration;
+  static String? get pendingSocialProvider => _pendingSocialProvider;
+
+  static void setPendingSocialRegistration(bool value, [String? provider]) {
+    _pendingSocialRegistration = value;
+    _pendingSocialProvider = provider;
+  }
+
+  static void clearPendingSocialRegistration() {
+    _pendingSocialRegistration = false;
+    _pendingSocialProvider = null;
   }
 
   /// Returns current active login provider: 'facebook', 'google', or 'email'

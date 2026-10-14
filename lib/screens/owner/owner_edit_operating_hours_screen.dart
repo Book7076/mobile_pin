@@ -261,7 +261,10 @@ class _OwnerEditOperatingHoursScreenState
       } catch (_) {}
     }
 
-    if (targetId == null || targetId.isEmpty) return false;
+    if (targetId == null || targetId.isEmpty) {
+      // โหมดกรอกข้อมูลก่อนเปิดร้าน (ยังไม่มี restaurant_id) - ให้บันทึก local state สำเร็จเพื่อส่งข้อมูลกลับ
+      return true;
+    }
 
     setState(() => _isLoading = true);
     try {

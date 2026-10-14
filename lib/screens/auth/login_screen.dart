@@ -10,8 +10,10 @@ import '../admin/admin_dashboard.dart';
 import '../onboarding/onboarding_flow_screen.dart';
 import '../../widgets/meal_mate_logo.dart';
 import '../../widgets/social_login_button.dart';
+import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
+import 'social_register_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -142,11 +144,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handlePostAuthSuccess() async {
     final user = supabase.auth.currentUser;
     String? role;
+    final currentProvider = AuthSessionManager.currentProvider;
+    final isSocialLogin = currentProvider == 'google' || currentProvider == 'facebook';
 
     if (user != null) {
+      Map<String, dynamic>? userData;
       try {
         // เช็ค id ว่าตรงกับแถวไหนในตาราง users แล้วดึงข้อมูลรวมถึง phone และ first_name, last_name
-        var userData = await supabase
+        userData = await supabase
             .from('users')
             .select('id, email, phone, first_name, last_name, username, image_url, user_type, role')
             .eq('id', user.id)
@@ -159,41 +164,69 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               .eq('email', user.email!)
               .maybeSingle();
         }
+      } catch (e) {
+        debugPrint('Error querying users table in LoginScreen: $e');
+      }
 
-        if (userData != null) {
-          role = (userData['user_type'] ?? userData['role'])?.toString();
-          final authPhone = (user.phone != null && user.phone!.isNotEmpty)
-              ? user.phone!
-              : (user.userMetadata?['phone']?.toString() ?? '');
-          final metaFirst = (user.userMetadata?['first_name'] ?? user.userMetadata?['fname'])?.toString().trim() ?? '';
-          final metaLast = (user.userMetadata?['last_name'] ?? user.userMetadata?['lname'])?.toString().trim() ?? '';
-          final authAvatar = (user.userMetadata?['image_url'] ?? user.userMetadata?['avatar_url'])?.toString().trim() ?? '';
-          final authUsername = user.userMetadata?['username']?.toString().trim() ?? '';
+      if (userData != null) {
+        // ถ้ามีบัญชีใน database สามารถเข้าแอปได้เลยเมื่อล็อคอินตามระบบสองระบบนั้นเสร็จ
+        role = (userData['user_type'] ?? userData['role'])?.toString();
+        final authPhone = (user.phone != null && user.phone!.isNotEmpty)
+            ? user.phone!
+            : (user.userMetadata?['phone']?.toString() ?? '');
+        final metaFirst = (user.userMetadata?['first_name'] ?? user.userMetadata?['fname'])?.toString().trim() ?? '';
+        final metaLast = (user.userMetadata?['last_name'] ?? user.userMetadata?['lname'])?.toString().trim() ?? '';
+        final authAvatar = (user.userMetadata?['image_url'] ?? user.userMetadata?['avatar_url'])?.toString().trim() ?? '';
+        final authUsername = user.userMetadata?['username']?.toString().trim() ?? '';
 
-          final mergedData = Map<String, dynamic>.from(userData);
-          if ((mergedData['phone'] == null || mergedData['phone'].toString().trim().isEmpty) && authPhone.isNotEmpty) {
-            mergedData['phone'] = authPhone;
+        final mergedData = Map<String, dynamic>.from(userData);
+        if ((mergedData['phone'] == null || mergedData['phone'].toString().trim().isEmpty) && authPhone.isNotEmpty) {
+          mergedData['phone'] = authPhone;
+        }
+        if ((mergedData['first_name'] == null || mergedData['first_name'].toString().trim().isEmpty) && metaFirst.isNotEmpty) {
+          mergedData['first_name'] = metaFirst;
+        }
+        if ((mergedData['last_name'] == null || mergedData['last_name'].toString().trim().isEmpty) && metaLast.isNotEmpty) {
+          mergedData['last_name'] = metaLast;
+        }
+        if ((mergedData['image_url'] == null || mergedData['image_url'].toString().trim().isEmpty) && authAvatar.isNotEmpty) {
+          mergedData['image_url'] = authAvatar;
+        }
+        if ((mergedData['username'] == null || mergedData['username'].toString().trim().isEmpty) && authUsername.isNotEmpty) {
+          mergedData['username'] = authUsername;
+        }
+        ref.read(authProvider.notifier).setUserFromMap(mergedData);
+      } else {
+        // ถ้าไม่พบบัญชีในตาราง users
+        if (isSocialLogin) {
+          if (AuthSessionManager.isPendingSocialRegistration) {
+            // เมื่อกลับมาจากการเลือกบัญชีเพื่อลงทะเบียน
+            AuthSessionManager.clearPendingSocialRegistration();
+            if (mounted) {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SocialRegisterScreen(
+                    authUser: user,
+                    providerName: currentProvider,
+                  ),
+                ),
+              );
+            }
+            return;
           }
-          if ((mergedData['first_name'] == null || mergedData['first_name'].toString().trim().isEmpty) && metaFirst.isNotEmpty) {
-            mergedData['first_name'] = metaFirst;
+
+          // ถ้าล็อกอินด้วย Google หรือ Facebook แล้วไม่พบบัญชีในตาราง users:
+          // ให้ขึ้นป็อปอัพแบบรูปที่ 2 แต่เปลี่ยนรูปแบบให้เป็นสี burgundyPrimary
+          if (mounted) {
+            final provider = currentProvider == 'facebook'
+                ? OAuthProvider.facebook
+                : OAuthProvider.google;
+            _showSocialAccountNotFoundDialog(provider, user);
           }
-          if ((mergedData['last_name'] == null || mergedData['last_name'].toString().trim().isEmpty) && metaLast.isNotEmpty) {
-            mergedData['last_name'] = metaLast;
-          }
-          if ((mergedData['image_url'] == null || mergedData['image_url'].toString().trim().isEmpty) && authAvatar.isNotEmpty) {
-            mergedData['image_url'] = authAvatar;
-          }
-          if ((mergedData['username'] == null || mergedData['username'].toString().trim().isEmpty) && authUsername.isNotEmpty) {
-            mergedData['username'] = authUsername;
-          }
-          ref.read(authProvider.notifier).setUserFromMap(mergedData);
+          return;
         } else {
           await ref.read(authProvider.notifier).refreshUser();
         }
-      } catch (_) {
-        try {
-          await ref.read(authProvider.notifier).refreshUser();
-        } catch (_) {}
       }
     }
 
@@ -218,6 +251,150 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
+  void showSocialAccountNotFoundDialog(OAuthProvider provider, [User? authUser]) {
+    _showSocialAccountNotFoundDialog(provider, authUser);
+  }
+
+  void _showSocialAccountNotFoundDialog(OAuthProvider provider, User? authUser) {
+    final isFacebook = provider == OAuthProvider.facebook;
+    final providerTitle = isFacebook ? 'Facebook' : 'Google';
+    const burgundy = AppConstants.burgundyPrimary;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+          ),
+          elevation: 10,
+          backgroundColor: const Color(0xFFF3F3F5),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'ไม่พบบัญชี MealMate',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF1D1D24),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'บัญชี $providerTitle นี้ไม่ได้เชื่อมต่อกับบัญชี MealMate',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF4A4A4A),
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 26),
+                // ปุ่ม "ลงทะเบียน" สี burgundyPrimary สไตล์ปุ่มเขียวในรูปที่ 2
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    key: const Key('social_dialog_register_button'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: burgundy,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    onPressed: () async {
+                      Navigator.of(dialogContext).pop();
+                      await _onSocialRegisterTapped(provider, authUser);
+                    },
+                    child: const Text(
+                      'ลงทะเบียน',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // ปุ่ม "ปิด" สไตล์ปุ่มล่างในรูปที่ 2
+                SizedBox(
+                  height: 48,
+                  child: OutlinedButton(
+                    key: const Key('social_dialog_close_button'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF2C2C2C),
+                      side: const BorderSide(color: Color(0xFFB0B0B0), width: 1.2),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                    ),
+                    onPressed: () async {
+                      Navigator.of(dialogContext).pop();
+                      try {
+                        await supabase.auth.signOut();
+                      } catch (_) {}
+                    },
+                    child: const Text(
+                      'ปิด',
+                      style: TextStyle(
+                        fontSize: 15.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _onSocialRegisterTapped(OAuthProvider provider, User? authUser) async {
+    final providerName = provider == OAuthProvider.facebook ? 'facebook' : 'google';
+    AuthSessionManager.setPendingSocialRegistration(true, providerName);
+
+    try {
+      await supabase.auth.signOut();
+      await supabase.auth.signInWithOAuth(
+        provider,
+        redirectTo: 'io.supabase.mealmate://login-callback/',
+      );
+    } catch (e) {
+      debugPrint('OAuth error when launching social register: $e');
+    }
+
+    User? resolvedUser = authUser;
+    if (resolvedUser == null) {
+      try {
+        resolvedUser = supabase.auth.currentUser;
+      } catch (_) {}
+    }
+
+    // กรณีอยู่ในโหมดทดสอบหรือไม่ได้เปลี่ยนหน้าอัตโนมัติ ให้เปิดหน้าลงทะเบียนข้อมูล
+    if (mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SocialRegisterScreen(
+            authUser: resolvedUser,
+            providerName: providerName,
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _handleSocialSignIn(OAuthProvider provider) async {
     final providerName = provider == OAuthProvider.facebook ? 'facebook' : 'google';
     AuthSessionManager.setProvider(providerName);
@@ -227,6 +404,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         provider,
         redirectTo: 'io.supabase.mealmate://login-callback/',
       );
+      if (supabase.auth.currentUser != null && mounted) {
+        await _handlePostAuthSuccess();
+      }
     } catch (error) {
       if (mounted) {
         _showMessage('การเข้าสู่ระบบผ่านโซเชียล: $error');

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/restaurant_admin_model.dart';
+import '../../providers/restaurant_approval_provider.dart';
 import '../../services/admin_restaurant_service.dart';
 import 'admin_theme.dart';
 import 'cancel_rejection_success_screen.dart';
@@ -34,7 +35,13 @@ class _CancelRejectionScreenState extends ConsumerState<CancelRejectionScreen> {
 
   Future<void> _executeCancelRejection(String id) async {
     setState(() => _isProcessing = true);
-    final success = await ref.read(adminRestaurantProvider.notifier).cancelRejection(id);
+    final restaurants = ref.read(adminRestaurantProvider);
+    final approvalList = ref.read(restaurantApprovalProvider);
+    final current = restaurants.where((r) => r.id == id).firstOrNull;
+    final appMatch = approvalList.where((r) => r.id == id).firstOrNull;
+    final name = current?.name ?? appMatch?.name;
+    final success = await ref.read(adminRestaurantProvider.notifier).cancelRejection(id, name: name);
+    await ref.read(restaurantApprovalProvider.notifier).cancelRejection(id, restaurantName: name);
     if (!mounted) return;
     setState(() => _isProcessing = false);
 
@@ -57,19 +64,33 @@ class _CancelRejectionScreenState extends ConsumerState<CancelRejectionScreen> {
   @override
   Widget build(BuildContext context) {
     final restaurants = ref.watch(adminRestaurantProvider);
+    final approvalList = ref.watch(restaurantApprovalProvider);
+    final appMatch = approvalList.where((r) => r.id == widget.restaurantId).firstOrNull;
     final restaurant = restaurants.firstWhere(
-      (r) => r.id == widget.restaurantId,
-      orElse: () => RestaurantAdminModel(
-        id: widget.restaurantId,
-        ownerId: '',
-        name: 'เตาอุ่น',
-        storeCode: '111U1101',
-        address: 'เทศบาลเชียงใหม่ อำเภอเมือง จังหวัดเชียงใหม่ ประเทศไทย',
-        phone: '091234567',
-        status: 'rejected',
-        createdAt: DateTime(2026, 8, 2, 9, 0),
-        requestSubmittedDate: DateTime(2026, 8, 3),
-      ),
+      (r) => r.id == widget.restaurantId || (appMatch != null && r.name == appMatch.name),
+      orElse: () => appMatch != null
+          ? RestaurantAdminModel(
+              id: appMatch.id,
+              ownerId: '',
+              name: appMatch.name,
+              storeCode: appMatch.code,
+              address: appMatch.address,
+              phone: appMatch.phone,
+              status: appMatch.status,
+              createdAt: DateTime.now(),
+              rejectionReason: appMatch.rejectionReason,
+            )
+          : RestaurantAdminModel(
+              id: widget.restaurantId,
+              ownerId: '',
+              name: 'เตาอุ่น',
+              storeCode: '111U1101',
+              address: 'เทศบาลเชียงใหม่ อำเภอเมือง จังหวัดเชียงใหม่ ประเทศไทย',
+              phone: '091234567',
+              status: 'rejected',
+              createdAt: DateTime(2026, 8, 2, 9, 0),
+              requestSubmittedDate: DateTime(2026, 8, 3),
+            ),
     );
 
     return Scaffold(

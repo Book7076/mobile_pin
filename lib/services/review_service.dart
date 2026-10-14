@@ -160,8 +160,67 @@ class ReviewService {
     }
   }
 
+  /// Fetches real review counts and average ratings for all restaurants directly from Supabase `reviews` table
+  static Future<Map<String, ({double rating, int reviewCount})>> fetchAllRestaurantReviewStats() async {
+    if (!isSupabaseAvailable) return {};
+
+    try {
+      final client = Supabase.instance.client;
+      final rows = await client.from('reviews').select('restaurant_id, rating');
+      if (rows is List) {
+        final Map<String, List<double>> ratingsByRestaurant = {};
+        for (final row in rows) {
+          final restId = row['restaurant_id']?.toString();
+          final ratingVal = (row['rating'] as num?)?.toDouble();
+          if (restId != null && restId.isNotEmpty && ratingVal != null) {
+            ratingsByRestaurant.putIfAbsent(restId, () => []).add(ratingVal);
+          }
+        }
+
+        final result = <String, ({double rating, int reviewCount})>{};
+        for (final entry in ratingsByRestaurant.entries) {
+          final list = entry.value;
+          final total = list.fold<double>(0.0, (sum, val) => sum + val);
+          final avg = double.parse((total / list.length).toStringAsFixed(1));
+          result[entry.key] = (rating: avg, reviewCount: list.length);
+        }
+        return result;
+      }
+    } catch (e) {
+      debugPrint('Note: Error fetching all review stats from Supabase: $e');
+    }
+    return {};
+  }
+
+  /// Fetches real review stats for a single restaurant directly from Supabase `reviews` table
+  static Future<({double rating, int reviewCount})> fetchRestaurantReviewStats(String restaurantId) async {
+    if (!isSupabaseAvailable) return (rating: 0.0, reviewCount: 0);
+
+    try {
+      final client = Supabase.instance.client;
+      final rows = await client
+          .from('reviews')
+          .select('rating')
+          .eq('restaurant_id', restaurantId);
+      if (rows is List && rows.isNotEmpty) {
+        final ratings = rows
+            .map((r) => (r['rating'] as num?)?.toDouble())
+            .whereType<double>()
+            .toList();
+        if (ratings.isNotEmpty) {
+          final total = ratings.fold<double>(0.0, (sum, r) => sum + r);
+          final avg = double.parse((total / ratings.length).toStringAsFixed(1));
+          return (rating: avg, reviewCount: ratings.length);
+        }
+      }
+    } catch (e) {
+      debugPrint('Note: Error fetching review stats for restaurant $restaurantId: $e');
+    }
+    return (rating: 0.0, reviewCount: 0);
+  }
+
   /// Calculates average rating from a list of reviews
-  static double calculateAverageRating(List<ReviewModel> reviews, {double defaultRating = 4.5}) {
+  static double calculateAverageRating(List<ReviewModel> reviews, {double defaultRating = 0.0}) {
     if (reviews.isEmpty) return defaultRating;
     final total = reviews.fold<double>(0.0, (sum, r) => sum + r.rating);
     final avg = total / reviews.length;

@@ -333,10 +333,12 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
 
   /// Approve a pending restaurant.
   /// Moves status from 'pending' to 'approved'.
-  Future<void> approveRestaurant(String restaurantId) async {
+  Future<void> approveRestaurant(String restaurantId, {String? restaurantName}) async {
     state = [
       for (final r in state)
-        if (r.id == restaurantId || (restaurantId == 'res-01' && r.name == 'Kohatsu Matcha'))
+        if (r.id == restaurantId ||
+            (restaurantName != null && r.name == restaurantName) ||
+            (restaurantId == 'res-01' && r.name == 'Kohatsu Matcha'))
           r.copyWith(
             status: 'approved',
             rejectionReason: null,
@@ -348,10 +350,20 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
     ];
 
     try {
-      await Supabase.instance.client
+      final res = await Supabase.instance.client
           .from('restaurants')
           .update({'status': 'approved', 'rejection_reason': null})
-          .eq('id', restaurantId);
+          .eq('id', restaurantId)
+          .select('owner_id')
+          .maybeSingle();
+
+      final ownerId = res?['owner_id']?.toString();
+      if (ownerId != null && ownerId.isNotEmpty) {
+        await Supabase.instance.client.from('users').update({
+          'user_type': 'owner',
+          'role': 'owner',
+        }).eq('id', ownerId);
+      }
     } catch (e) {
       debugPrint('Note: Error updating approved status in Supabase: $e');
     }
@@ -359,10 +371,11 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
 
   /// Reject a pending restaurant with reason and optional details.
   /// Moves status from 'pending' to 'rejected'.
-  Future<void> rejectRestaurant(String restaurantId, String reason, {String? details}) async {
+  Future<void> rejectRestaurant(String restaurantId, String reason, {String? details, String? restaurantName}) async {
     state = [
       for (final r in state)
         if (r.id == restaurantId ||
+            (restaurantName != null && r.name == restaurantName) ||
             (restaurantId == 'res-01' && r.name == 'Kohatsu Matcha') ||
             (restaurantId == 'res-02' && r.name == 'ข้าวบ้านก๋ง') ||
             (restaurantId == 'res-03' && r.name == 'Potto Hot Pot'))
@@ -378,23 +391,47 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
     ];
 
     try {
-      await Supabase.instance.client
-          .from('restaurants')
-          .update({
-            'status': 'rejected',
-            'rejection_reason': reason.trim(),
-          })
-          .eq('id', restaurantId);
+      Map<String, dynamic>? res;
+      try {
+        res = await Supabase.instance.client
+            .from('restaurants')
+            .update({
+              'status': 'rejected',
+              'rejection_reason': reason.trim(),
+            })
+            .eq('id', restaurantId)
+            .select('owner_id')
+            .maybeSingle();
+      } catch (_) {
+        res = await Supabase.instance.client
+            .from('restaurant')
+            .update({
+              'status': 'rejected',
+              'rejection_reason': reason.trim(),
+            })
+            .eq('id', restaurantId)
+            .select('owner_id')
+            .maybeSingle();
+      }
+
+      final ownerId = res?['owner_id']?.toString();
+      if (ownerId != null && ownerId.isNotEmpty) {
+        await Supabase.instance.client.from('users').update({
+          'user_type': 'owner',
+          'role': 'owner',
+        }).eq('id', ownerId);
+      }
     } catch (e) {
       debugPrint('Note: Error updating rejected status in Supabase: $e');
     }
   }
 
   /// Revoke approval for an already approved restaurant.
-  Future<void> revokeApproval(String restaurantId, String reason) async {
+  Future<void> revokeApproval(String restaurantId, String reason, {String? restaurantName}) async {
     state = [
       for (final r in state)
         if (r.id == restaurantId ||
+            (restaurantName != null && r.name == restaurantName) ||
             (restaurantId == 'res-04' && r.name == 'Haru Sushi Bar') ||
             (restaurantId == 'res-05' && r.name == 'ส้มตำเจ๊นก ครกยักษ์'))
           r.copyWith(
@@ -408,28 +445,52 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
     ];
 
     try {
-      await Supabase.instance.client
-          .from('restaurants')
-          .update({
-            'status': 'rejected',
-            'rejection_reason': reason.trim(),
-          })
-          .eq('id', restaurantId);
+      Map<String, dynamic>? res;
+      try {
+        res = await Supabase.instance.client
+            .from('restaurants')
+            .update({
+              'status': 'rejected',
+              'rejection_reason': reason.trim(),
+            })
+            .eq('id', restaurantId)
+            .select('owner_id')
+            .maybeSingle();
+      } catch (_) {
+        res = await Supabase.instance.client
+            .from('restaurant')
+            .update({
+              'status': 'rejected',
+              'rejection_reason': reason.trim(),
+            })
+            .eq('id', restaurantId)
+            .select('owner_id')
+            .maybeSingle();
+      }
+
+      final ownerId = res?['owner_id']?.toString();
+      if (ownerId != null && ownerId.isNotEmpty) {
+        await Supabase.instance.client.from('users').update({
+          'user_type': 'owner',
+          'role': 'owner',
+        }).eq('id', ownerId);
+      }
     } catch (e) {
       debugPrint('Note: Error updating revoke status in Supabase: $e');
     }
   }
 
-  /// Cancel rejection (moves from rejected back to pending).
-  Future<void> cancelRejection(String restaurantId) async {
+  /// Cancel rejection (moves from rejected to approved).
+  Future<void> cancelRejection(String restaurantId, {String? restaurantName}) async {
     state = [
       for (final r in state)
         if (r.id == restaurantId ||
+            (restaurantName != null && r.name == restaurantName) ||
             (restaurantId == 'res-rejected-01' && r.name == 'เตาอุ่น') ||
             (restaurantId == 'res-rejected-02' && r.name == 'KAME KAFE') ||
             (restaurantId == 'res-rejected-03' && r.name == 'สุกี้ช้างเผือก'))
           r.copyWith(
-            status: 'pending',
+            status: 'approved',
             rejectionReason: null,
             rejectionDetails: null,
             lastUpdated: 'วันนี้',
@@ -439,13 +500,22 @@ class RestaurantApprovalNotifier extends StateNotifier<List<ApprovalRestaurant>>
     ];
 
     try {
-      await Supabase.instance.client
+      final res = await Supabase.instance.client
           .from('restaurants')
           .update({
-            'status': 'pending',
-            'rejection_reason': null,
+            'status': 'approved',
           })
-          .eq('id', restaurantId);
+          .eq('id', restaurantId)
+          .select('owner_id')
+          .maybeSingle();
+
+      final ownerId = res?['owner_id']?.toString();
+      if (ownerId != null && ownerId.isNotEmpty) {
+        await Supabase.instance.client.from('users').update({
+          'user_type': 'owner',
+          'role': 'owner',
+        }).eq('id', ownerId);
+      }
     } catch (e) {
       debugPrint('Note: Error cancelling rejection in Supabase: $e');
     }

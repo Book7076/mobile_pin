@@ -8,6 +8,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/flow/category_selection_screen.dart';
+import 'screens/restaurants/create_restaurant_screen.dart';
 import 'screens/restaurants/shop_registration_screen.dart';
 import 'screens/restaurants/shop_details_screen.dart';
 import 'screens/restaurants/add_menu_screen.dart';
@@ -71,7 +72,8 @@ class MyApp extends StatelessWidget {
         '/home': (context) => const HomeScreen(),
         '/category-selection': (context) =>
             const CategorySelectionScreen(isStandalone: false),
-        '/shop-registration': (context) => const ShopRegistrationScreen(),
+        '/shop-registration': (context) => const CreateRestaurantScreen(),
+        '/create-restaurant': (context) => const CreateRestaurantScreen(),
         '/shop-details': (context) => const ShopDetailsScreen(),
         '/add-menu': (context) => const AddMenuScreen(),
         '/owner-dashboard': (context) => const SelectRestaurantScreen(),

@@ -6,6 +6,7 @@ import '../../models/approval_restaurant.dart';
 import '../../providers/restaurant_approval_provider.dart';
 import '../../services/admin_restaurant_service.dart';
 import 'approval_action_success_screen.dart';
+import 'cancel_rejection_screen.dart';
 import 'confirm_revoke_screen.dart';
 
 class RestaurantApprovalDetailScreen extends ConsumerWidget {
@@ -640,6 +641,48 @@ class RestaurantApprovalDetailScreen extends ConsumerWidget {
                     const Divider(color: dividerColor, height: 1),
                     const SizedBox(height: 16),
 
+                    if (restaurant.rejectionReason != null &&
+                        restaurant.rejectionReason!.trim().isNotEmpty) ...[
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF2F4),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFFCD3D9)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.info_outline_rounded,
+                                    color: primaryBurgundy, size: 18),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'สาเหตุที่ไม่อนุมัติ',
+                                  style: GoogleFonts.notoSansThai(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: primaryBurgundy,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              restaurant.rejectionReason!,
+                              style: GoogleFonts.notoSansThai(
+                                fontSize: 13,
+                                color: const Color(0xFF333333),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     // Section: ที่อยู่ ช่องทางติดต่อ
                     Text(
                       'ที่อยู่ ช่องทางติดต่อ',
@@ -907,35 +950,67 @@ class RestaurantApprovalDetailScreen extends ConsumerWidget {
                         ),
                       ],
                     )
-                  : SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => ConfirmRevokeScreen(restaurant: restaurant),
+                  : (restaurant.status == 'rejected'
+                      ? SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => CancelRejectionScreen(
+                                    restaurantId: restaurant.id,
+                                  ),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryBurgundy,
+                              foregroundColor: Colors.white,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(26),
+                              ),
                             ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: primaryBurgundy,
-                          foregroundColor: Colors.white,
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(26),
+                            child: Text(
+                              'ยกเลิกการไม่อนุมัติ',
+                              style: GoogleFonts.notoSansThai(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          'ยกเลิกการอนุมัติ',
-                          style: GoogleFonts.notoSansThai(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
+                        )
+                      : SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => ConfirmRevokeScreen(restaurant: restaurant),
+                                ),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: primaryBurgundy,
+                              foregroundColor: Colors.white,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(26),
+                              ),
+                            ),
+                            child: Text(
+                              'ยกเลิกการอนุมัติ',
+                              style: GoogleFonts.notoSansThai(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
-                    ),
+                        )),
             ),
           ],
         ),

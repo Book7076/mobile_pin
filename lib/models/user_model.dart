@@ -23,9 +23,14 @@ class UserModel {
     this.ownedRestaurantId,
   });
 
-  bool get isOwner => role.toLowerCase() == 'owner';
-  bool get isAdmin => role.toLowerCase() == 'admin';
-  bool get isCustomer => role.toLowerCase() == 'customer' || role.toLowerCase() == 'user';
+  bool get isOwner =>
+      role.trim().toLowerCase() == 'owner' ||
+      userType.trim().toLowerCase() == 'owner';
+  bool get isAdmin =>
+      role.trim().toLowerCase() == 'admin' ||
+      userType.trim().toLowerCase() == 'admin';
+  bool get isCustomer =>
+      !isOwner && !isAdmin;
   bool get isRegularUser => isCustomer;
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -53,12 +58,25 @@ class UserModel {
       }
     }
 
+    final rawRole = json['role']?.toString().trim().toLowerCase();
+    final rawUserType = json['user_type']?.toString().trim().toLowerCase();
+    String resolvedRole = 'customer';
+    if (rawRole == 'owner' || rawUserType == 'owner') {
+      resolvedRole = 'owner';
+    } else if (rawRole == 'admin' || rawUserType == 'admin') {
+      resolvedRole = 'admin';
+    } else if (json['user_type'] != null && json['user_type'].toString().trim().isNotEmpty) {
+      resolvedRole = json['user_type'].toString().trim();
+    } else if (json['role'] != null && json['role'].toString().trim().isNotEmpty) {
+      resolvedRole = json['role'].toString().trim();
+    }
+
     return UserModel(
       id: json['id']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
       name: resolvedName,
       phone: json['phone']?.toString() ?? '',
-      role: json['user_type']?.toString() ?? json['role']?.toString() ?? 'customer',
+      role: resolvedRole,
       swipeCount: (json['swipe_count'] as num?)?.toInt() ?? 0,
       avatarUrl: json['image_url']?.toString() ?? json['avatar_url']?.toString(),
       username: json['username']?.toString(),

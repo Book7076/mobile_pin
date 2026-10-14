@@ -19,6 +19,7 @@ class AdminProblemReport {
   final String? restaurantId;
   final String description;
   final String reportedAt;
+  final DateTime? createAt; // อิงตามคอลัมน์ create_at ในตาราง reports
   String status; // 'pending' (รอดำเนินการ), 'in_progress' (กำลังตรวจสอบ), 'resolved' (แก้ไขแล้ว)
   String adminNote;
 
@@ -34,6 +35,7 @@ class AdminProblemReport {
     this.restaurantId,
     required this.description,
     required this.reportedAt,
+    this.createAt,
     required this.status,
     this.adminNote = '',
   });
@@ -182,6 +184,7 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
               restaurantId: r.restaurantId,
               description: r.description,
               reportedAt: dateStr,
+              createAt: r.createAt,
               status: r.status,
               adminNote: r.adminNote ?? '',
             ));
@@ -221,6 +224,11 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
   int get _countInProgress => _reports.where((r) => r.status == 'in_progress').length;
   int get _countResolved => _reports.where((r) => r.status == 'resolved').length;
 
+  /// จำนวนการแจ้งเตือนรายงานใหม่ที่ยังไม่ได้กดดู อิงตามฐานข้อมูลตาราง reports จากรูปที่ 1
+  /// แจ้งเตือนเมื่อมีรายงานเข้ามาใหม่เท่านั้น และเมื่อกดดูแล้วจะหายไป
+  int get _newIncomingReportsCount =>
+      _reports.where((r) => r.status == 'pending' && !ReportNotificationManager.isSeen(r.id)).length;
+
   // กรองรายการตามฟิลเตอร์สถานะและการค้นหา
   List<AdminProblemReport> get _filteredReports {
     return _reports.where((report) {
@@ -247,6 +255,15 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
 
   /// แสดง Modal Bottom Sheet รายการแจ้งเตือนรายงานปัญหาทั้งหมดเมื่อกดกระดิ่ง
   void _showNotificationsSheet() {
+    // เมื่อกดดูกระดิ่งแจ้งเตือน ถือว่าแอดมินเห็นรายงานเหล่านี้แล้ว ตัวเลขการแจ้งเตือนจึงหายไป
+    if (_newIncomingReportsCount > 0) {
+      setState(() {
+        ReportNotificationManager.markAllAsSeen(_reports.map((r) => r.id));
+      });
+    } else {
+      ReportNotificationManager.markAllAsSeen(_reports.map((r) => r.id));
+    }
+
     final pendingReports = _reports.where((r) => r.status == 'pending').toList();
     final inProgressReports = _reports.where((r) => r.status == 'in_progress').toList();
 
@@ -512,6 +529,12 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
 
   /// แสดง Bottom Sheet รายละเอียดรายงานปัญหาและการจัดการสถานะ
   void _showReportDetailSheet(AdminProblemReport report) {
+    if (!ReportNotificationManager.isSeen(report.id)) {
+      setState(() {
+        ReportNotificationManager.markAsSeen(report.id);
+      });
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -583,12 +606,13 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
                         ),
                         onPressed: _showNotificationsSheet,
                       ),
-                      if (_countPending > 0)
+                      if (_newIncomingReportsCount > 0)
                         Positioned(
                           right: 8,
                           top: 8,
                           child: IgnorePointer(
                             child: Container(
+                              key: const Key('admin_bell_badge'),
                               padding: const EdgeInsets.all(4),
                               decoration: const BoxDecoration(
                                 color: Color(0xFFE53935),
@@ -599,7 +623,7 @@ class _AdminUserManagementScreenState extends ConsumerState<AdminUserManagementS
                                 minHeight: 16,
                               ),
                               child: Text(
-                                '$_countPending',
+                                '$_newIncomingReportsCount',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 9.5,

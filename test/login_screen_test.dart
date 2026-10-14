@@ -75,6 +75,8 @@ void main() {
     expect(find.text('ชื่อ'), findsOneWidget);
     expect(find.text('ชื่อจริง'), findsOneWidget);
     expect(find.text('นามสกุล'), findsNWidgets(2)); // Label and hint are both 'นามสกุล'
+    expect(find.text('ชื่อผู้ใช้'), findsOneWidget);
+    expect(find.text('กรุณากรอกชื่อผู้ใช้'), findsOneWidget);
     expect(find.text('เลขบัตรประชาชน'), findsNothing);
     expect(find.text('กรุณากรอกเลขบัตรประชาชน'), findsNothing);
     expect(find.text('เบอร์โทรศัพท์'), findsOneWidget);
@@ -110,9 +112,10 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(RegisterScreen), findsOneWidget);
 
-    // Fill all 6 form fields
+    // Fill all form fields
     await tester.enterText(find.descendant(of: find.byKey(const Key('first_name_field')), matching: find.byType(TextField)), 'สมชาย');
     await tester.enterText(find.descendant(of: find.byKey(const Key('last_name_field')), matching: find.byType(TextField)), 'ใจดี');
+    await tester.enterText(find.descendant(of: find.byKey(const Key('username_field')), matching: find.byType(TextField)), 'somchai123');
     await tester.enterText(find.descendant(of: find.byKey(const Key('phone_field')), matching: find.byType(TextField)), '0812345678');
     await tester.enterText(find.descendant(of: find.byKey(const Key('email_field')), matching: find.byType(TextField)), 'test@test.com');
     await tester.enterText(find.descendant(of: find.byKey(const Key('password_field')), matching: find.byType(TextField)), '123456');

@@ -90,6 +90,7 @@ void main() {
       // Check form fields by keys
       expect(find.byKey(const Key('first_name_field')), findsOneWidget);
       expect(find.byKey(const Key('last_name_field')), findsOneWidget);
+      expect(find.byKey(const Key('username_field')), findsOneWidget);
       expect(find.byKey(const Key('phone_field')), findsOneWidget);
       expect(find.byKey(const Key('email_field')), findsOneWidget);
       expect(find.byKey(const Key('password_field')), findsOneWidget);

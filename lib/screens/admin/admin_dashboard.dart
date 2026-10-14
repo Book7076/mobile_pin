@@ -79,8 +79,8 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
 
   void _onRestaurantCardTapped(ApprovalRestaurant restaurant) {
     if (restaurant.status == 'rejected' ||
-        restaurant.id == 'res-rejected-01' ||
-        restaurant.name == 'เตาอุ่น') {
+        (restaurant.id == 'res-rejected-01' && restaurant.status == 'rejected') ||
+        (restaurant.name == 'เตาอุ่น' && restaurant.status == 'rejected')) {
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => admin_detail.RestaurantDetailScreen(
@@ -501,22 +501,62 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
 
     // Compute effective status for each ApprovalRestaurant
     final List<ApprovalRestaurant> list = [];
+    final Set<String> seenIds = {};
+    final Set<String> seenNames = {};
+
     for (final r in allApproval) {
-      String status = r.status;
       final adminMatch = allAdmin
           .where((a) => a.id == r.id || a.name == r.name)
           .firstOrNull;
-      if (adminMatch != null) {
-        if (adminMatch.status == 'rejected') {
-          status = 'rejected';
-        } else if (adminMatch.status == 'approved') {
-          status = 'approved';
-        } else if (adminMatch.status == 'pending' && (r.name == 'เตาอุ่น' || r.id == 'res-rejected-01')) {
-          status = 'pending';
-        }
+
+      String status = r.status;
+      String? reason = r.rejectionReason;
+
+      // Effective status calculation:
+      if (adminMatch?.status == 'approved' && r.status == 'approved') {
+        status = 'approved';
+        reason = null;
+      } else if (adminMatch?.status == 'approved' && r.status != 'approved') {
+        // e.g. updated to approved via cancelRejection in admin provider
+        status = 'approved';
+        reason = null;
+      } else if (r.status == 'approved' && adminMatch?.status != 'approved') {
+        // e.g. updated to approved in approval provider
+        status = 'approved';
+        reason = null;
+      } else if (r.status == 'rejected' || adminMatch?.status == 'rejected') {
+        status = 'rejected';
+        reason = (r.rejectionReason != null && r.rejectionReason!.trim().isNotEmpty)
+            ? r.rejectionReason
+            : adminMatch?.rejectionReason;
+      } else if (adminMatch != null && adminMatch.status == 'pending') {
+        status = 'pending';
+        reason = null;
+      } else if (r.status == 'pending') {
+        status = 'pending';
+        reason = null;
       }
+
+      final item = r.copyWith(
+        status: status,
+        rejectionReason: reason,
+      );
+
+      seenIds.add(item.id);
+      seenNames.add(item.name);
+
       if (status == targetStatus) {
-        list.add(r);
+        list.add(item);
+      }
+    }
+
+    // Also include any restaurants present in allAdmin but missing from allApproval
+    for (final a in allAdmin) {
+      if (!seenIds.contains(a.id) && !seenNames.contains(a.name)) {
+        final converted = ApprovalRestaurant.fromAdminModel(a);
+        if (converted.status == targetStatus) {
+          list.add(converted);
+        }
       }
     }
 

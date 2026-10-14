@@ -700,7 +700,7 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
             ),
             SizedBox(height: 8),
             Text(
-              'โดยปกติใช้เวลาประมาณ 3-5 วันทำการ\n(ไม่รวมวันหยุดเสาร์-อาทิตย์ และวันหยุดนักขัตฤกษ์)',
+              'รอการตรวจสอบร้านประมาณ 2-3 วัน\n(ทางทีมงานกำลังเร่งดำเนินการตรวจสอบข้อมูลร้านและเมนูอาหาร)',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12.5,

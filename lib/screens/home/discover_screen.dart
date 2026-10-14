@@ -8,6 +8,7 @@ import '../../main.dart';
 import '../../models/restaurant_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/restaurant_provider.dart';
+import '../../services/review_service.dart';
 import '../flow/category_selection_screen.dart';
 
 class DiscoverScreen extends ConsumerStatefulWidget {
@@ -68,12 +69,48 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
             .eq('status', 'approved');
       }
 
-      final allRestaurants =
-          (response as List).map((e) => RestaurantModel.fromJson(e)).toList();
+      final allRestaurants = (response as List)
+          .map((e) => RestaurantModel.fromJson(e))
+          .where((r) => r.status == 'approved')
+          .toList();
+
+      // Apply real review stats from Supabase reviews table (Image 1)
+      try {
+        final stats = await ReviewService.fetchAllRestaurantReviewStats();
+        for (int i = 0; i < allRestaurants.length; i++) {
+          final r = allRestaurants[i];
+          final stat = stats[r.id];
+          if (stat != null) {
+            allRestaurants[i] = r.copyWith(rating: stat.rating, reviewCount: stat.reviewCount);
+          } else {
+            allRestaurants[i] = r.copyWith(rating: 0.0, reviewCount: 0);
+          }
+        }
+      } catch (_) {}
+
+      final currentUser = ref.read(authProvider);
+      String? authUserId;
+      try {
+        authUserId = supabase.auth.currentUser?.id;
+      } catch (_) {
+        authUserId = null;
+      }
+
+      // Filter out restaurants owned by current user (database restaurants.owner_id == users.id)
+      final availableRestaurants = allRestaurants.where((restaurant) {
+        if (isUserOwnerOfRestaurant(
+          restaurant: restaurant,
+          currentUser: currentUser,
+          authUserId: authUserId,
+        )) {
+          return false;
+        }
+        return true;
+      }).toList();
 
       // 3. Filter by distance
       if (_currentPosition != null) {
-        _restaurants = allRestaurants.where((restaurant) {
+        _restaurants = availableRestaurants.where((restaurant) {
           final distanceInMeters = Geolocator.distanceBetween(
             _currentPosition!.latitude,
             _currentPosition!.longitude,
@@ -83,7 +120,7 @@ class _DiscoverScreenState extends ConsumerState<DiscoverScreen> {
           return (distanceInMeters / 1000) <= _radiusKm;
         }).toList();
       } else {
-        _restaurants = allRestaurants;
+        _restaurants = availableRestaurants;
       }
 
       // Apply Flow 3-4 filters if active

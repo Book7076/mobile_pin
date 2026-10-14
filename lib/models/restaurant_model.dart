@@ -1,3 +1,5 @@
+import 'swipe_session_model.dart';
+
 class SignatureDish {
   final String name;
   final int price;
@@ -64,6 +66,7 @@ class RestaurantModel {
   final String? locationBadge;
   final String? googleMapsUrl;
   final int? cuisineTypeId;
+  final String? cuisineTypeName;
   final String? rejectionReason;
   final DateTime? createdAt;
 
@@ -79,8 +82,8 @@ class RestaurantModel {
     this.menu,
     required this.status,
     this.categories = const [],
-    this.rating = 4.5,
-    this.reviewCount = 50,
+    this.rating = 0.0,
+    this.reviewCount = 0,
     this.priceLevel = 1,
     this.priceRange = '50 - 150 บาท',
     this.imageUrls = const [],
@@ -95,6 +98,7 @@ class RestaurantModel {
     this.locationBadge,
     this.googleMapsUrl,
     this.cuisineTypeId,
+    this.cuisineTypeName,
     this.rejectionReason,
     this.createdAt,
   });
@@ -122,113 +126,15 @@ class RestaurantModel {
       }
     }
 
-    // Mapping table for cuisine_type_id to category slugs and Thai labels
-    const Map<int, List<String>> cuisineTypeCategoryMap = {
-      1: ['thai', 'อาหารไทย'],
-      2: ['japanese', 'อาหารญี่ปุ่น'],
-      3: ['korean', 'อาหารเกาหลี'],
-      4: ['chinese', 'อาหารจีน'],
-      5: ['dessert_bakery', 'cafe_dessert', 'ของหวาน', 'ขนมหวาน/เบเกอรี่'],
-      6: ['italian_western', 'fast_food', 'อาหารอิตาเลียน', 'สเต็ก', 'พิซซ่า'],
-      7: ['fast_food', 'fastfood', 'อาหารฟาสฟู้ด', 'ฟาสต์ฟู้ด'],
-      8: ['healthy', 'halal', 'อาหารฮาลาล', 'อาหารสุขภาพ'],
-      9: ['healthy', 'healthy_clean', 'vegetarian', 'อาหารมังสวิรัติ', 'อาหารสุขภาพ'],
-      10: ['noodles', 'ก๋วยเตี๋ยว', 'ก๋วยเตี๋ยว / บะหมี่'],
-      11: ['cafe_beverage', 'cafe_dessert', 'cafe', 'คาเฟ่', 'คาเฟ่/เครื่องดื่ม', 'คาเฟ่ / ของหวาน'],
-      12: ['shabu_hotpot', 'mookata', 'shabu_grill', 'buffet', 'ปิ้งย่าง/ชาบู', 'ชาบู/ฮอกพอด', 'หมูกระทะ', 'ชาบู / ปิ้งย่าง / หมูกระทะ'],
-      13: ['breakfast', 'dessert_bakery', 'a_la_carte', 'อาหารเช้า', 'ขนมหวาน/เบเกอรี่', 'เบเกอรี่'],
-      14: ['somtum_isan', 'thai', 'อาหารอีสาน', 'ส้มตำ / ยำ / อาหารอีสาน', 'อาหารไทย'],
-      15: ['northern_thai', 'thai', 'อาหารเหนือ', 'อาหารไทย'],
-      16: ['southern_thai', 'thai', 'อาหารใต้', 'อาหารไทย'],
-      17: ['a_la_carte', 'street_food', 'made_to_order', 'thai', 'อาหารตามสั่ง', 'ตามสั่ง / สตรีทฟู้ด', 'อาหารไทย'],
-    };
-
-    if (cuisineTypeId != null && cuisineTypeCategoryMap.containsKey(cuisineTypeId)) {
-      for (final cat in cuisineTypeCategoryMap[cuisineTypeId]!) {
-        if (!parsedCategories.contains(cat)) {
-          parsedCategories.add(cat);
-        }
-      }
+    // ประเภทอาหารของแต่ละร้านคือ cuisine_type_id อิงตาม database (รูปที่ 2 และ 3)
+    if ((cuisineTypeName == null || cuisineTypeName.isEmpty) && cuisineTypeId != null) {
+      cuisineTypeName = mapCuisineTypeIdToName(cuisineTypeId);
     }
 
     if (cuisineTypeName != null && cuisineTypeName.isNotEmpty) {
-      if (!parsedCategories.contains(cuisineTypeName)) {
-        parsedCategories.add(cuisineTypeName);
-      }
-      if (cuisineTypeName.contains('ไทย')) {
-        if (!parsedCategories.contains('thai')) parsedCategories.add('thai');
-        if (!parsedCategories.contains('อาหารไทย')) parsedCategories.add('อาหารไทย');
-      }
-      if (cuisineTypeName.contains('ญี่ปุ่น')) {
-        if (!parsedCategories.contains('japanese')) parsedCategories.add('japanese');
-        if (!parsedCategories.contains('อาหารญี่ปุ่น')) parsedCategories.add('อาหารญี่ปุ่น');
-      }
-      if (cuisineTypeName.contains('เกาหลี')) {
-        if (!parsedCategories.contains('korean')) parsedCategories.add('korean');
-        if (!parsedCategories.contains('อาหารเกาหลี')) parsedCategories.add('อาหารเกาหลี');
-      }
-      if (cuisineTypeName.contains('จีน')) {
-        if (!parsedCategories.contains('chinese')) parsedCategories.add('chinese');
-        if (!parsedCategories.contains('อาหารจีน')) parsedCategories.add('อาหารจีน');
-      }
-      if (cuisineTypeName.contains('หวาน') || cuisineTypeName.contains('เบเกอรี่')) {
-        if (!parsedCategories.contains('dessert_bakery')) parsedCategories.add('dessert_bakery');
-        if (!parsedCategories.contains('ของหวาน')) parsedCategories.add('ของหวาน');
-        if (!parsedCategories.contains('ขนมหวาน/เบเกอรี่')) parsedCategories.add('ขนมหวาน/เบเกอรี่');
-      }
-      if (cuisineTypeName.contains('อิตาเลียน') || cuisineTypeName.contains('สเต็ก') || cuisineTypeName.contains('พิซซ่า')) {
-        if (!parsedCategories.contains('italian_western')) parsedCategories.add('italian_western');
-        if (!parsedCategories.contains('fast_food')) parsedCategories.add('fast_food');
-        if (!parsedCategories.contains('อาหารอิตาเลียน')) parsedCategories.add('อาหารอิตาเลียน');
-      }
-      if (cuisineTypeName.contains('ฟาส') || cuisineTypeName.contains('เบอร์เกอร์')) {
-        if (!parsedCategories.contains('fast_food')) parsedCategories.add('fast_food');
-        if (!parsedCategories.contains('ฟาสต์ฟู้ด')) parsedCategories.add('ฟาสต์ฟู้ด');
-      }
-      if (cuisineTypeName.contains('เตี๋ยว') || cuisineTypeName.contains('บะหมี่')) {
-        if (!parsedCategories.contains('noodles')) parsedCategories.add('noodles');
-        if (!parsedCategories.contains('ก๋วยเตี๋ยว')) parsedCategories.add('ก๋วยเตี๋ยว');
-      }
-      if (cuisineTypeName.contains('คาเฟ่') || cuisineTypeName.contains('กาแฟ') || cuisineTypeName.contains('ชา')) {
-        if (!parsedCategories.contains('cafe_beverage')) parsedCategories.add('cafe_beverage');
-        if (!parsedCategories.contains('cafe')) parsedCategories.add('cafe');
-        if (!parsedCategories.contains('คาเฟ่')) parsedCategories.add('คาเฟ่');
-        if (!parsedCategories.contains('คาเฟ่/เครื่องดื่ม')) parsedCategories.add('คาเฟ่/เครื่องดื่ม');
-      }
-      if (cuisineTypeName.contains('ชาบู') || cuisineTypeName.contains('ปิ้งย่าง') || cuisineTypeName.contains('หมูกระทะ') || cuisineTypeName.contains('ฮอทพอท') || cuisineTypeName.contains('ฮอกพอด')) {
-        if (!parsedCategories.contains('shabu_hotpot')) parsedCategories.add('shabu_hotpot');
-        if (!parsedCategories.contains('mookata')) parsedCategories.add('mookata');
-        if (!parsedCategories.contains('shabu_grill')) parsedCategories.add('shabu_grill');
-        if (!parsedCategories.contains('ปิ้งย่าง/ชาบู')) parsedCategories.add('ปิ้งย่าง/ชาบู');
-        if (!parsedCategories.contains('ชาบู/ฮอกพอด')) parsedCategories.add('ชาบู/ฮอกพอด');
-        if (!parsedCategories.contains('หมูกระทะ')) parsedCategories.add('หมูกระทะ');
-      }
-      if (cuisineTypeName.contains('เช้า')) {
-        if (!parsedCategories.contains('breakfast')) parsedCategories.add('breakfast');
-        if (!parsedCategories.contains('อาหารเช้า')) parsedCategories.add('อาหารเช้า');
-        if (!parsedCategories.contains('dessert_bakery')) parsedCategories.add('dessert_bakery');
-      }
-      if (cuisineTypeName.contains('อีสาน') || cuisineTypeName.contains('ส้มตำ') || cuisineTypeName.contains('ยำ')) {
-        if (!parsedCategories.contains('somtum_isan')) parsedCategories.add('somtum_isan');
-        if (!parsedCategories.contains('อาหารอีสาน')) parsedCategories.add('อาหารอีสาน');
-        if (!parsedCategories.contains('thai')) parsedCategories.add('thai');
-      }
-      if (cuisineTypeName.contains('เหนือ') || cuisineTypeName.contains('ข้าวซอย')) {
-        if (!parsedCategories.contains('northern_thai')) parsedCategories.add('northern_thai');
-        if (!parsedCategories.contains('อาหารเหนือ')) parsedCategories.add('อาหารเหนือ');
-        if (!parsedCategories.contains('thai')) parsedCategories.add('thai');
-      }
-      if (cuisineTypeName.contains('ใต้')) {
-        if (!parsedCategories.contains('southern_thai')) parsedCategories.add('southern_thai');
-        if (!parsedCategories.contains('อาหารใต้')) parsedCategories.add('อาหารใต้');
-        if (!parsedCategories.contains('thai')) parsedCategories.add('thai');
-      }
-      if (cuisineTypeName.contains('สั่ง') || cuisineTypeName.contains('สตรีท')) {
-        if (!parsedCategories.contains('a_la_carte')) parsedCategories.add('a_la_carte');
-        if (!parsedCategories.contains('street_food')) parsedCategories.add('street_food');
-        if (!parsedCategories.contains('อาหารตามสั่ง')) parsedCategories.add('อาหารตามสั่ง');
-        if (!parsedCategories.contains('thai')) parsedCategories.add('thai');
-      }
+      parsedCategories = [cuisineTypeName];
+    } else if (parsedCategories.isEmpty && cuisineTypeId != null) {
+      parsedCategories = [mapCuisineTypeIdToName(cuisineTypeId)];
     }
 
     List<String> parsedImages = [];
@@ -351,8 +257,26 @@ class RestaurantModel {
       menu: json['menu']?.toString(),
       status: json['status']?.toString() ?? 'approved',
       categories: parsedCategories.isNotEmpty ? parsedCategories : ['thai'],
-      rating: (json['rating'] as num?)?.toDouble() ?? 4.5,
-      reviewCount: (json['review_count'] as num?)?.toInt() ?? 80,
+      rating: () {
+        if (json['reviews'] != null && json['reviews'] is List) {
+          final rList = json['reviews'] as List;
+          final numericRatings = rList
+              .map((r) => (r is Map) ? (r['rating'] as num?)?.toDouble() : null)
+              .whereType<double>()
+              .toList();
+          if (numericRatings.isNotEmpty) {
+            final total = numericRatings.fold<double>(0.0, (s, e) => s + e);
+            return double.parse((total / numericRatings.length).toStringAsFixed(1));
+          }
+        }
+        return (json['rating'] as num?)?.toDouble() ?? 0.0;
+      }(),
+      reviewCount: () {
+        if (json['reviews'] != null && json['reviews'] is List) {
+          return (json['reviews'] as List).length;
+        }
+        return (json['review_count'] as num?)?.toInt() ?? 0;
+      }(),
       priceLevel: computedPriceLevel,
       priceRange: computedPriceRange,
       imageUrls: parsedImages,
@@ -366,6 +290,7 @@ class RestaurantModel {
       distanceKm: (json['distance_km'] as num?)?.toDouble(),
       googleMapsUrl: json['google_maps_url']?.toString() ?? json['map_url']?.toString(),
       cuisineTypeId: (json['cuisine_type_id'] as num?)?.toInt(),
+      cuisineTypeName: cuisineTypeName,
       rejectionReason: json['rejection_reason']?.toString(),
       createdAt: parsedCreatedAt,
     );
@@ -399,6 +324,7 @@ class RestaurantModel {
       'distance_km': distanceKm,
       if (googleMapsUrl != null) 'google_maps_url': googleMapsUrl,
       if (cuisineTypeId != null) 'cuisine_type_id': cuisineTypeId,
+      if (cuisineTypeName != null) 'cuisine_type_name': cuisineTypeName,
       if (rejectionReason != null) 'rejection_reason': rejectionReason,
     };
   }
@@ -430,6 +356,7 @@ class RestaurantModel {
     double? distanceKm,
     String? googleMapsUrl,
     int? cuisineTypeId,
+    String? cuisineTypeName,
     String? rejectionReason,
     DateTime? createdAt,
   }) {
@@ -460,6 +387,7 @@ class RestaurantModel {
       distanceKm: distanceKm ?? this.distanceKm,
       googleMapsUrl: googleMapsUrl ?? this.googleMapsUrl,
       cuisineTypeId: cuisineTypeId ?? this.cuisineTypeId,
+      cuisineTypeName: cuisineTypeName ?? this.cuisineTypeName,
       rejectionReason: rejectionReason ?? this.rejectionReason,
       createdAt: createdAt ?? this.createdAt,
     );

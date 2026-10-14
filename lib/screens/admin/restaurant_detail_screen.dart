@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../models/restaurant_admin_model.dart';
+import '../../models/approval_restaurant.dart';
+import '../../providers/restaurant_approval_provider.dart';
 import '../../services/admin_restaurant_service.dart';
 import 'admin_theme.dart';
 import 'cancel_rejection_screen.dart';
+import 'confirm_revoke_screen.dart';
 import 'reject_success_screen.dart';
 import 'widgets/restaurant_logo_badge.dart';
 
@@ -477,17 +480,34 @@ class _RestaurantDetailScreenState extends ConsumerState<RestaurantDetailScreen>
   @override
   Widget build(BuildContext context) {
     final restaurants = ref.watch(adminRestaurantProvider);
+    final approvalList = ref.watch(restaurantApprovalProvider);
+    final appMatch = approvalList.where((r) => r.id == widget.restaurantId).firstOrNull;
     final restaurant = restaurants.firstWhere(
-      (r) => r.id == widget.restaurantId,
-      orElse: () => RestaurantAdminModel(
-        id: '',
-        ownerId: '',
-        name: 'ไม่พบข้อมูล',
-        address: '',
-        phone: '',
-        status: 'pending',
-        createdAt: DateTime.now(),
-      ),
+      (r) => r.id == widget.restaurantId || (appMatch != null && r.name == appMatch.name),
+      orElse: () => appMatch != null
+          ? RestaurantAdminModel(
+              id: appMatch.id,
+              ownerId: '',
+              name: appMatch.name,
+              storeCode: appMatch.code,
+              address: appMatch.address,
+              phone: appMatch.phone,
+              status: appMatch.status,
+              createdAt: DateTime.now(),
+              rejectionReason: appMatch.rejectionReason,
+              category: appMatch.category,
+              mapUrl: appMatch.mapUrl,
+              imageUrl: appMatch.imageAsset,
+            )
+          : RestaurantAdminModel(
+              id: '',
+              ownerId: '',
+              name: 'ไม่พบข้อมูล',
+              address: '',
+              phone: '',
+              status: 'pending',
+              createdAt: DateTime.now(),
+            ),
     );
 
     if (restaurant.id.isEmpty) {
@@ -1062,6 +1082,61 @@ class _RestaurantDetailScreenState extends ConsumerState<RestaurantDetailScreen>
               ),
               child: const Text(
                 'ยกเลิกการไม่อนุมัติ',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // สถานะอนุมัติแล้ว (Approved) -> ปุ่ม "ยกเลิกการอนุมัติ"
+    if (restaurant.status == 'approved') {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.95),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () {
+                final allApproval = ref.read(restaurantApprovalProvider);
+                final appMatch = allApproval
+                    .where((a) => a.id == restaurant.id || a.name == restaurant.name)
+                    .firstOrNull;
+                final approvalRest = appMatch ?? ApprovalRestaurant.fromAdminModel(restaurant);
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ConfirmRevokeScreen(restaurant: approvalRest),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF800F2F),
+                foregroundColor: Colors.white,
+                elevation: 2,
+                shadowColor: Colors.black.withValues(alpha: 0.15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(26),
+                ),
+              ),
+              child: const Text(
+                'ยกเลิกการอนุมัติ',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,

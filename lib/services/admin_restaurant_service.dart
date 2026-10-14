@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/restaurant_admin_model.dart';
 import '../main.dart';
@@ -252,18 +253,49 @@ class AdminRestaurantNotifier extends StateNotifier<List<RestaurantAdminModel>> 
   }
 
   /// อนุมัติร้านอาหาร
-  Future<bool> approveRestaurant(String id) async {
+  Future<bool> approveRestaurant(String id, {String? name}) async {
     try {
+      String? ownerId;
+      for (final r in state) {
+        if (r.id == id || (name != null && r.name == name)) {
+          ownerId = r.ownerId;
+          break;
+        }
+      }
+
       // พยายามอัปเดตไปที่ Supabase
       try {
-        await supabase.from('restaurants').update({
-          'status': 'approved',
-        }).eq('id', id);
-      } catch (_) {}
+        Map<String, dynamic>? res;
+        try {
+          res = await supabase.from('restaurants').update({
+            'status': 'approved',
+            'rejection_reason': null,
+          }).eq('id', id).select('owner_id').maybeSingle();
+        } catch (_) {
+          res = await supabase.from('restaurant').update({
+            'status': 'approved',
+            'rejection_reason': null,
+          }).eq('id', id).select('owner_id').maybeSingle();
+        }
+
+        if (res != null && res['owner_id'] != null) {
+          ownerId = res['owner_id']?.toString();
+        }
+
+        // เมื่อ admin อนุมัติ: เปลี่ยน status เป็น approved และเปลี่ยน user_type จาก customer เป็น owner
+        if (ownerId != null && ownerId.isNotEmpty) {
+          await supabase.from('users').update({
+            'user_type': 'owner',
+            'role': 'owner',
+          }).eq('id', ownerId);
+        }
+      } catch (e) {
+        debugPrint('Supabase approveRestaurant update note: $e');
+      }
 
       // อัปเดต State ภายในแอป
       state = state.map((restaurant) {
-        if (restaurant.id == id) {
+        if (restaurant.id == id || (name != null && restaurant.name == name)) {
           return restaurant.copyWith(status: 'approved', clearRejection: true);
         }
         return restaurant;
@@ -276,17 +308,47 @@ class AdminRestaurantNotifier extends StateNotifier<List<RestaurantAdminModel>> 
   }
 
   /// ไม่อนุมัติร้านอาหาร พร้อมระบุเหตุผล
-  Future<bool> rejectRestaurant(String id, String reason) async {
+  Future<bool> rejectRestaurant(String id, String reason, {String? name}) async {
     try {
+      String? ownerId;
+      for (final r in state) {
+        if (r.id == id || (name != null && r.name == name)) {
+          ownerId = r.ownerId;
+          break;
+        }
+      }
+
       try {
-        await supabase.from('restaurants').update({
-          'status': 'rejected',
-          'rejection_reason': reason,
-        }).eq('id', id);
-      } catch (_) {}
+        Map<String, dynamic>? res;
+        try {
+          res = await supabase.from('restaurants').update({
+            'status': 'rejected',
+            'rejection_reason': reason,
+          }).eq('id', id).select('owner_id').maybeSingle();
+        } catch (_) {
+          res = await supabase.from('restaurant').update({
+            'status': 'rejected',
+            'rejection_reason': reason,
+          }).eq('id', id).select('owner_id').maybeSingle();
+        }
+
+        if (res != null && res['owner_id'] != null) {
+          ownerId = res['owner_id']?.toString();
+        }
+
+        // เมื่อ admin ไม่อนุมัติ: เปลี่ยน status เป็น rejected และ user_type เป็น owner
+        if (ownerId != null && ownerId.isNotEmpty) {
+          await supabase.from('users').update({
+            'user_type': 'owner',
+            'role': 'owner',
+          }).eq('id', ownerId);
+        }
+      } catch (e) {
+        debugPrint('Supabase rejectRestaurant update note: $e');
+      }
 
       state = state.map((restaurant) {
-        if (restaurant.id == id) {
+        if (restaurant.id == id || (name != null && restaurant.name == name)) {
           return restaurant.copyWith(
             status: 'rejected',
             rejectionReason: reason,
@@ -302,17 +364,46 @@ class AdminRestaurantNotifier extends StateNotifier<List<RestaurantAdminModel>> 
   }
 
   /// ยกเลิกการอนุมัติ พร้อมระบุเหตุผล
-  Future<bool> cancelApproval(String id, String reason) async {
+  Future<bool> cancelApproval(String id, String reason, {String? name}) async {
     try {
+      String? ownerId;
+      for (final r in state) {
+        if (r.id == id || (name != null && r.name == name)) {
+          ownerId = r.ownerId;
+          break;
+        }
+      }
+
       try {
-        await supabase.from('restaurants').update({
-          'status': 'rejected',
-          'rejection_reason': reason,
-        }).eq('id', id);
-      } catch (_) {}
+        Map<String, dynamic>? res;
+        try {
+          res = await supabase.from('restaurants').update({
+            'status': 'rejected',
+            'rejection_reason': reason,
+          }).eq('id', id).select('owner_id').maybeSingle();
+        } catch (_) {
+          res = await supabase.from('restaurant').update({
+            'status': 'rejected',
+            'rejection_reason': reason,
+          }).eq('id', id).select('owner_id').maybeSingle();
+        }
+
+        if (res != null && res['owner_id'] != null) {
+          ownerId = res['owner_id']?.toString();
+        }
+
+        if (ownerId != null && ownerId.isNotEmpty) {
+          await supabase.from('users').update({
+            'user_type': 'owner',
+            'role': 'owner',
+          }).eq('id', ownerId);
+        }
+      } catch (e) {
+        debugPrint('Supabase cancelApproval update note: $e');
+      }
 
       state = state.map((restaurant) {
-        if (restaurant.id == id) {
+        if (restaurant.id == id || (name != null && restaurant.name == name)) {
           return restaurant.copyWith(
             status: 'rejected',
             rejectionReason: reason,
@@ -327,21 +418,49 @@ class AdminRestaurantNotifier extends StateNotifier<List<RestaurantAdminModel>> 
     }
   }
 
-  /// ยกเลิกการไม่อนุมัติ (ย้ายร้านกลับสู่สถานะรออนุมัติ pending และล้างเหตุผลการไม่อนุมัติ)
-  Future<bool> cancelRejection(String id) async {
+  /// ยกเลิกการไม่อนุมัติ (ย้ายร้านกลับสู่สถานะอนุมัติ approved และล้างเหตุผลการไม่อนุมัติ)
+  Future<bool> cancelRejection(String id, {String? name}) async {
     try {
+      String? ownerId;
+      for (final r in state) {
+        if (r.id == id || (name != null && r.name == name)) {
+          ownerId = r.ownerId;
+          break;
+        }
+      }
+
       try {
-        await supabase.from('restaurants').update({
-          'status': 'pending',
-          'rejection_reason': null,
-          'reviewer_name': null,
-        }).eq('id', id);
-      } catch (_) {}
+        Map<String, dynamic>? res;
+        try {
+          res = await supabase.from('restaurants').update({
+            'status': 'approved',
+            'rejection_reason': null,
+          }).eq('id', id).select('owner_id').maybeSingle();
+        } catch (_) {
+          res = await supabase.from('restaurant').update({
+            'status': 'approved',
+            'rejection_reason': null,
+          }).eq('id', id).select('owner_id').maybeSingle();
+        }
+
+        if (res != null && res['owner_id'] != null) {
+          ownerId = res['owner_id']?.toString();
+        }
+
+        if (ownerId != null && ownerId.isNotEmpty) {
+          await supabase.from('users').update({
+            'user_type': 'owner',
+            'role': 'owner',
+          }).eq('id', ownerId);
+        }
+      } catch (e) {
+        debugPrint('Supabase cancelRejection update note: $e');
+      }
 
       state = state.map((restaurant) {
-        if (restaurant.id == id) {
+        if (restaurant.id == id || (name != null && restaurant.name == name)) {
           return restaurant.copyWith(
-            status: 'pending',
+            status: 'approved',
             clearRejection: true,
           );
         }
@@ -362,7 +481,9 @@ class AdminRestaurantNotifier extends StateNotifier<List<RestaurantAdminModel>> 
           'status': 'pending',
           'rejection_reason': null,
         }).eq('id', id);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Supabase resetToPending update note: $e');
+      }
 
       state = state.map((restaurant) {
         if (restaurant.id == id) {

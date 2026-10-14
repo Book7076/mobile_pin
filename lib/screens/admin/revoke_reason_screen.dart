@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../models/approval_restaurant.dart';
 import '../../providers/restaurant_approval_provider.dart';
+import '../../services/admin_restaurant_service.dart';
 import 'revoke_success_screen.dart';
 
 class RevokeReasonScreen extends ConsumerStatefulWidget {
@@ -49,16 +50,28 @@ class _RevokeReasonScreenState extends ConsumerState<RevokeReasonScreen> {
       return;
     }
 
-    // Update state to revoked in Riverpod provider
+    // Update state to revoked in both Riverpod providers
     ref.read(restaurantApprovalProvider.notifier).revokeApproval(
           widget.restaurant.id,
           reason,
+          restaurantName: widget.restaurant.name,
+        );
+
+    ref.read(adminRestaurantProvider.notifier).cancelApproval(
+          widget.restaurant.id,
+          reason,
+          name: widget.restaurant.name,
         );
 
     // Navigate to success screen
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
-        builder: (_) => RevokeSuccessScreen(restaurant: widget.restaurant),
+        builder: (_) => RevokeSuccessScreen(
+          restaurant: widget.restaurant.copyWith(
+            status: 'rejected',
+            rejectionReason: reason,
+          ),
+        ),
       ),
     );
   }

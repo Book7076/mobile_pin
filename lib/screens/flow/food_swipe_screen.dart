@@ -573,7 +573,11 @@ class _FoodSwipeScreenState extends ConsumerState<FoodSwipeScreen>
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${restaurant.rating} (${restaurant.reviewCount} รีวิว)',
+                            restaurant.reviewCount > 0
+                                ? '${restaurant.rating.toStringAsFixed(1)} (${restaurant.reviewCount} รีวิว)'
+                                : (restaurant.rating > 0
+                                    ? '${restaurant.rating.toStringAsFixed(1)} (${restaurant.reviewCount} รีวิว)'
+                                    : '0.0 (ยังไม่มีรีวิว)'),
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 13.5,

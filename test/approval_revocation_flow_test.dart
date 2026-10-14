@@ -76,21 +76,21 @@ void main() {
     await tester.tap(find.text('กลับหน้าจัดการร้านอาหาร'));
     await tester.pumpAndSettle();
 
-    // Verify returned to AdminDashboard
+    // Verify returned to AdminDashboard on "ไม่อนุมัติ" tab (initialSubTabIndex: 2)
     expect(find.byType(AdminDashboard), findsOneWidget);
+
+    // Verify "ดำเนินสะดวก" is immediately shown in "ไม่อนุมัติ" tab with the recorded reason!
+    expect(find.text('ดำเนินสะดวก'), findsOneWidget);
+    expect(find.textContaining('เหตุผล: ร้านไม่ผ่านเกณฑ์มาตรฐานความสะอาด'), findsOneWidget);
+
+    // 7. Switch to "อนุมัติ" tab
+    await tester.tap(find.text('อนุมัติ'));
+    await tester.pumpAndSettle();
 
     // Verify that "ดำเนินสะดวก" is REMOVED from the "อนุมัติ" list!
     expect(find.text('ดำเนินสะดวก'), findsNothing);
     // Other approved restaurants still remain
     expect(find.text('The Volcano'), findsOneWidget);
     expect(find.text('เจียวดาวหลังมอ(เจ้าแรก)'), findsOneWidget);
-
-    // 7. Switch to "ไม่อนุมัติ" tab
-    await tester.tap(find.text('ไม่อนุมัติ'));
-    await tester.pumpAndSettle();
-
-    // Verify "ดำเนินสะดวก" is now in "ไม่อนุมัติ" with the recorded reason!
-    expect(find.text('ดำเนินสะดวก'), findsOneWidget);
-    expect(find.textContaining('เหตุผล: ร้านไม่ผ่านเกณฑ์มาตรฐานความสะอาด'), findsOneWidget);
   });
 }
