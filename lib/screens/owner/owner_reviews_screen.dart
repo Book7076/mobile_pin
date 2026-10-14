@@ -38,7 +38,7 @@ class OwnerReviewsScreen extends StatefulWidget {
   const OwnerReviewsScreen({
     super.key,
     this.restaurantId,
-    this.restaurantName = 'The CHICKEN',
+    this.restaurantName = '',
   });
 
   @override
@@ -46,33 +46,158 @@ class OwnerReviewsScreen extends StatefulWidget {
 }
 
 class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
-  // รายการรีวิว 10 รายการเริ่มต้น ตรงตามภาพต้นแบบ 100%
-  late List<ReviewItem> _reviews;
-  bool _isLoading = false;
+  // ข้อมูลรีวิวทั้งหมดดึงมาจาก Database 100% (ไม่มี mock หรือคิดข้อมูลขึ้นมาเอง)
+  List<ReviewItem> _reviews = [];
+  bool _isLoading = true;
+  String? _resolvedRestaurantId;
 
   @override
   void initState() {
     super.initState();
-    _initReviews();
-    if (widget.restaurantId != null) {
-      _loadReviewsFromSupabase();
-    }
+    _loadReviewsFromSupabase();
   }
 
+  /// ค้นหา ID ร้านค้าจาก Parameter หรือจาก Owner ปัจจุบันใน Database
+  Future<String?> _resolveRestaurantId() async {
+    // 1. หากส่ง restaurantId เข้ามาโดยตรง
+    if (widget.restaurantId != null && widget.restaurantId!.trim().isNotEmpty) {
+      final rid = widget.restaurantId!.trim();
+      // หากเป็น UUID ใช้ได้ทันที
+      if (rid.contains('-')) {
+        return rid;
+      }
+
+      // หากไม่ใช่ UUID เผื่อเป็นชื่อร้าน ให้ลองค้นหา ID จริงจากตาราง restaurants
+      try {
+        final res = await Supabase.instance.client
+            .from('restaurants')
+            .select('id')
+            .ilike('name', '%$rid%')
+            .limit(1)
+            .maybeSingle();
+        if (res != null && res['id'] != null) {
+          return res['id'].toString();
+        }
+      } catch (_) {}
+      return rid;
+    }
+
+    // 2. หากไม่ได้ส่ง restaurantId ให้ค้นหาจาก owner_id ของผู้ใช้ปัจจุบันที่ล็อกอิน
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        // ค้นหาร้านค้าที่ owner_id ตรงกับ auth user
+        try {
+          final res = await Supabase.instance.client
+              .from('restaurants')
+              .select('id, name')
+              .eq('owner_id', user.id)
+              .order('created_at', ascending: false)
+              .limit(1)
+              .maybeSingle();
+          if (res != null && res['id'] != null) {
+            return res['id'].toString();
+          }
+        } catch (_) {
+          // หากไม่มี column created_at ให้ query แบบธรรมดา
+          final resFallback = await Supabase.instance.client
+              .from('restaurants')
+              .select('id, name')
+              .eq('owner_id', user.id)
+              .limit(1)
+              .maybeSingle();
+          if (resFallback != null && resFallback['id'] != null) {
+            return resFallback['id'].toString();
+          }
+        }
+
+        // กรณี fallback ค้นหาผ่านตาราง public users
+        if (user.email != null && user.email!.isNotEmpty) {
+          try {
+            final uRow = await Supabase.instance.client
+                .from('users')
+                .select('id')
+                .eq('email', user.email!)
+                .maybeSingle();
+            if (uRow != null && uRow['id'] != null) {
+              final resByUid = await Supabase.instance.client
+                  .from('restaurants')
+                  .select('id, name')
+                  .eq('owner_id', uRow['id'])
+                  .limit(1)
+                  .maybeSingle();
+              if (resByUid != null && resByUid['id'] != null) {
+                return resByUid['id'].toString();
+              }
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      debugPrint('Note: Error resolving restaurantId for reviews: $e');
+    }
+
+    return null;
+  }
+
+  /// โหลดรีวิวจาก Supabase ตาราง reviews จริงตาม database 100%
   Future<void> _loadReviewsFromSupabase() async {
-    if (widget.restaurantId == null) return;
     setState(() => _isLoading = true);
 
     try {
-      final data = await Supabase.instance.client
-          .from('reviews')
-          .select('*, users(first_name, last_name, email)')
-          .eq('restaurant_id', widget.restaurantId!);
+      // ตรวจสอบความพร้อมของ Supabase client
+      try {
+        Supabase.instance.client;
+      } catch (_) {
+        if (mounted) {
+          setState(() {
+            _reviews = [];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
 
-      if (data.isNotEmpty) {
-        final List<ReviewItem> loaded = [];
+      final effectiveId = await _resolveRestaurantId();
+      _resolvedRestaurantId = effectiveId;
+
+      if (effectiveId == null || effectiveId.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _reviews = [];
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // ดึงข้อมูลรีวิวพร้อมข้อมูลผู้ใช้ที่เขียนรีวิว (ถ้ามี relation users)
+      dynamic data;
+      try {
+        data = await Supabase.instance.client
+            .from('reviews')
+            .select('*, users(first_name, last_name, email, image_url)')
+            .eq('restaurant_id', effectiveId);
+      } catch (e) {
+        debugPrint('Query reviews with users join failed, falling back to plain select: $e');
+        try {
+          data = await Supabase.instance.client
+              .from('reviews')
+              .select('*')
+              .eq('restaurant_id', effectiveId);
+        } catch (e2) {
+          debugPrint('Error querying reviews from Supabase: $e2');
+          data = [];
+        }
+      }
+
+      final List<ReviewItem> loaded = [];
+      if (data != null && data is List) {
         for (final row in data) {
           String uName = '';
+          String? uAvatar;
+
+          // 1. อ่านข้อมูลชื่อจาก Relation users
           if (row['users'] != null && row['users'] is Map) {
             final u = row['users'] as Map;
             final f = u['first_name']?.toString().trim() ?? '';
@@ -82,137 +207,94 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
             } else if (u['email'] != null) {
               uName = u['email'].toString().split('@').first;
             }
+            uAvatar = u['image_url']?.toString() ?? u['avatar_url']?.toString();
           }
-          if (uName.isEmpty) uName = 'ผู้ใช้งาน';
 
+          // 2. ถ้าไม่มี relation ให้ดูจาก field ใน row โดยตรง
+          if (uName.isEmpty && row['user_name'] != null) {
+            uName = row['user_name'].toString().trim();
+          }
+          if (uName.isEmpty && row['contact_email'] != null) {
+            uName = row['contact_email'].toString().split('@').first;
+          }
+          if (uName.isEmpty) {
+            uName = 'ผู้ใช้งาน';
+          }
+
+          uAvatar ??= row['user_avatar']?.toString() ?? row['photo_url']?.toString();
+
+          // 3. วันที่สร้างรีวิว (รองรับทั้ง created_at และ create_at)
           final rawDate = row['created_at'] ?? row['create_at'];
           DateTime dt = DateTime.now();
           if (rawDate != null) {
-            dt = DateTime.tryParse(rawDate.toString()) ?? DateTime.now();
+            dt = DateTime.tryParse(rawDate.toString())?.toLocal() ?? DateTime.now();
           }
+
+          // 4. คะแนนดาว (1 - 5)
+          final ratingNum = (row['rating'] as num?)?.toInt() ?? 5;
+          final clampedRating = ratingNum.clamp(1, 5);
 
           loaded.add(
             ReviewItem(
               id: row['id']?.toString() ?? '',
               userName: uName,
-              avatarUrl: row['photo_url']?.toString(),
-              rating: (row['rating'] as num?)?.toInt() ?? 5,
+              avatarUrl: uAvatar,
+              avatarLetter: (uAvatar == null || uAvatar.isEmpty)
+                  ? (uName.isNotEmpty ? uName.substring(0, 1).toUpperCase() : 'U')
+                  : null,
+              rating: clampedRating,
               comment: row['comment']?.toString() ?? '',
-              dateText: '${dt.day}/${dt.month}/${dt.year}',
+              dateText: _formatReviewDate(dt),
               createdAt: dt,
             ),
           );
         }
-        if (mounted) {
-          setState(() {
-            _reviews = loaded;
-          });
-        }
+      }
+
+      // เรียงลำดับรีวิวล่าสุดขึ้นก่อนเสมอ
+      loaded.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      if (mounted) {
+        setState(() {
+          _reviews = loaded;
+        });
       }
     } catch (e) {
-      debugPrint('Error loading reviews from Supabase: $e');
+      debugPrint('Error loading reviews from database: $e');
+      if (mounted) {
+        setState(() {
+          _reviews = [];
+        });
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _initReviews() {
-    _reviews = [
-      ReviewItem(
-        id: '1',
-        userName: 'Noey',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-        rating: 5,
-        comment: 'อร่อยมาก กินตลอด รสชาติอร่อย รักษามาตรฐานแบบนี้ต่อไปนะคะ',
-        dateText: 'วันนี้',
-      ),
-      ReviewItem(
-        id: '2',
-        userName: 'i.cha',
-        avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-        rating: 5,
-        comment: 'อร่อย ไปกินมา 4-5 วันติดแล้วค่ะ',
-        dateText: 'วันนี้',
-      ),
-      ReviewItem(
-        id: '3',
-        userName: 'อายเลิฟหมาเด็ก',
-        avatarUrl: 'https://images.unsplash.com/photo-1543466835-00a7907e9de1?w=150&auto=format&fit=crop&q=80',
-        rating: 5,
-        comment: 'เดอะเบสสสสสสสสสสสสส',
-        dateText: 'เมื่อวาน',
-      ),
-      ReviewItem(
-        id: '4',
-        userName: 'Kevin G.',
-        avatarLetter: 'K',
-        rating: 5,
-        comment: 'Amazing. The spicy heat the black sesame leaves a nice slow burn with some sweetness.',
-        dateText: 'เมื่อวาน',
-      ),
-      ReviewItem(
-        id: '5',
-        userName: 'ฝนตกมันเหงา',
-        avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-        rating: 5,
-        comment: 'อร่อย กินบ่อย รามยอน ปังมาก ไก่กรอบซอสฉ่ำ อร่อย!!!!',
-        dateText: '4/08/2025',
-      ),
-      ReviewItem(
-        id: '6',
-        userName: 'Jim B.',
-        avatarLetter: 'J',
-        rating: 5,
-        comment: 'Best fried chicken on the planet',
-        dateText: '4/08/2025',
-      ),
-      ReviewItem(
-        id: '7',
-        userName: 'เอ็ม',
-        avatarUrl: 'https://images.unsplash.com/photo-1582266255765-fa5cf1a1d501?w=150&auto=format&fit=crop&q=80',
-        rating: 4,
-        comment: 'วันนี้ข้าวแข็งครับ',
-        dateText: '3/08/2025',
-      ),
-      ReviewItem(
-        id: '8',
-        userName: 'ปูเป้',
-        avatarLetter: 'ปู',
-        rating: 4,
-        comment: 'วันนี้ไก่เค็ม หรือไปตอนร้านใกล้ปิดคะ',
-        dateText: '3/08/2025',
-      ),
-      ReviewItem(
-        id: '9',
-        userName: 'dream',
-        avatarUrl: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=150&auto=format&fit=crop&q=80',
-        rating: 5,
-        comment: 'เริ่ดดดดมาก',
-        dateText: '2/08/2025',
-      ),
-      ReviewItem(
-        id: '10',
-        userName: 'soul',
-        avatarUrl: 'https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=150&auto=format&fit=crop&q=80',
-        rating: 5,
-        comment: 'best.wings.ever.',
-        dateText: '1/08/2025',
-      ),
-    ];
+  /// แปลงวันที่ให้อ่านเข้าใจง่าย
+  String _formatReviewDate(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final reviewDate = DateTime(dt.year, dt.month, dt.day);
+    final diffDays = today.difference(reviewDate).inDays;
+
+    if (diffDays == 0) {
+      return 'วันนี้';
+    } else if (diffDays == 1) {
+      return 'เมื่อวาน';
+    } else {
+      return '${dt.day}/${dt.month}/${dt.year}';
+    }
   }
 
-  /// คำนวณจำนวนดาวแต่ละระดับ (1 ถึง 5 ดาว)
+  /// คำนวณจำนวนดาวแต่ละระดับ (1 ถึง 5 ดาว) ตามข้อมูลจริงใน Database
   int _getCountForStar(int star) {
     return _reviews.where((r) => r.rating == star).length;
   }
 
-  /// คำนวณคะแนนเฉลี่ยจากเต็ม 5 (Weighted Average)
+  /// คำนวณคะแนนเฉลี่ยจากเต็ม 5 (Weighted Average) ตามข้อมูลจริงใน Database
   String get _formattedAverage {
     if (_reviews.isEmpty) return '0.0';
-    // ค่าเฉลี่ยของ 10 รีวิวตั้งต้นตามภาพคือ 4.9
-    if (_reviews.length == 10 && _getCountForStar(5) == 8 && _getCountForStar(4) == 2) {
-      return '4.9';
-    }
     final totalStars = _reviews.fold<int>(0, (sum, item) => sum + item.rating);
     final avg = totalStars / _reviews.length;
     return avg.toStringAsFixed(1);
@@ -240,10 +322,9 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
         ),
         centerTitle: true,
         actions: [
-          // ปุ่มจำลองลูกค้าพิมพ์รีวิวเข้ามาที่ร้าน
           IconButton(
             icon: const Icon(Icons.rate_review_outlined, color: Colors.white, size: 24),
-            tooltip: 'จำลองลูกค้าเขียนรีวิว',
+            tooltip: 'เขียนรีวิว',
             onPressed: _showAddReviewDialog,
           ),
         ],
@@ -254,24 +335,34 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
           onRefresh: _loadReviewsFromSupabase,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-          children: [
-            // 1. การ์ดสรุปคะแนนรวม & สัดส่วนแถบดาว
-            _buildRatingSummaryCard(),
-            const SizedBox(height: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+            children: [
+              // 1. การ์ดสรุปคะแนนรวม & สัดส่วนแถบดาว
+              _buildRatingSummaryCard(),
+              const SizedBox(height: 16),
 
-            // 2. รายการรีวิวจากลูกค้า (Avatar ซ้าย + กล่องข้อความขวา)
-            ..._reviews.map((review) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: _buildReviewItem(review),
-                )),
-            const SizedBox(height: 20),
-          ],
+              // 2. รายการรีวิวจากลูกค้าตาม Database
+              if (_isLoading)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 48.0),
+                  child: Center(
+                    child: CircularProgressIndicator(color: kOwnerPrimaryColor),
+                  ),
+                )
+              else if (_reviews.isEmpty)
+                _buildEmptyReviewsState()
+              else
+                ..._reviews.map((review) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: _buildReviewItem(review),
+                    )),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   // ==========================================
   // 1. การ์ดสรุปคะแนนรวม & สัดส่วนแถบดาว
@@ -325,7 +416,7 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
                         ),
                       ),
                       const SizedBox(width: 12),
-                      // ตัวเลขคะแนนเฉลี่ย เช่น 4.9
+                      // ตัวเลขคะแนนเฉลี่ยจริงตาม database
                       Text(
                         _formattedAverage,
                         style: const TextStyle(
@@ -423,9 +514,9 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          // ตัวเลขจำนวนคน เช่น 8, 2, 0
+          // ตัวเลขจำนวนคนจริง
           SizedBox(
-            width: 14,
+            width: 18,
             child: Text(
               '$count',
               textAlign: TextAlign.right,
@@ -434,6 +525,68 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
                 color: Color(0xFF555555),
                 fontWeight: FontWeight.w400,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================
+  // แสดงสถานะเมื่อยังไม่มีรีวิวใน Database
+  // ==========================================
+  Widget _buildEmptyReviewsState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+      margin: const EdgeInsets.only(top: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kOwnerBorderColor, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFBF1F3),
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Icon(
+                Icons.reviews_outlined,
+                size: 32,
+                color: kOwnerPrimaryColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'ยังไม่มีรีวิวสำหรับร้านนี้',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: kOwnerTextDark,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'ข้อมูลรีวิวจะแสดงที่นี่โดยอัตโนมัติเมื่อมีลูกค้าเขียนรีวิวในระบบ',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF777777),
+              height: 1.4,
             ),
           ),
         ],
@@ -489,7 +642,7 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    // แถวดาว 5 ดวง (เต็มดวงตามคะแนน, ดวงที่เหลือเป็น Outline)
+                    // แถวดาว 5 ดวง (เต็มดวงตามคะแนนจริง, ดวงที่เหลือเป็น Outline)
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: List.generate(5, (index) {
@@ -540,7 +693,7 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
   Widget _buildAvatarWidget(ReviewItem review) {
     const avatarSize = 46.0;
 
-    // กรณีเป็นตัวอักษรย่อ (เช่น K, J, ปู)
+    // กรณีเป็นตัวอักษรย่อ
     if (review.avatarLetter != null && review.avatarLetter!.isNotEmpty) {
       return Container(
         width: avatarSize,
@@ -583,7 +736,7 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
   }
 
   Widget _buildFallbackAvatar(String name) {
-    final initial = name.isNotEmpty ? name.substring(0, 1) : 'U';
+    final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'U';
     return Container(
       color: const Color(0xFFFBE8EB),
       child: Center(
@@ -600,12 +753,13 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
   }
 
   // ==========================================
-  // 3. ฟอร์มจำลองลูกค้าเขียนรีวิวใหม่เข้ามา
+  // 3. ฟอร์มเขียนรีวิวเข้าสู่ Database
   // ==========================================
   void _showAddReviewDialog() {
-    final nameController = TextEditingController(text: 'น้องเนย สายหวาน');
-    final commentController = TextEditingController(text: 'ไก่ทอดหอมกรอบมาก ซอสหวานกลมกล่อม บริการดีเยี่ยมค่ะ');
+    final nameController = TextEditingController();
+    final commentController = TextEditingController();
     int selectedRating = 5;
+    bool isSubmitting = false;
 
     showModalBottomSheet(
       context: context,
@@ -631,7 +785,7 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text(
-                        'จำลองลูกค้าส่งรีวิวใหม่',
+                        'เขียนรีวิวใหม่',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -658,9 +812,11 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
                           color: kOwnerPrimaryColor,
                           size: 32,
                         ),
-                        onPressed: () {
-                          setModalState(() => selectedRating = star);
-                        },
+                        onPressed: isSubmitting
+                            ? null
+                            : () {
+                                setModalState(() => selectedRating = star);
+                              },
                       );
                     }),
                   ),
@@ -669,8 +825,10 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
                   // ชื่อลูกค้า
                   TextField(
                     controller: nameController,
+                    enabled: !isSubmitting,
                     decoration: InputDecoration(
                       labelText: 'ชื่อผู้รีวิว (ลูกค้า)',
+                      hintText: 'กรอกชื่อผู้รีวิว',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
@@ -680,9 +838,11 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
                   // ข้อความรีวิว
                   TextField(
                     controller: commentController,
+                    enabled: !isSubmitting,
                     maxLines: 3,
                     decoration: InputDecoration(
                       labelText: 'ข้อความรีวิว',
+                      hintText: 'กรอกข้อความรีวิว...',
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       contentPadding: const EdgeInsets.all(14),
                     ),
@@ -699,58 +859,64 @@ class _OwnerReviewsScreenState extends State<OwnerReviewsScreen> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         elevation: 0,
                       ),
-                      onPressed: () async {
-                        if (nameController.text.trim().isEmpty) return;
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              final commentText = commentController.text.trim();
+                              final userNameText = nameController.text.trim();
 
-                        final commentText = commentController.text.trim();
-                        final userNameText = nameController.text.trim();
+                              if (commentText.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('กรุณากรอกข้อความรีวิว'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                                return;
+                              }
 
-                        final newReview = ReviewItem(
-                          id: DateTime.now().millisecondsSinceEpoch.toString(),
-                          userName: userNameText,
-                          avatarLetter: userNameText.substring(0, 1),
-                          rating: selectedRating,
-                          comment: commentText,
-                          dateText: 'วันนี้',
-                        );
+                              setModalState(() => isSubmitting = true);
 
-                        if (widget.restaurantId != null) {
-                          try {
-                            final user = Supabase.instance.client.auth.currentUser;
-                            if (user != null) {
-                              await Supabase.instance.client.from('reviews').insert({
-                                'restaurant_id': widget.restaurantId,
-                                'user_id': user.id,
-                                'rating': selectedRating,
-                                'comment': commentText,
-                              });
-                            }
-                          } catch (e) {
-                            debugPrint('Error inserting review to Supabase: $e');
-                          }
-                        }
+                              final effectiveId = _resolvedRestaurantId ?? await _resolveRestaurantId();
+                              if (effectiveId != null && effectiveId.isNotEmpty) {
+                                try {
+                                  final user = Supabase.instance.client.auth.currentUser;
+                                  final payload = <String, dynamic>{
+                                    'restaurant_id': effectiveId,
+                                    if (user != null) 'user_id': user.id,
+                                    'rating': selectedRating,
+                                    'comment': commentText,
+                                    if (userNameText.isNotEmpty) 'user_name': userNameText,
+                                    'create_at': DateTime.now().toIso8601String(),
+                                  };
+                                  await Supabase.instance.client.from('reviews').insert(payload);
+                                } catch (e) {
+                                  debugPrint('Error inserting review to Supabase: $e');
+                                }
+                              }
 
-                        if (mounted) {
-                          setState(() {
-                            _reviews.insert(0, newReview);
-                          });
-                        }
-
-                        Navigator.pop(context);
-
-                        if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('เพิ่มรีวิวใหม่จาก "$userNameText" เรียบร้อย (คะแนนรวมคำนวณใหม่ทันที)'),
-                            backgroundColor: kOwnerPrimaryColor,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
-                      child: const Text(
-                        'ส่งรีวิว (คำนวณคะแนนเฉลี่ยใหม่ทันที)',
-                        style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
-                      ),
+                              if (mounted) {
+                                Navigator.pop(context);
+                                await _loadReviewsFromSupabase();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('บันทึกรีวิวเข้าสู่ระบบเรียบร้อยแล้ว'),
+                                    backgroundColor: kOwnerPrimaryColor,
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            },
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            )
+                          : const Text(
+                              'ส่งรีวิวเข้าสู่ระบบ',
+                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
                     ),
                   ),
                 ],

@@ -13,6 +13,7 @@ import '../../providers/restaurant_provider.dart';
 import '../../services/review_service.dart';
 import 'restaurant_all_menu_screen.dart';
 import 'review_restaurant_screen.dart';
+import '../../services/menu_availability_manager.dart';
 
 /// Restaurant Detail Screen matching Mockup Image 4:
 /// - Header: Back arrow (<) + "รายละเอียดร้านอาหาร" in Burgundy
@@ -112,7 +113,7 @@ class _RestaurantDetailScreenState
       if (targetRestaurantId != null && targetRestaurantId.isNotEmpty) {
         final rows = await Supabase.instance.client
             .from('menu_items')
-            .select('id, name, price, image_url, sort_order')
+            .select()
             .eq('restaurant_id', targetRestaurantId)
             .order('sort_order', ascending: true)
             .limit(3);
@@ -123,11 +124,13 @@ class _RestaurantDetailScreenState
             final name = row['name']?.toString() ?? '';
             final price = (row['price'] as num?)?.toInt() ?? 0;
             final img = row['image_url']?.toString();
+            final isAvailable = MenuAvailabilityManager.parseFromRow(Map<String, dynamic>.from(row));
             if (name.isNotEmpty) {
               loaded.add(SignatureDish(
                 name: name,
                 price: price,
                 imageUrl: (img != null && img.isNotEmpty) ? img : null,
+                isAvailable: isAvailable,
               ));
             }
           }
@@ -411,6 +414,15 @@ class _RestaurantDetailScreenState
   }
 
   RestaurantModel _createFallbackModel() {
+    if (widget.restaurantData != null) {
+      try {
+        final parsed = RestaurantModel.fromJson(widget.restaurantData!);
+        if (parsed.name.isNotEmpty) {
+          return parsed;
+        }
+      } catch (_) {}
+    }
+
     final effectiveName =
         widget.name ?? widget.restaurantData?['name']?.toString() ?? 'ร้านอาหารยอดนิยม';
     final effectiveCategory =
@@ -424,22 +436,34 @@ class _RestaurantDetailScreenState
     final effectiveHours = widget.openingHours ??
         widget.restaurantData?['open_hours']?.toString() ??
         '10:00 - 21:00 น.';
-    final effectiveDishes = (widget.signatureDishes != null &&
-            widget.signatureDishes!.isNotEmpty)
-        ? widget.signatureDishes!
-            .map((d) => SignatureDish(name: d, price: 150))
-            .toList()
-        : [SignatureDish(name: 'เมนูซิกเนเจอร์', price: 150)];
+    final effectiveId = widget.restaurantId ??
+        widget.restaurantData?['id']?.toString() ??
+        'custom_${effectiveName.hashCode}';
+
+    List<SignatureDish> effectiveDishes = [];
+    if (widget.signatureDishes != null && widget.signatureDishes!.isNotEmpty) {
+      effectiveDishes = widget.signatureDishes!
+          .map((d) => SignatureDish(name: d, price: 150))
+          .toList();
+    } else if (widget.restaurantData?['signature_dishes'] != null &&
+        widget.restaurantData?['signature_dishes'] is List) {
+      effectiveDishes = (widget.restaurantData!['signature_dishes'] as List)
+          .whereType<Map>()
+          .map((d) => SignatureDish.fromJson(Map<String, dynamic>.from(d)))
+          .toList();
+    } else {
+      effectiveDishes = [SignatureDish(name: 'เมนูซิกเนเจอร์', price: 150)];
+    }
 
     return RestaurantModel(
-      id: 'custom_${effectiveName.hashCode}',
-      ownerId: 'owner_1',
+      id: effectiveId,
+      ownerId: widget.restaurantData?['owner_id']?.toString() ?? 'owner_1',
       name: effectiveName,
       address: effectiveAddress,
-      lat: 13.7563,
-      lng: 100.5018,
+      lat: (widget.restaurantData?['lat'] as num?)?.toDouble() ?? 13.7563,
+      lng: (widget.restaurantData?['lng'] as num?)?.toDouble() ?? 100.5018,
       phone: effectivePhone,
-      status: 'approved',
+      status: widget.restaurantData?['status']?.toString() ?? 'approved',
       categories: [effectiveCategory],
       openHours: effectiveHours,
       imageUrls: effectiveImage != null ? [effectiveImage] : [],
@@ -1126,7 +1150,29 @@ class _RestaurantDetailScreenState
                           ),
                         ],
                       ),
-                      child: _buildDishPreview(dish.imageUrl),
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: _buildDishPreview(dish.imageUrl),
+                          ),
+                          if (!dish.isAvailable)
+                            Positioned.fill(
+                              child: Container(
+                                color: Colors.black.withOpacity(0.55),
+                                child: const Center(
+                                  child: Text(
+                                    'สินค้าหมด',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1136,10 +1182,12 @@ class _RestaurantDetailScreenState
                       children: [
                         Text(
                           dish.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15.5,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF1E293B),
+                            color: dish.isAvailable
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFF94A3B8),
                           ),
                         ),
                         if (dish.description != null &&
@@ -1154,13 +1202,38 @@ class _RestaurantDetailScreenState
                           ),
                         ],
                         const SizedBox(height: 4),
-                        Text(
-                          dish.formattedPrice,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF1E293B),
-                          ),
+                        Row(
+                          children: [
+                            Text(
+                              dish.formattedPrice,
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                color: dish.isAvailable
+                                    ? const Color(0xFF1E293B)
+                                    : const Color(0xFF94A3B8),
+                              ),
+                            ),
+                            if (!dish.isAvailable) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFEE2E2),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFFCA5A5), width: 0.8),
+                                ),
+                                child: const Text(
+                                  'สินค้าหมด',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Color(0xFFDC2626),
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ],
                     ),

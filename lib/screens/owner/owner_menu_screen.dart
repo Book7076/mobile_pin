@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/menu_availability_manager.dart';
 import 'owner_edit_menu_item_screen.dart';
 
 const Color kOwnerPrimaryColor = Color(0xFF8B1E3F);
@@ -116,9 +117,46 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
     _loadMenuItems();
   }
 
+  /// ค้นหา ID ร้านค้าจาก Parameter หรือจาก Owner ปัจจุบันใน Database
+  Future<String?> _resolveRestaurantId() async {
+    if (widget.restaurantId != null && widget.restaurantId!.trim().isNotEmpty) {
+      final rid = widget.restaurantId!.trim();
+      if (rid.contains('-')) return rid;
+      try {
+        final res = await Supabase.instance.client
+            .from('restaurants')
+            .select('id')
+            .ilike('name', '%$rid%')
+            .limit(1)
+            .maybeSingle();
+        if (res != null && res['id'] != null) {
+          return res['id'].toString();
+        }
+      } catch (_) {}
+      return rid;
+    }
+
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final res = await Supabase.instance.client
+            .from('restaurants')
+            .select('id')
+            .eq('owner_id', user.id)
+            .limit(1)
+            .maybeSingle();
+        if (res != null && res['id'] != null) {
+          return res['id'].toString();
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   /// โหลดข้อมูลเมนูจากตาราง menu_items และหมวดหมู่จากตาราง categories
   Future<void> _loadMenuItems() async {
-    if (widget.restaurantId == null) {
+    final effectiveRestaurantId = await _resolveRestaurantId();
+    if (effectiveRestaurantId == null) {
       setState(() {
         _menuItems = List.from(_defaultMockItems);
         _isLoading = false;
@@ -134,7 +172,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
         final catRows = await Supabase.instance.client
             .from('categories')
             .select('id, name, sort_order')
-            .eq('restaurant_id', widget.restaurantId!)
+            .eq('restaurant_id', effectiveRestaurantId)
             .order('sort_order', ascending: true);
 
         if (catRows is List && catRows.isNotEmpty) {
@@ -191,7 +229,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       final response = await Supabase.instance.client
           .from('menu_items')
           .select()
-          .eq('restaurant_id', widget.restaurantId!)
+          .eq('restaurant_id', effectiveRestaurantId)
           .order('sort_order', ascending: true);
 
       if (response.isNotEmpty) {
@@ -202,14 +240,17 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
           final itemCats = itemToCategories[id] ?? [_detectCategoryByName(name)];
           final categoryName = itemCats.isNotEmpty ? itemCats.first : _detectCategoryByName(name);
 
+          // ดึงสถานะเปิดขาย / สินค้าหมด ตามฐานข้อมูลและ cache
+          final isAvailable = MenuAvailabilityManager.parseFromRow(row);
+
           loaded.add({
             'id': id,
-            'restaurant_id': row['restaurant_id']?.toString() ?? '',
+            'restaurant_id': row['restaurant_id']?.toString() ?? effectiveRestaurantId,
             'name': name,
             'category': categoryName,
             'categories': itemCats,
             'price': (row['price'] as num?)?.toDouble() ?? 0.0,
-            'isAvailable': true,
+            'isAvailable': isAvailable,
             'image': (row['image_url'] != null && row['image_url'].toString().isNotEmpty)
                 ? row['image_url'].toString()
                 : '',
@@ -448,9 +489,23 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
 
     if (itemId != null && !itemId.startsWith('mock-')) {
       try {
-        await Supabase.instance.client.from('menu_items').delete().eq('id', itemId);
+        // 1. ลบความสัมพันธ์ในตาราง menu_item_categories ก่อนเพื่อป้องกัน foreign key error
+        try {
+          await Supabase.instance.client
+              .from('menu_item_categories')
+              .delete()
+              .eq('menu_item_id', itemId);
+        } catch (e) {
+          debugPrint('Note: Error deleting menu_item_categories: $e');
+        }
+
+        // 2. ลบเมนูอาหารออกจากตาราง menu_items ในฐานข้อมูลจริง
+        await Supabase.instance.client
+            .from('menu_items')
+            .delete()
+            .eq('id', itemId);
       } catch (e) {
-        debugPrint('Error deleting menu item: $e');
+        debugPrint('Error deleting menu item from Supabase: $e');
       }
     }
 
@@ -463,7 +518,7 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
       });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('ลบเมนูเรียบร้อยแล้ว'),
+          content: Text('ลบเมนูออกจากฐานข้อมูลเรียบร้อยแล้ว'),
           backgroundColor: kOwnerPrimaryColor,
         ),
       );
@@ -650,14 +705,18 @@ class _OwnerMenuScreenState extends State<OwnerMenuScreen> {
                                         Switch(
                                           value: isAvailable,
                                           activeColor: kOwnerPrimaryColor,
-                                          onChanged: (val) {
+                                          onChanged: (val) async {
                                             setState(() {
                                               item['isAvailable'] = val;
                                             });
+                                            final itemId = item['id']?.toString();
+                                            if (itemId != null && itemId.isNotEmpty) {
+                                              await MenuAvailabilityManager.updateAvailabilityInDatabase(itemId, val);
+                                            }
                                           },
                                         ),
                                         Text(
-                                          isAvailable ? 'เปิดขาย' : 'หมด',
+                                          isAvailable ? 'เปิดขาย' : 'สินค้าหมด',
                                           style: TextStyle(
                                             fontSize: 11,
                                             color: isAvailable ? Colors.green : Colors.red,

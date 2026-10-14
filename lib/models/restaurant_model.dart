@@ -6,6 +6,7 @@ class SignatureDish {
   final String? imageUrl;
   final String? description;
   final String? priceDisplay;
+  final bool isAvailable;
 
   SignatureDish({
     required this.name,
@@ -13,11 +14,21 @@ class SignatureDish {
     this.imageUrl,
     this.description,
     this.priceDisplay,
+    this.isAvailable = true,
   });
 
   String get formattedPrice => priceDisplay ?? '฿$price';
 
   factory SignatureDish.fromJson(Map<String, dynamic> json) {
+    bool available = true;
+    if (json.containsKey('is_available') && json['is_available'] != null) {
+      available = json['is_available'] == true;
+    } else if (json['sort_order'] != null && (json['sort_order'] as num) < 0) {
+      available = false;
+    } else if (json['isAvailable'] != null) {
+      available = json['isAvailable'] == true;
+    }
+
     return SignatureDish(
       name: json['name'] as String? ?? '',
       price: json['price'] is int
@@ -26,6 +37,7 @@ class SignatureDish {
       imageUrl: json['image_url'] as String?,
       description: json['description'] as String?,
       priceDisplay: json['price_display'] as String?,
+      isAvailable: available,
     );
   }
 
@@ -35,6 +47,7 @@ class SignatureDish {
         'image_url': imageUrl,
         'description': description,
         'price_display': priceDisplay,
+        'is_available': isAvailable,
       };
 }
 
@@ -199,13 +212,7 @@ class RestaurantModel {
     } else if (json['menu_items'] != null && json['menu_items'] is List) {
       parsedDishes = (json['menu_items'] as List)
           .whereType<Map>()
-          .map((d) => SignatureDish(
-                name: d['name']?.toString() ?? '',
-                price: (d['price'] is num)
-                    ? (d['price'] as num).toInt()
-                    : (int.tryParse(d['price']?.toString() ?? '') ?? 0),
-                imageUrl: d['image_url']?.toString(),
-              ))
+          .map((d) => SignatureDish.fromJson(Map<String, dynamic>.from(d)))
           .toList();
     }
 

@@ -659,23 +659,6 @@ class _OwnerRestaurantInfoScreenState extends State<OwnerRestaurantInfoScreen> {
                                 color: Colors.grey.shade600,
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: kOwnerRedColor.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Text(
-                                '⚠️ ถ้าไม่ได้ใส่รูปนี้ จะไม่อนุญาตให้กดบันทึกข้อมูล',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: kOwnerRedColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),

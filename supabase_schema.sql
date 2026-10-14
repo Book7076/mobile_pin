@@ -146,4 +146,40 @@ CREATE POLICY "Users can update swipe sessions"
 ON public.swipe_sessions FOR UPDATE
 USING (true);
 
+-- 6. Create table for Menu Items with is_available column
+CREATE TABLE IF NOT EXISTS public.menu_items (
+  id uuid default gen_random_uuid() primary key,
+  restaurant_id uuid references public.restaurants(id) on delete cascade,
+  name text not null,
+  price numeric not null,
+  image_url text,
+  is_available boolean not null default true,
+  sort_order integer not null default 0,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Turn on Row Level Security (RLS) for menu_items table
+ALTER TABLE public.menu_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Anyone can view menu items"
+ON public.menu_items FOR SELECT
+USING (true);
+
+CREATE POLICY "Owners can insert menu items"
+ON public.menu_items FOR INSERT
+WITH CHECK (true);
+
+CREATE POLICY "Owners can update menu items"
+ON public.menu_items FOR UPDATE
+USING (true);
+
+CREATE POLICY "Owners can delete menu items"
+ON public.menu_items FOR DELETE
+USING (true);
+
+-- Ensure is_available column exists on menu_items table
+ALTER TABLE public.menu_items ADD COLUMN IF NOT EXISTS is_available boolean DEFAULT true;
+
+
 

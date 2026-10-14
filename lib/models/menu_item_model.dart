@@ -18,13 +18,22 @@ class MenuItemModel {
   });
 
   factory MenuItemModel.fromJson(Map<String, dynamic> json) {
+    bool available = true;
+    if (json.containsKey('is_available') && json['is_available'] != null) {
+      available = json['is_available'] == true;
+    } else if (json['sort_order'] != null && (json['sort_order'] as num) < 0) {
+      available = false;
+    } else if (json['isAvailable'] != null) {
+      available = json['isAvailable'] == true;
+    }
+
     return MenuItemModel(
       id: json['id']?.toString() ?? '',
       restaurantId: json['restaurant_id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
       imageUrl: json['image_url']?.toString(),
-      isAvailable: json['is_available'] as bool? ?? true,
+      isAvailable: available,
       category: json['category']?.toString() ?? 'ทั่วไป',
     );
   }

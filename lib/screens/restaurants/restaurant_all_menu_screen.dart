@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/constants.dart';
 import '../../models/restaurant_model.dart';
+import '../../services/menu_availability_manager.dart';
 
 class RestaurantAllMenuScreen extends StatefulWidget {
   final String? restaurantId;
@@ -160,11 +161,14 @@ class _RestaurantAllMenuScreenState extends State<RestaurantAllMenuScreen> {
           final categoryName =
               itemToCategoryName[id] ?? _detectCategoryByName(name);
 
+          final isAvailable = MenuAvailabilityManager.parseFromRow(row);
+
           loaded.add({
             'id': id,
             'name': name,
             'category': categoryName,
             'price': (row['price'] as num?)?.toDouble() ?? 0.0,
+            'isAvailable': isAvailable,
             'image': (row['image_url'] != null &&
                     row['image_url'].toString().isNotEmpty)
                 ? row['image_url'].toString()
@@ -198,6 +202,7 @@ class _RestaurantAllMenuScreenState extends State<RestaurantAllMenuScreen> {
           'name': dish.name,
           'category': _detectCategoryByName(dish.name),
           'price': dish.price.toDouble(),
+          'isAvailable': dish.isAvailable,
           'image': (dish.imageUrl != null && dish.imageUrl!.isNotEmpty)
               ? dish.imageUrl!
               : 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=200&auto=format&fit=crop&q=80',
@@ -506,6 +511,8 @@ class _RestaurantAllMenuScreenState extends State<RestaurantAllMenuScreen> {
                               final item = filteredList[index];
                               final price = item['price'] as num? ?? 0;
 
+                              final isAvailable = item['isAvailable'] as bool? ?? true;
+
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 padding: const EdgeInsets.all(12),
@@ -524,8 +531,28 @@ class _RestaurantAllMenuScreenState extends State<RestaurantAllMenuScreen> {
                                   children: [
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(12),
-                                      child: _buildDishThumbnailWidget(
-                                        item['image']?.toString(),
+                                      child: Stack(
+                                        children: [
+                                          _buildDishThumbnailWidget(
+                                            item['image']?.toString(),
+                                          ),
+                                          if (!isAvailable)
+                                            Positioned.fill(
+                                              child: Container(
+                                                color: Colors.black.withOpacity(0.55),
+                                                child: const Center(
+                                                  child: Text(
+                                                    'สินค้าหมด',
+                                                    style: TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
                                       ),
                                     ),
                                     const SizedBox(width: 14),
@@ -536,23 +563,49 @@ class _RestaurantAllMenuScreenState extends State<RestaurantAllMenuScreen> {
                                         children: [
                                           Text(
                                             item['name']?.toString() ?? '',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 15.5,
                                               fontWeight: FontWeight.bold,
-                                              color: Color(0xFF1E293B),
+                                              color: isAvailable
+                                                  ? const Color(0xFF1E293B)
+                                                  : const Color(0xFF94A3B8),
                                             ),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
                                           ),
                                           const SizedBox(height: 6),
-                                          Text(
-                                            '฿${price.toInt()}',
-                                            style: const TextStyle(
-                                              fontSize: 15.5,
-                                              fontWeight: FontWeight.w800,
-                                              color:
-                                                  AppConstants.burgundyPrimary,
-                                            ),
+                                          Row(
+                                            children: [
+                                              Text(
+                                                '฿${price.toInt()}',
+                                                style: TextStyle(
+                                                  fontSize: 15.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: isAvailable
+                                                      ? AppConstants.burgundyPrimary
+                                                      : const Color(0xFF94A3B8),
+                                                ),
+                                              ),
+                                              if (!isAvailable) ...[
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFFFEE2E2),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: const Color(0xFFFCA5A5), width: 0.8),
+                                                  ),
+                                                  child: const Text(
+                                                    'สินค้าหมด',
+                                                    style: TextStyle(
+                                                      fontSize: 11,
+                                                      color: Color(0xFFDC2626),
+                                                      fontWeight: FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
                                         ],
                                       ),

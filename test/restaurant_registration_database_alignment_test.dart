@@ -124,8 +124,8 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Tap "แก้ไข" in ที่อยู่ section (first 'แก้ไข' on screen)
-      final editAddressBtn = find.text('แก้ไข').at(2); // 0 is logo, 1 is banner, 2 is address
+      // Tap "แก้ไข" in ที่อยู่ section
+      final editAddressBtn = find.text('แก้ไข').at(1); // 0 is logo, 1 is address
       await tester.tap(editAddressBtn);
       await tester.pumpAndSettle();
 
@@ -162,7 +162,10 @@ void main() {
       await tester.pumpWidget(
         const ProviderScope(
           child: MaterialApp(
-            home: CreateRestaurantScreen(),
+            home: CreateRestaurantScreen(
+              initialLogoImageUrl: 'https://images.unsplash.com/logo.jpg',
+              initialBannerImageUrl: 'https://images.unsplash.com/banner.jpg',
+            ),
           ),
         ),
       );
@@ -181,17 +184,23 @@ void main() {
       await tester.tap(find.text('อาหารไทย').first);
       await tester.pumpAndSettle();
 
-      // 3. Select Logo & Banner
+      // 3. Verify Logo & Banner bottom sheet options (ถ่ายรูปภาพ & เลือกจากคลังรูปภาพ - matching Owner)
       await tester.tap(find.text('แก้ไข').at(0)); // logo edit
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).last, 'https://images.unsplash.com/logo.jpg');
-      await tester.tap(find.text('บันทึกรูปภาพ'));
+      expect(find.text('รูปภาพโปรไฟล์ร้านอาหาร'), findsOneWidget);
+      expect(find.text('ถ่ายรูปภาพ'), findsOneWidget);
+      expect(find.text('เลือกจากคลังรูปภาพ'), findsOneWidget);
+      expect(find.text('ลบรูปภาพ'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('แก้ไข').at(1)); // banner edit
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).last, 'https://images.unsplash.com/banner.jpg');
-      await tester.tap(find.text('บันทึกรูปภาพ'));
+      expect(find.text('รูปภาพสำหรับหน้าปัดร้านอาหาร'), findsOneWidget);
+      expect(find.text('ถ่ายรูปภาพ'), findsOneWidget);
+      expect(find.text('เลือกจากคลังรูปภาพ'), findsOneWidget);
+      expect(find.text('ลบรูปภาพ'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
 
       // 4. Address & Contact
@@ -324,6 +333,44 @@ void main() {
       final rejectedItem = notifier.state.firstWhere((r) => r.id == 'res-02');
       expect(rejectedItem.status, equals('rejected'));
       expect(rejectedItem.rejectionReason, equals('ข้อมูลไม่ครบถ้วน'));
+    });
+
+    testWidgets('9. Adding menu without image does not show fallback food image and displays ไม่มีรูป placeholder', (tester) async {
+      tester.view.physicalSize = const Size(1080, 2400);
+      tester.view.devicePixelRatio = 2.75;
+      addTearDown(() => tester.view.resetPhysicalSize());
+
+      await tester.pumpWidget(
+        const ProviderScope(
+          child: MaterialApp(
+            home: CreateRestaurantScreen(),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Tap + เพิ่มเมนู
+      final addMenuBtn = find.text('+ เพิ่มเมนู');
+      await tester.ensureVisible(addMenuBtn);
+      await tester.tap(addMenuBtn);
+      await tester.pumpAndSettle();
+
+      // Enter Name and Price without image
+      await tester.enterText(find.byType(TextField).at(0), 'ข้าวมันไก่');
+      await tester.enterText(find.byType(TextField).at(1), '50');
+
+      // Select Category
+      await tester.tap(find.text('ข้าว'));
+      await tester.pumpAndSettle();
+
+      // Save Menu Item
+      await tester.tap(find.text('บันทึก').last);
+      await tester.pumpAndSettle();
+
+      // Verify menu item was added without image and renders 'ไม่มีรูป' placeholder
+      expect(find.text('ข้าวมันไก่'), findsOneWidget);
+      expect(find.text('ไม่มีรูป'), findsOneWidget);
+      expect(find.byIcon(Icons.camera_alt_outlined), findsOneWidget);
     });
   });
 }

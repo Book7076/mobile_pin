@@ -770,12 +770,14 @@ class _OwnerEditMenuItemScreenState extends State<OwnerEditMenuItemScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'ประเภทอาหาร',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                const Expanded(
+                  child: Text(
+                    'ประเภทอาหาร',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
                 ),
                 Text(
