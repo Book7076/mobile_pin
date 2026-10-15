@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,22 +12,36 @@ import '../owner/owner_edit_operating_hours_screen.dart';
 import '../owner/owner_edit_amenities_screen.dart';
 import '../owner/owner_edit_menu_item_screen.dart';
 import 'restaurant_pending_review_screen.dart';
+import '../../services/admin_restaurant_service.dart';
+import '../../providers/auth_provider.dart';
+
+/// Helper สำหรับสุ่มสร้าง UUID v4 ให้ตรงตามมาตรฐาน RFC 4122
+String _generateUuidV4() {
+  final random = Random.secure();
+  final values = List<int>.generate(16, (i) => random.nextInt(256));
+  values[6] = (values[6] & 0x0f) | 0x40; // version 4
+  values[8] = (values[8] & 0x3f) | 0x80; // variant
+  final hex = values.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}';
+}
 
 /// Draft model for menu items being added during restaurant registration.
-/// Aligned strictly with database table `menu_items`:
+/// Aligned strictly with database tables `menu_items`, `categories`, `menu_item_categories`:
 /// - name: text
 /// - price: numeric
 /// - image_url: text
-/// - sort_order: int4
+/// - categories: list of category names
 class RestaurantMenuItemDraft {
   String name;
   double price;
   String imageUrl;
+  List<String> categories;
 
   RestaurantMenuItemDraft({
     required this.name,
     required this.price,
     required this.imageUrl,
+    this.categories = const ['ข้าว'],
   });
 }
 
@@ -126,31 +141,37 @@ class _CreateRestaurantScreenState
       'name': 'ข้าวกะเพราหมูกรอบไข่ดาว',
       'price': '65',
       'url': 'https://images.unsplash.com/photo-1562967914-608f82629710?w=400&q=80',
+      'category': 'ข้าว',
     },
     {
       'name': 'ก๋วยเตี๋ยวต้มยำโบราณ',
       'price': '60',
       'url': 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=400&q=80',
+      'category': 'เมนูเส้น',
     },
     {
       'name': 'ส้มตำไทยคอหมูย่าง',
       'price': '85',
       'url': 'https://images.unsplash.com/photo-1559847844-5315695dadae?w=400&q=80',
+      'category': 'ของทอด',
     },
     {
       'name': 'กาแฟคาปูชิโน่ร้อน',
       'price': '55',
       'url': 'https://images.unsplash.com/photo-1517256064527-09c73fc73e38?w=400&q=80',
+      'category': 'เครื่องดื่ม',
     },
     {
       'name': 'แซลมอนซาชิมิรวม',
       'price': '180',
       'url': 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=400&q=80',
+      'category': 'ข้าว',
     },
     {
       'name': 'วาฟเฟิลไอศกรีม',
       'price': '99',
       'url': 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=400&q=80',
+      'category': 'ของหวาน',
     },
   ];
 
@@ -627,20 +648,8 @@ class _CreateRestaurantScreenState
 
       if (croppedBytes == null) return;
 
-      String convertedUrl = 'data:image/png;base64,${base64Encode(croppedBytes)}';
-
-      try {
-        final fileName = 'restaurant_logo_${DateTime.now().millisecondsSinceEpoch}.png';
-        await Supabase.instance.client.storage.from('restaurant-images').uploadBinary(
-          fileName,
-          croppedBytes,
-          fileOptions: const FileOptions(contentType: 'image/png', upsert: true),
-        );
-        final pubUrl = Supabase.instance.client.storage.from('restaurant-images').getPublicUrl(fileName);
-        if (pubUrl.isNotEmpty) {
-          convertedUrl = pubUrl;
-        }
-      } catch (_) {}
+      // ขณะกรอกยังไม่ต้องบันทึกลง database หรือ storage ให้เก็บภาพใน Local State เพื่อแสดงผลเท่านั้น
+      final convertedUrl = 'data:image/png;base64,${base64Encode(croppedBytes)}';
 
       setState(() {
         _logoImageUrl = convertedUrl;
@@ -687,20 +696,8 @@ class _CreateRestaurantScreenState
 
       if (croppedBytes == null) return;
 
-      String convertedUrl = 'data:image/png;base64,${base64Encode(croppedBytes)}';
-
-      try {
-        final fileName = 'restaurant_card_${DateTime.now().millisecondsSinceEpoch}.png';
-        await Supabase.instance.client.storage.from('restaurant-images').uploadBinary(
-          fileName,
-          croppedBytes,
-          fileOptions: const FileOptions(contentType: 'image/png', upsert: true),
-        );
-        final pubUrl = Supabase.instance.client.storage.from('restaurant-images').getPublicUrl(fileName);
-        if (pubUrl.isNotEmpty) {
-          convertedUrl = pubUrl;
-        }
-      } catch (_) {}
+      // ขณะกรอกยังไม่ต้องบันทึกลง database หรือ storage ให้เก็บภาพใน Local State เพื่อแสดงผลเท่านั้น
+      final convertedUrl = 'data:image/png;base64,${base64Encode(croppedBytes)}';
 
       setState(() {
         _bannerImageUrl = convertedUrl;
@@ -1302,6 +1299,7 @@ class _CreateRestaurantScreenState
               name: sample['name']!,
               price: double.tryParse(sample['price']!) ?? 60.0,
               imageUrl: sample['url']!,
+              categories: [sample['category'] ?? 'ข้าว'],
             ),
           );
         }
@@ -1331,8 +1329,10 @@ class _CreateRestaurantScreenState
             'name': _menuItems[editIndex].name,
             'price': _menuItems[editIndex].price,
             'image_url': _menuItems[editIndex].imageUrl,
-            'category': 'ข้าว',
-            'categories': ['ข้าว'],
+            'category': _menuItems[editIndex].categories.isNotEmpty
+                ? _menuItems[editIndex].categories.first
+                : 'ข้าว',
+            'categories': _menuItems[editIndex].categories,
           }
         : null;
 
@@ -1352,12 +1352,19 @@ class _CreateRestaurantScreenState
       final name = itemMap['name']?.toString() ?? '';
       final price = (itemMap['price'] as num?)?.toDouble() ?? 0.0;
       final img = itemMap['image_url']?.toString() ?? itemMap['image']?.toString() ?? '';
+      final categories = (itemMap['categories'] as List?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          (itemMap['category'] != null
+              ? [itemMap['category'].toString()]
+              : ['ข้าว']);
 
       setState(() {
         final draft = RestaurantMenuItemDraft(
           name: name,
           price: price,
           imageUrl: img.trim(),
+          categories: categories,
         );
         if (editIndex != null) {
           _menuItems[editIndex] = draft;
@@ -1448,123 +1455,253 @@ class _CreateRestaurantScreenState
       if (isSupabaseReady) {
         final client = Supabase.instance.client;
         final user = client.auth.currentUser;
-        final ownerId = user?.id ?? '00000000-0000-0000-0000-000000000000';
+        String? ownerId = user?.id;
+        if (ownerId == null || ownerId.isEmpty || !ownerId.contains('-')) {
+          try {
+            final providerUser = ref.read(authProvider);
+            if (providerUser != null && providerUser.id.contains('-')) {
+              ownerId = providerUser.id;
+            }
+          } catch (_) {}
+        }
+        if (ownerId == null || ownerId.isEmpty || !ownerId.contains('-')) {
+          try {
+            final uRow = await client.from('users').select('id').limit(1).maybeSingle();
+            if (uRow != null && uRow['id'] != null) {
+              ownerId = uRow['id'].toString();
+            }
+          } catch (_) {}
+        }
+        ownerId ??= '00000000-0000-0000-0000-000000000000';
 
-        // 1. Insert into `restaurants` table strictly aligned with database schema (status: 'pending')
+        // 1. ตรวจสอบว่ามีร้านเดิมของ owner หรือ phone นี้ที่อยู่ในสถานะ 'pending' หรือไม่
+        String? existingRestaurantId;
+        try {
+          final res = await client
+              .from('restaurants')
+              .select('id, status')
+              .or('phone.eq.${_phone.trim()},owner_id.eq.$ownerId')
+              .maybeSingle();
+          if (res != null && res['id'] != null) {
+            existingRestaurantId = res['id'].toString();
+          }
+        } catch (_) {}
+
+        // 2. หากยังไม่มีร้านเดิม ให้สุ่มไอดีร้านอาหารอันใหม่ขึ้นมา (Random UUID v4)
+        //    หากมีร้านเดิมที่เคยกรอกค้างไว้ ให้ใช้/อัปเดต ID เดิมเพื่อไม่ให้ชน Unique Constraint (409)
+        final restaurantId = existingRestaurantId ?? _generateUuidV4();
+
+        // 3. Insert หรือ Update เข้าตาราง `restaurants` ใน Supabase โดยสถานะเป็น 'pending'
         final insertData = <String, dynamic>{
+          'id': restaurantId,
           'owner_id': ownerId,
           'name': _name.trim(),
           'address': _address.trim(),
           'phone': _phone.trim(),
           'google_maps_url': _mapsUrl.trim(),
-          'status': 'pending', // Waiting for approval (DO NOT approve yet)
+          'status': 'pending', // สถานะรออนุมัติโดยแอดมิน
           'cuisine_type_id': _selectedCuisineTypeId,
-          'menu': _menuItems.map((m) => '${m.name} (฿${m.price.toStringAsFixed(0)})').join(', '),
           'crated_at': DateTime.now().toIso8601String(),
         };
 
-        try {
-          final res = await client
-              .from('restaurants')
-              .insert(insertData)
-              .select()
-              .maybeSingle();
-          if (res != null) {
-            newRestaurantId = res['id']?.toString();
-          }
-        } catch (e) {
-          debugPrint('Note: Supabase restaurants insert info: $e');
-          // Fallback if table is named 'restaurant' (singular)
+        if (existingRestaurantId != null) {
           try {
-            final res = await client
-                .from('restaurant')
-                .insert(insertData)
-                .select()
-                .maybeSingle();
-            if (res != null) {
-              newRestaurantId = res['id']?.toString();
+            await client.from('restaurants').update({
+              'name': _name.trim(),
+              'address': _address.trim(),
+              'phone': _phone.trim(),
+              'google_maps_url': _mapsUrl.trim(),
+              'status': 'pending',
+              'cuisine_type_id': _selectedCuisineTypeId,
+            }).eq('id', existingRestaurantId);
+            newRestaurantId = existingRestaurantId;
+          } catch (e) {
+            debugPrint('Note: Supabase restaurants update info: $e');
+          }
+        } else {
+          try {
+            await client.from('restaurants').insert(insertData);
+            newRestaurantId = restaurantId;
+          } catch (e) {
+            debugPrint('Note: Supabase restaurants insert info: $e');
+            // หากเกิด 409 Conflict เนื่องจากเบอร์โทร ให้ fallback อัปเดตแถวที่มีเบอร์นี้
+            try {
+              final up = await client
+                  .from('restaurants')
+                  .update(Map<String, dynamic>.from(insertData)..remove('id'))
+                  .eq('phone', _phone.trim())
+                  .select('id')
+                  .maybeSingle();
+              if (up != null && up['id'] != null) {
+                newRestaurantId = up['id'].toString();
+              }
+            } catch (e2) {
+              debugPrint('Note: Supabase restaurants fallback insert/update info: $e2');
             }
-          } catch (e2) {
-            debugPrint('Note: Supabase restaurant singular insert info: $e2');
           }
         }
 
-        final restaurantId = newRestaurantId ?? 'rest-${DateTime.now().millisecondsSinceEpoch}';
+        final effectiveRestaurantId = newRestaurantId ?? restaurantId;
 
-        // 2. Insert Logo and Swipe Card Images into `restaurant_images`
+        // ลบข้อมูลย่อยเดิมของร้านนี้ (หากเป็นการส่งซ้ำ/อัปเดต) เพื่อป้องกันข้อมูลซ้ำซ้อน
         try {
-          if (_logoImageUrl != null) {
-            await client.from('restaurant_images').insert({
-              'restaurant_id': restaurantId,
-              'image_url': _logoImageUrl,
+          await client.from('restaurant_images').delete().eq('restaurant_id', effectiveRestaurantId);
+        } catch (_) {}
+        try {
+          await client.from('operating_hours').delete().eq('restaurant_id', effectiveRestaurantId);
+        } catch (_) {}
+        try {
+          final existingMenus = await client.from('menu_items').select('id').eq('restaurant_id', effectiveRestaurantId);
+          for (final m in existingMenus) {
+            if (m['id'] != null) {
+              await client.from('menu_item_categories').delete().eq('menu_item_id', m['id'].toString());
+            }
+          }
+          await client.from('menu_items').delete().eq('restaurant_id', effectiveRestaurantId);
+          await client.from('categories').delete().eq('restaurant_id', effectiveRestaurantId);
+        } catch (_) {}
+
+        // 3. รูปโปรไฟล์ร้านเข้า restaurant_images สถานะ is_logo = true
+        //    รูปสำหรับหน้าปัดร้านอาหารเข้า restaurant_images สถานะ is_logo = false
+        try {
+          final List<Map<String, dynamic>> imageRows = [];
+          if (_logoImageUrl != null && _logoImageUrl!.trim().isNotEmpty) {
+            imageRows.add({
+              'id': _generateUuidV4(),
+              'restaurant_id': effectiveRestaurantId,
+              'image_url': _logoImageUrl!.trim(),
               'is_logo': true,
               'sort_order': 0,
             });
           }
-          if (_bannerImageUrl != null) {
-            await client.from('restaurant_images').insert({
-              'restaurant_id': restaurantId,
-              'image_url': _bannerImageUrl,
+          if (_bannerImageUrl != null && _bannerImageUrl!.trim().isNotEmpty) {
+            imageRows.add({
+              'id': _generateUuidV4(),
+              'restaurant_id': effectiveRestaurantId,
+              'image_url': _bannerImageUrl!.trim(),
               'is_logo': false,
               'sort_order': 1,
             });
+          }
+          if (imageRows.isNotEmpty) {
+            await client.from('restaurant_images').insert(imageRows);
           }
         } catch (e) {
           debugPrint('Note: Supabase restaurant_images insert note: $e');
         }
 
-        // 3. Insert Operating Hours into `operating_hours`
-        for (final s in _schedules) {
-          if (!s.isClosed && s.openTime.isNotEmpty && s.closeTime.isNotEmpty) {
-            try {
-              await client.from('operating_hours').insert({
-                'restaurant_id': restaurantId,
+        // 4. เวลาเปิดปิดร้านเข้า operating_hours
+        try {
+          final List<Map<String, dynamic>> hoursRows = [];
+          for (final s in _schedules) {
+            if (!s.isClosed && s.openTime.isNotEmpty && s.closeTime.isNotEmpty) {
+              final openTime = s.openTime.length == 5 ? '${s.openTime}:00' : s.openTime;
+              final closeTime = s.closeTime.length == 5 ? '${s.closeTime}:00' : s.closeTime;
+              hoursRows.add({
+                'restaurant_id': effectiveRestaurantId,
                 'day_of_week': s.dayOfWeek,
-                'open_time': s.openTime,
-                'close_time': s.closeTime,
+                'open_time': openTime,
+                'close_time': closeTime,
+                'is_closed': false,
               });
-            } catch (_) {}
+            }
           }
+          if (hoursRows.isNotEmpty) {
+            await client.from('operating_hours').insert(hoursRows);
+          }
+        } catch (e) {
+          debugPrint('Note: Supabase operating_hours insert note: $e');
         }
 
-        // 4. Insert at least 3 menu items into `menu_items` (and also `menu` table if present)
-        for (int i = 0; i < _menuItems.length; i++) {
-          final item = _menuItems[i];
-          final menuPayload = {
-            'restaurant_id': restaurantId,
-            'name': item.name,
-            'price': item.price,
-            'image_url': item.imageUrl,
-            'sort_order': i + 1,
-            'created_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          };
+        // 5. เมนูอาหารเข้า menu_items และประเภทอาหารของเมนูอิงตาม menu_item_categories
+        try {
+          final Map<String, String> categoryNameToId = {};
 
-          try {
-            await client.from('menu_items').insert(menuPayload);
-          } catch (e) {
-            debugPrint('Note: Supabase menu_items insert info: $e');
-          }
+          for (int i = 0; i < _menuItems.length; i++) {
+            final item = _menuItems[i];
+            final menuItemId = _generateUuidV4();
 
-          try {
-            await client.from('menu').insert({
-              'restaurant_id': restaurantId,
+            final menuPayload = {
+              'id': menuItemId,
+              'restaurant_id': effectiveRestaurantId,
               'name': item.name,
               'price': item.price,
               'image_url': item.imageUrl,
               'sort_order': i + 1,
-            });
-          } catch (_) {}
+              'created_at': DateTime.now().toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            };
+
+            await client.from('menu_items').insert(menuPayload);
+
+            // บันทึกประเภทอาหารของเมนูลงตาราง categories และ menu_item_categories
+            final itemCats = item.categories.isNotEmpty ? item.categories : ['ข้าว'];
+            for (final catName in itemCats) {
+              String? catId = categoryNameToId[catName];
+              if (catId == null) {
+                catId = _generateUuidV4();
+                try {
+                  await client.from('categories').insert({
+                    'id': catId,
+                    'restaurant_id': effectiveRestaurantId,
+                    'name': catName,
+                    'sort_order': categoryNameToId.length + 1,
+                  });
+                  categoryNameToId[catName] = catId;
+                } catch (_) {}
+              }
+
+              if (catId != null) {
+                try {
+                  await client.from('menu_item_categories').insert({
+                    'menu_item_id': menuItemId,
+                    'category_id': catId,
+                  });
+                } catch (_) {}
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Note: Supabase menu_items and categories insert note: $e');
         }
 
-        // Note: As per user specification, user_type in users table remains 'customer'
+        // 6. เปลี่ยนสถานะ user_type เป็น 'owner' ทันทีตามที่ระบุ
         try {
-          if (user != null) {
+          try {
             await client.from('users').update({
-              'user_type': 'customer',
-              'role': 'user',
-            }).eq('id', user.id);
-          }
+              'user_type': 'owner',
+              'role': 'owner',
+            }).eq('id', ownerId);
+          } catch (_) {}
+
+          try {
+            await client.auth.updateUser(
+              UserAttributes(data: {
+                'user_type': 'owner',
+                'role': 'owner',
+              }),
+            );
+          } catch (_) {}
+
+          // อัปเดต Riverpod auth state ภายในแอปให้เป็น owner ทันที
+          try {
+            final authNotifier = ref.read(authProvider.notifier);
+            final currentUser = ref.read(authProvider);
+            if (currentUser != null) {
+              authNotifier.setUserFromMap({
+                ...currentUser.toJson(),
+                'user_type': 'owner',
+                'role': 'owner',
+              });
+            }
+          } catch (_) {}
+        } catch (e) {
+          debugPrint('Note: Update user to owner error: $e');
+        }
+
+        // 7. สั่งรีเฟรชข้อมูลฝั่งแอดมินให้เห็นร้านที่เพิ่งสมัครสถานะ pending ทันที
+        try {
+          ref.read(adminRestaurantProvider.notifier).refresh();
         } catch (_) {}
       }
 

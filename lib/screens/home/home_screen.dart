@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
 import '../auth/login_screen.dart';
 import '../profile/user_profile_screen.dart';
@@ -9,9 +10,11 @@ import '../profile/help_center_screen.dart';
 import '../profile/report_problem_screen.dart';
 import '../restaurants/open_restaurant_intro_screen.dart';
 import '../restaurants/restaurant_detail_screen.dart';
+import '../restaurants/restaurant_pending_review_screen.dart';
 import '../owner/owner_dashboard_screen.dart';
 import '../owner/select_restaurant_screen.dart';
 import '../flow/category_selection_screen.dart';
+import '../admin/admin_dashboard.dart';
 import '../../models/favorite_manager.dart';
 import '../../providers/auth_provider.dart';
 
@@ -40,6 +43,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final riverpodRole = ref.watch(authProvider)?.role?.trim().toLowerCase();
     if (riverpodRole == 'owner') return true;
     return _currentUserType?.trim().toLowerCase() == 'owner';
+  }
+
+  bool get _isAdmin {
+    final riverpodRole = ref.watch(authProvider)?.role?.trim().toLowerCase();
+    if (riverpodRole == 'admin') return true;
+    return _currentUserType?.trim().toLowerCase() == 'admin';
   }
 
   // Favorites Tab Search Controller & Data
@@ -186,10 +195,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     try {
       final user = supabase.auth.currentUser;
       if (user != null) {
-        // Check restaurant status for user in Supabase
-        // Step 1: When user registers a restaurant (status: pending), user_type remains 'customer'
-        // Step 2: When admin approves -> status approved, user_type becomes 'owner'
-        //         When admin rejects -> status rejected, user_type becomes 'owner'
+        // 1. ตรวจสอบสิทธิ์ Admin ก่อนเป็นลำดับแรก
+        final userData = await supabase
+            .from('users')
+            .select('user_type, role')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        final dbType = (userData?['user_type'] ?? userData?['role'])
+            ?.toString()
+            .trim()
+            .toLowerCase();
+        final metaType = (user.userMetadata?['user_type'] ??
+                user.userMetadata?['role'] ??
+                user.appMetadata['user_type'] ??
+                user.appMetadata['role'])
+            ?.toString()
+            .trim()
+            .toLowerCase();
+        final lowerEmail = (user.email ?? '').trim().toLowerCase();
+
+        if (dbType == 'admin' || metaType == 'admin' || lowerEmail == 'admin@mealmate.com' || lowerEmail == 'admin@test.com') {
+          if (mounted) {
+            setState(() {
+              _currentUserType = 'admin';
+            });
+          }
+          return;
+        }
+
+        // 2. ตรวจสอบสถานะร้านอาหารในระบบ
         try {
           final anyRestaurants = await supabase
               .from('restaurants')
@@ -197,69 +232,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               .eq('owner_id', user.id);
 
           if (anyRestaurants is List && anyRestaurants.isNotEmpty) {
-            final hasApprovedOrRejected = anyRestaurants.any((r) =>
-                r['status'] == 'approved' || r['status'] == 'rejected');
-            final isOnlyPending = anyRestaurants.every((r) => r['status'] == 'pending');
+            // เมื่อผู้ใช้ส่งข้อมูลสมัครร้านแล้ว มีร้านในระบบ ให้เป็น owner ทันที (แม้จะยังรออนุมัติ pending)
+            try {
+              await supabase
+                  .from('users')
+                  .update({'user_type': 'owner', 'role': 'owner'})
+                  .eq('id', user.id);
+            } catch (_) {}
 
-            if (hasApprovedOrRejected) {
-              // Admin decided (approved or rejected): user_type = owner
-              try {
-                await supabase
-                    .from('users')
-                    .update({'user_type': 'owner', 'role': 'owner'})
-                    .eq('id', user.id);
-              } catch (_) {}
+            try {
+              await supabase.auth.updateUser(
+                UserAttributes(data: {'user_type': 'owner', 'role': 'owner'}),
+              );
+            } catch (_) {}
 
-              if (mounted) {
-                setState(() {
-                  _currentUserType = 'owner';
-                });
-              }
-              return;
-            } else if (isOnlyPending) {
-              // Pending review: user_type remains customer
-              try {
-                await supabase
-                    .from('users')
-                    .update({'user_type': 'customer', 'role': 'user'})
-                    .eq('id', user.id);
-              } catch (_) {}
-
-              if (mounted) {
-                setState(() {
-                  _currentUserType = 'customer';
-                });
-              }
-              return;
+            if (mounted) {
+              setState(() {
+                _currentUserType = 'owner';
+              });
             }
+            return;
           }
         } catch (_) {}
 
-        final metaType = user.userMetadata?['user_type'] ??
-            user.userMetadata?['role'] ??
-            user.appMetadata['user_type'] ??
-            user.appMetadata['role'];
         if (metaType != null && mounted) {
           setState(() {
-            _currentUserType = metaType.toString().toLowerCase();
+            _currentUserType = metaType;
           });
         }
 
-        final userData = await supabase
-            .from('users')
-            .select('user_type, role')
-            .eq('id', user.id)
-            .maybeSingle();
-
-        if (userData != null) {
-          final dbType = (userData['user_type'] ?? userData['role'])
-              ?.toString()
-              .toLowerCase();
-          if (dbType != null && mounted) {
-            setState(() {
-              _currentUserType = dbType;
-            });
-          }
+        if (dbType != null && mounted) {
+          setState(() {
+            _currentUserType = dbType;
+          });
         }
       }
     } catch (e) {
@@ -1442,20 +1447,92 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   const SizedBox(height: 12),
 
+                  // 4.1 แดชบอร์ดผู้ดูแลระบบ (สำหรับ Admin)
+                  if (_isAdmin) ...[
+                    _buildProfileMenuCard(
+                      icon: Icons.admin_panel_settings_outlined,
+                      title: 'แดชบอร์ดผู้ดูแลระบบ (Admin)',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AdminDashboard(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+
                   // 5. เปิดร้านอาหาร / แดชบอร์ดเจ้าของร้าน (เช็คตาม user_type / role)
                   _buildProfileMenuCard(
                     icon: _isOwner
                         ? Icons.dashboard_customize_outlined
                         : Icons.storefront_outlined,
                     title: _isOwner ? 'แดชบอร์ดเจ้าของร้าน' : 'เปิดร้านอาหาร',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => _isOwner
-                              ? const SelectRestaurantScreen()
-                              : const OpenRestaurantIntroScreen(),
-                        ),
-                      );
+                    onTap: () async {
+                      if (!_isOwner) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const OpenRestaurantIntroScreen(),
+                          ),
+                        );
+                        return;
+                      }
+
+                      // เมื่อเป็น owner: ตรวจสอบสถานะการอนุมัติร้าน
+                      // แอดมินอนุมัติแล้ว (approved) เท่านั้น ถึงจะเข้าหน้าเลือกร้านอาหาร (รูปที่ 1)
+                      // ถ้ายังรออนุมัติ (pending) ให้ขึ้นหน้าสีแดงที่เป็นหน้ารอตรวจสอบ
+                      try {
+                        final user = supabase.auth.currentUser;
+                        final currentUid = user?.id;
+                        List<dynamic> myRests = [];
+                        if (currentUid != null && currentUid.isNotEmpty) {
+                          myRests = await supabase
+                              .from('restaurants')
+                              .select('id, name, status')
+                              .eq('owner_id', currentUid);
+                        }
+
+                        if (myRests.isNotEmpty) {
+                          final hasApprovedOrRejected = myRests.any(
+                              (r) => r['status'] == 'approved' || r['status'] == 'rejected');
+                          if (hasApprovedOrRejected) {
+                            if (context.mounted) {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const SelectRestaurantScreen(),
+                                ),
+                              );
+                            }
+                            return;
+                          }
+
+                          final pendingRest = myRests.firstWhere(
+                            (r) => r['status'] == 'pending',
+                            orElse: () => myRests.first,
+                          );
+                          if (context.mounted) {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => RestaurantPendingReviewScreen(
+                                  restaurantName: pendingRest['name']?.toString() ?? 'ร้านอาหารของคุณ',
+                                ),
+                              ),
+                            );
+                          }
+                          return;
+                        }
+                      } catch (e) {
+                        debugPrint('Note: Error checking owner restaurant status: $e');
+                      }
+
+                      if (context.mounted) {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const SelectRestaurantScreen(),
+                          ),
+                        );
+                      }
                     },
                   ),
 

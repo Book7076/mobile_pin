@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../widgets/app_adaptive_image.dart';
 
 class RestaurantLogoBadge extends StatelessWidget {
   final String name;
@@ -38,15 +39,13 @@ class RestaurantLogoBadge extends StatelessWidget {
         border: Border.all(color: const Color(0xFFF5D5DC)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: imageUrl != null && imageUrl!.isNotEmpty
-          ? Image.network(
-              imageUrl!,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => _buildFallbackIcon(),
-            )
-          : _buildFallbackIcon(),
+      child: AppAdaptiveImage(
+        imageUrl: imageUrl,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        fallback: _buildFallbackIcon(),
+      ),
     );
   }
 
@@ -80,13 +79,13 @@ class RestaurantLogoBadge extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          if (imageUrl != null)
-            Image.network(
-              imageUrl!,
+          if (imageUrl != null && imageUrl!.isNotEmpty)
+            AppAdaptiveImage(
+              imageUrl: imageUrl,
               width: size,
               height: size,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const SizedBox(),
+              fallback: const SizedBox(),
             ),
           // Layer ข้อมูลร้าน Kohatsu Matcha
           Container(

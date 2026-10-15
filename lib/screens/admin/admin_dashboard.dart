@@ -9,6 +9,7 @@ import 'restaurant_approval_detail_screen.dart';
 import 'restaurant_detail_screen.dart' as admin_detail;
 import 'admin_user_management_screen.dart';
 import 'admin_settings_screen.dart';
+import '../../widgets/app_adaptive_image.dart';
 
 class AdminDashboard extends ConsumerStatefulWidget {
   final int initialTabIndex;
@@ -663,39 +664,22 @@ class _AdminDashboardState extends ConsumerState<AdminDashboard>
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child: restaurant.imageAsset.startsWith('http')
-                      ? Image.network(
-                          restaurant.imageAsset,
-                          width: 82,
-                          height: 82,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            width: 82,
-                            height: 82,
-                            color: const Color(0xFFF9EEF2),
-                            child: const Icon(
-                              Icons.storefront_rounded,
-                              color: primaryBurgundy,
-                              size: 36,
-                            ),
-                          ),
-                        )
-                      : Image.asset(
-                          restaurant.imageAsset,
-                          width: 82,
-                          height: 82,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            width: 82,
-                            height: 82,
-                            color: const Color(0xFFF9EEF2),
-                            child: const Icon(
-                              Icons.storefront_rounded,
-                              color: primaryBurgundy,
-                              size: 36,
-                            ),
-                          ),
-                        ),
+                  child: AppAdaptiveImage(
+                    imageUrl: restaurant.imageAsset,
+                    width: 82,
+                    height: 82,
+                    fit: BoxFit.cover,
+                    fallback: Container(
+                      width: 82,
+                      height: 82,
+                      color: const Color(0xFFF9EEF2),
+                      child: const Icon(
+                        Icons.storefront_rounded,
+                        color: primaryBurgundy,
+                        size: 36,
+                      ),
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(

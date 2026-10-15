@@ -3,6 +3,7 @@ import '../home/home_screen.dart';
 import 'shop_details_screen.dart';
 import 'edit_shop_photo_screen.dart';
 import 'menu_management_screen.dart';
+import '../../widgets/app_adaptive_image.dart';
 
 class OwnerDashboardScreen extends StatefulWidget {
   final Map<String, dynamic>? shopData;
@@ -139,15 +140,13 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
                     padding: const EdgeInsets.all(6),
                     child: ClipOval(
                       child: (imageUrl != null && imageUrl.trim().isNotEmpty)
-                          ? Image.network(
-                              imageUrl,
+                          ? AppAdaptiveImage(
+                              imageUrl: imageUrl,
                               fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const CustomPaint(
-                                  size: Size(190, 190),
-                                  painter: AvatarPlaceholderPainter(),
-                                );
-                              },
+                              fallback: const CustomPaint(
+                                size: Size(190, 190),
+                                painter: AvatarPlaceholderPainter(),
+                              ),
                             )
                           : const CustomPaint(
                               size: Size(190, 190),

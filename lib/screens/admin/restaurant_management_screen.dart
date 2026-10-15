@@ -37,6 +37,11 @@ class _RestaurantManagementScreenState extends ConsumerState<RestaurantManagemen
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
+    Future.microtask(() {
+      if (mounted) {
+        ref.read(adminRestaurantProvider.notifier).refresh();
+      }
+    });
   }
 
   @override

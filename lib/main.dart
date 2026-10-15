@@ -6,6 +6,7 @@ import 'core/constants.dart';
 import 'screens/splash_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
+import 'screens/auth/terms_policy_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/flow/category_selection_screen.dart';
 import 'screens/restaurants/create_restaurant_screen.dart';
@@ -85,6 +86,7 @@ class MyApp extends StatelessWidget {
         '/owner-support': (context) => const OwnerHelpCenterScreen(),
         '/admin-dashboard': (context) => const AdminDashboard(),
         '/admin-login': (context) => const AdminLoginScreen(),
+        '/terms-policy': (context) => const TermsPolicyScreen(),
       },
     );
   }

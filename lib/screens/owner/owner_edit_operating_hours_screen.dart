@@ -242,29 +242,12 @@ class _OwnerEditOperatingHoursScreenState
       return false;
     }
 
-    String? targetId = widget.restaurantId;
-
-    // Fallback: หากไม่ได้ระบุ restaurantId ให้ลองค้นหาร้านของ owner ปัจจุบัน
-    if (targetId == null || targetId.isEmpty) {
-      try {
-        final user = Supabase.instance.client.auth.currentUser;
-        if (user != null) {
-          final res = await Supabase.instance.client
-              .from('restaurants')
-              .select('id')
-              .eq('owner_id', user.id)
-              .maybeSingle();
-          if (res != null) {
-            targetId = res['id']?.toString();
-          }
-        }
-      } catch (_) {}
-    }
-
-    if (targetId == null || targetId.isEmpty) {
-      // โหมดกรอกข้อมูลก่อนเปิดร้าน (ยังไม่มี restaurant_id) - ให้บันทึก local state สำเร็จเพื่อส่งข้อมูลกลับ
+    if (widget.restaurantId == null || widget.restaurantId!.isEmpty) {
+      // โหมดกรอกข้อมูลก่อนเปิดร้าน (ยังไม่มี restaurant_id) - ให้บันทึก local state สำเร็จเพื่อส่งข้อมูลกลับ ไม่บันทึกลง database
       return true;
     }
+
+    final String targetId = widget.restaurantId!;
 
     setState(() => _isLoading = true);
     try {

@@ -1,9 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../models/restaurant_model.dart';
 import '../providers/restaurant_provider.dart';
 import '../screens/restaurants/restaurant_detail_screen.dart';
+import 'app_adaptive_image.dart';
 
 class RestaurantCard extends ConsumerWidget {
   final RestaurantModel restaurant;
@@ -58,10 +59,10 @@ class RestaurantCard extends ConsumerWidget {
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
                     child: restaurant.imageUrls.isNotEmpty
-                        ? Image.network(
-                            restaurant.imageUrls.first,
+                        ? AppAdaptiveImage(
+                            imageUrl: restaurant.imageUrls.first,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                            fallback: Container(
                               color: Colors.grey[200],
                               child: const Icon(Icons.restaurant, size: 50, color: Colors.grey),
                             ),
@@ -291,10 +292,10 @@ class RestaurantCard extends ConsumerWidget {
                 height: 120,
                 width: double.infinity,
                 child: restaurant.imageUrls.isNotEmpty
-                    ? Image.network(
-                        restaurant.imageUrls.first,
+                    ? AppAdaptiveImage(
+                        imageUrl: restaurant.imageUrls.first,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
+                        fallback: Container(
                           color: Colors.grey[200],
                           child: const Icon(Icons.restaurant, color: Colors.grey),
                         ),

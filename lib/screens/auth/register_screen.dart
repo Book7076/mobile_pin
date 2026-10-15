@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../main.dart';
 import 'login_screen.dart';
+import 'terms_policy_screen.dart';
 
 /// Register Screen (สมัครสมาชิก):
 /// Pixel-perfect implementation matching design mockup:
@@ -32,6 +33,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _acceptedTerms = false;
 
   @override
   void initState() {
@@ -124,6 +126,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    // ต้องกดยืนยันข้อตกลงและนโยบายความเป็นส่วนตัวก่อนสมัครได้
+    if (!_acceptedTerms) {
+      _showMessage('กรุณากดยืนยันยอมรับข้อตกลงและนโยบายความเป็นส่วนตัว');
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
@@ -160,6 +168,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     try {
+      final nowIso = DateTime.now().toUtc().toIso8601String();
       final response = await supabase.auth.signUp(
         email: email,
         password: password,
@@ -168,6 +177,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'last_name': lastName,
           'username': username,
           'phone': phone,
+          'terms_accepted_at': nowIso,
         },
       );
 
@@ -186,6 +196,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             'phone': phone,
             'password': password,
             'swipe_count': 0,
+            'terms_accepted_at': nowIso,
           });
         } catch (_) {
           // If trigger already handled insertion, ignore
@@ -463,7 +474,71 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           obscureText: true,
                         ),
 
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 18),
+
+                        // Checkbox ยืนยันข้อตกลงและนโยบายความเป็นส่วนตัว
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Checkbox(
+                                key: const Key('register_terms_checkbox'),
+                                value: _acceptedTerms,
+                                activeColor: burgundy,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _acceptedTerms = val ?? false;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _acceptedTerms = !_acceptedTerms;
+                                  });
+                                },
+                                child: Text.rich(
+                                  TextSpan(
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF555555),
+                                      fontFamily: 'Kanit',
+                                    ),
+                                    children: [
+                                      const TextSpan(text: 'ฉันได้อ่านและยอมรับ '),
+                                      WidgetSpan(
+                                        alignment: PlaceholderAlignment.middle,
+                                        child: GestureDetector(
+                                          onTap: () => showPrivacyPolicyDialog(context),
+                                          child: const Text(
+                                            'นโยบายความเป็นส่วนตัว',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: burgundy,
+                                              decoration: TextDecoration.underline,
+                                              fontFamily: 'Kanit',
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 20),
 
                         // 8. Submit Button: "สมัครสมาชิก"
                         SizedBox(

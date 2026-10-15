@@ -13,6 +13,7 @@ class MockData {
     swipeCount: 3,
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&q=80',
     dietaryPreferences: ['ชอบทานเผ็ด', 'ชอบอาหารญี่ปุ่น', 'สายคาเฟ่'],
+    termsAcceptedAt: DateTime(2026, 10, 16),
   );
 
   static UserModel demoOwner = UserModel(
@@ -24,6 +25,7 @@ class MockData {
     swipeCount: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1577219491135-ce391730fb2c?w=300&q=80',
     ownedRestaurantId: 'rest_01',
+    termsAcceptedAt: DateTime(2026, 10, 16),
   );
 
   static UserModel demoAdmin = UserModel(
@@ -34,6 +36,7 @@ class MockData {
     role: 'admin',
     swipeCount: 0,
     avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&q=80',
+    termsAcceptedAt: DateTime(2026, 10, 16),
   );
 
   // Initial Mock Restaurants

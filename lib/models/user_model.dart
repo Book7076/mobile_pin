@@ -9,6 +9,7 @@ class UserModel {
   final String? username;
   final List<String> dietaryPreferences;
   final String? ownedRestaurantId;
+  final DateTime? termsAcceptedAt;
 
   UserModel({
     required this.id,
@@ -21,6 +22,7 @@ class UserModel {
     this.username,
     this.dietaryPreferences = const [],
     this.ownedRestaurantId,
+    this.termsAcceptedAt,
   });
 
   bool get isOwner =>
@@ -71,6 +73,11 @@ class UserModel {
       resolvedRole = json['role'].toString().trim();
     }
 
+    DateTime? termsAcceptedAt;
+    if (json['terms_accepted_at'] != null && json['terms_accepted_at'].toString().isNotEmpty) {
+      termsAcceptedAt = DateTime.tryParse(json['terms_accepted_at'].toString());
+    }
+
     return UserModel(
       id: json['id']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
@@ -82,6 +89,7 @@ class UserModel {
       username: json['username']?.toString(),
       dietaryPreferences: prefs,
       ownedRestaurantId: json['owned_restaurant_id']?.toString(),
+      termsAcceptedAt: termsAcceptedAt,
     );
   }
 
@@ -101,6 +109,7 @@ class UserModel {
       'username': username,
       'dietary_preferences': dietaryPreferences,
       'owned_restaurant_id': ownedRestaurantId,
+      'terms_accepted_at': termsAcceptedAt?.toIso8601String(),
     };
   }
 
@@ -116,6 +125,8 @@ class UserModel {
     bool clearAvatar = false,
     List<String>? dietaryPreferences,
     String? ownedRestaurantId,
+    DateTime? termsAcceptedAt,
+    bool clearTermsAcceptedAt = false,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -128,6 +139,7 @@ class UserModel {
       username: username ?? this.username,
       dietaryPreferences: dietaryPreferences ?? this.dietaryPreferences,
       ownedRestaurantId: ownedRestaurantId ?? this.ownedRestaurantId,
+      termsAcceptedAt: clearTermsAcceptedAt ? null : (termsAcceptedAt ?? this.termsAcceptedAt),
     );
   }
 }

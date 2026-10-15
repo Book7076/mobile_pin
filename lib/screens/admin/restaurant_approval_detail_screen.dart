@@ -8,6 +8,7 @@ import '../../services/admin_restaurant_service.dart';
 import 'approval_action_success_screen.dart';
 import 'cancel_rejection_screen.dart';
 import 'confirm_revoke_screen.dart';
+import '../../widgets/app_adaptive_image.dart';
 
 class RestaurantApprovalDetailScreen extends ConsumerWidget {
   final ApprovalRestaurant restaurant;
@@ -573,31 +574,18 @@ class RestaurantApprovalDetailScreen extends ConsumerWidget {
                             width: 80,
                             height: 80,
                             color: const Color(0xFFF9EEF2),
-                            child: restaurant.imageAsset.startsWith('http')
-                                ? Image.network(
-                                    restaurant.imageAsset,
-                                    width: 80,
-                                    height: 80,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => Container(
-                                      width: 80,
-                                      height: 80,
-                                      color: const Color(0xFFF9EEF2),
-                                      child: const Icon(Icons.storefront_rounded, color: primaryBurgundy, size: 36),
-                                    ),
-                                  )
-                                : Image.asset(
-                                    restaurant.imageAsset,
-                                    width: 80,
-                                    height: 80,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stackTrace) => Container(
-                                      width: 80,
-                                      height: 80,
-                                      color: const Color(0xFFF9EEF2),
-                                      child: const Icon(Icons.storefront_rounded, color: primaryBurgundy, size: 36),
-                                    ),
-                                  ),
+                            child: AppAdaptiveImage(
+                              imageUrl: restaurant.imageAsset,
+                              width: 80,
+                              height: 80,
+                              fit: BoxFit.cover,
+                              fallback: Container(
+                                width: 80,
+                                height: 80,
+                                color: const Color(0xFFF9EEF2),
+                                child: const Icon(Icons.storefront_rounded, color: primaryBurgundy, size: 36),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -834,27 +822,18 @@ class RestaurantApprovalDetailScreen extends ConsumerWidget {
                                 width: 72,
                                 height: 72,
                                 color: const Color(0xFFF9EEF2),
-                                child: menu.imageAsset.startsWith('http')
-                                    ? Image.network(
-                                        menu.imageAsset,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) => Container(
-                                          width: 72,
-                                          height: 72,
-                                          color: const Color(0xFFF9EEF2),
-                                          child: const Icon(Icons.fastfood_rounded, color: primaryBurgundy, size: 30),
-                                        ),
-                                      )
-                                    : Image.asset(
-                                        menu.imageAsset,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) => Container(
-                                          width: 72,
-                                          height: 72,
-                                          color: const Color(0xFFF9EEF2),
-                                          child: const Icon(Icons.fastfood_rounded, color: primaryBurgundy, size: 30),
-                                        ),
-                                      ),
+                                child: AppAdaptiveImage(
+                                  imageUrl: menu.imageAsset,
+                                  width: 72,
+                                  height: 72,
+                                  fit: BoxFit.cover,
+                                  fallback: Container(
+                                    width: 72,
+                                    height: 72,
+                                    color: const Color(0xFFF9EEF2),
+                                    child: const Icon(Icons.fastfood_rounded, color: primaryBurgundy, size: 30),
+                                  ),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 14),

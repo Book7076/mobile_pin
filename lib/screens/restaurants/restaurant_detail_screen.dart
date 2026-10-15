@@ -14,6 +14,7 @@ import '../../services/review_service.dart';
 import 'restaurant_all_menu_screen.dart';
 import 'review_restaurant_screen.dart';
 import '../../services/menu_availability_manager.dart';
+import '../../widgets/app_adaptive_image.dart';
 
 /// Restaurant Detail Screen matching Mockup Image 4:
 /// - Header: Back arrow (<) + "รายละเอียดร้านอาหาร" in Burgundy
@@ -676,29 +677,17 @@ class _RestaurantDetailScreenState
               ],
             ),
             child: (effectiveImage != null && effectiveImage.isNotEmpty)
-                ? (effectiveImage.startsWith('assets/')
-                    ? Image.asset(
-                        effectiveImage,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const Center(
-                          child: Icon(
-                            Icons.restaurant,
-                            color: Color(0xFFCBD5E1),
-                            size: 36,
-                          ),
-                        ),
-                      )
-                    : Image.network(
-                        effectiveImage,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const Center(
-                          child: Icon(
-                            Icons.restaurant,
-                            color: Color(0xFFCBD5E1),
-                            size: 36,
-                          ),
-                        ),
-                      ))
+                ? AppAdaptiveImage(
+                    imageUrl: effectiveImage,
+                    fit: BoxFit.cover,
+                    fallback: const Center(
+                      child: Icon(
+                        Icons.restaurant,
+                        color: Color(0xFFCBD5E1),
+                        size: 36,
+                      ),
+                    ),
+                  )
                 : const Center(
                     child: Icon(
                       Icons.restaurant,

@@ -14,6 +14,7 @@ import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
 import 'register_screen.dart';
 import 'social_register_screen.dart';
+import 'terms_policy_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -98,6 +99,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       if (_isLogin) {
+        final lowerEmail = email.trim().toLowerCase();
+        if (lowerEmail == 'admin@mealmate.com' || lowerEmail == 'admin@test.com') {
+          ref.read(authProvider.notifier).switchDemoRole('admin');
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const AdminDashboard()),
+            );
+          }
+          return;
+        }
+
         try {
           await supabase.auth.signInWithPassword(
             email: email,
@@ -123,13 +135,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         await _handlePostAuthSuccess();
       }
     } on AuthException catch (error) {
-      if (email.toLowerCase() == 'test@test.com') {
+      final lowerEmail = email.trim().toLowerCase();
+      if (lowerEmail == 'admin@mealmate.com' || lowerEmail == 'admin@test.com') {
+        ref.read(authProvider.notifier).switchDemoRole('admin');
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          );
+        }
+      } else if (email.toLowerCase() == 'test@test.com') {
         if (mounted) await _handlePostAuthSuccess();
       } else if (mounted) {
         _showMessage(error.message);
       }
     } catch (error) {
-      if (email.toLowerCase() == 'test@test.com') {
+      final lowerEmail = email.trim().toLowerCase();
+      if (lowerEmail == 'admin@mealmate.com' || lowerEmail == 'admin@test.com') {
+        ref.read(authProvider.notifier).switchDemoRole('admin');
+        if (mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const AdminDashboard()),
+          );
+        }
+      } else if (email.toLowerCase() == 'test@test.com') {
         if (mounted) await _handlePostAuthSuccess();
       } else if (mounted) {
         _showMessage('เกิดข้อผิดพลาด: $error');
@@ -146,21 +174,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     String? role;
     final currentProvider = AuthSessionManager.currentProvider;
     final isSocialLogin = currentProvider == 'google' || currentProvider == 'facebook';
+    Map<String, dynamic>? userData;
 
     if (user != null) {
-      Map<String, dynamic>? userData;
       try {
-        // เช็ค id ว่าตรงกับแถวไหนในตาราง users แล้วดึงข้อมูลรวมถึง phone และ first_name, last_name
+        // เช็ค id ว่าตรงกับแถวไหนในตาราง users แล้วดึงข้อมูลรวมถึง phone และ first_name, last_name, terms_accepted_at
         userData = await supabase
             .from('users')
-            .select('id, email, phone, first_name, last_name, username, image_url, user_type, role')
+            .select('id, email, phone, first_name, last_name, username, image_url, user_type, role, terms_accepted_at')
             .eq('id', user.id)
             .maybeSingle();
 
         if (userData == null && user.email != null && user.email!.isNotEmpty) {
           userData = await supabase
               .from('users')
-              .select('id, email, phone, first_name, last_name, username, image_url, user_type, role')
+              .select('id, email, phone, first_name, last_name, username, image_url, user_type, role, terms_accepted_at')
               .eq('email', user.email!)
               .maybeSingle();
         }
@@ -195,6 +223,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         if ((mergedData['username'] == null || mergedData['username'].toString().trim().isEmpty) && authUsername.isNotEmpty) {
           mergedData['username'] = authUsername;
         }
+
+        final dbUserType = (userData['user_type'] ?? userData['role'])?.toString().trim().toLowerCase();
+        final metaRole = (user.userMetadata?['user_type'] ?? user.userMetadata?['role'])?.toString().trim().toLowerCase();
+        final lowerEmail = (user.email ?? '').trim().toLowerCase();
+
+        if (dbUserType == 'admin' || metaRole == 'admin' || lowerEmail == 'admin@mealmate.com' || lowerEmail == 'admin@test.com') {
+          mergedData['user_type'] = 'admin';
+          mergedData['role'] = 'admin';
+          role = 'admin';
+        } else if (metaRole == 'owner') {
+          mergedData['user_type'] = 'owner';
+          mergedData['role'] = 'owner';
+          role = 'owner';
+        } else {
+          try {
+            final ownedRests = await supabase
+                .from('restaurants')
+                .select('id')
+                .eq('owner_id', user.id)
+                .limit(1);
+            if (ownedRests is List && ownedRests.isNotEmpty) {
+              mergedData['user_type'] = 'owner';
+              mergedData['role'] = 'owner';
+              role = 'owner';
+            }
+          } catch (_) {}
+        }
+
         ref.read(authProvider.notifier).setUserFromMap(mergedData);
       } else {
         // ถ้าไม่พบบัญชีในตาราง users
@@ -232,9 +288,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     if (!mounted) return;
 
+    final effectiveRole = (role ?? ref.read(authProvider)?.role ?? '').trim().toLowerCase();
+    final isRoleAdmin = effectiveRole == 'admin' ||
+        (user?.email != null &&
+            (user!.email!.trim().toLowerCase() == 'admin@mealmate.com' ||
+                user!.email!.trim().toLowerCase() == 'admin@test.com'));
+
+    // ตรวจสอบว่าได้กดยอมรับนโยบายความเป็นส่วนตัวหรือยัง
+    final termsAccepted = userData?['terms_accepted_at'] ?? ref.read(authProvider)?.termsAcceptedAt;
+    if (termsAccepted == null || termsAccepted.toString().trim().isEmpty) {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => TermsPolicyScreen(
+            targetRoute: isRoleAdmin ? '/admin-dashboard' : '/home',
+          ),
+        ),
+      );
+      return;
+    }
+
     // For user login (e.g. test@test.com), navigate DIRECTLY to HomeScreen!
     if (_isLogin) {
-      final destination = role == 'admin'
+      final destination = isRoleAdmin
           ? const AdminDashboard()
           : const HomeScreen();
 

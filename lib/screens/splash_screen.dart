@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../main.dart';
 import '../providers/auth_provider.dart';
 import 'auth/login_screen.dart';
+import 'auth/terms_policy_screen.dart';
 import 'home/home_screen.dart';
 import 'admin/admin_dashboard.dart';
 import '../widgets/meal_mate_logo.dart';
@@ -115,13 +116,51 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         if (!mounted) return;
 
         if (userData != null) {
-          ref.read(authProvider.notifier).setUserFromMap(userData);
+          final mergedData = Map<String, dynamic>.from(userData);
+          final dbRole = (userData['user_type'] ?? userData['role'])?.toString().trim().toLowerCase();
+          final metaRole = (session.user.userMetadata?['user_type'] ?? session.user.userMetadata?['role'])?.toString().trim().toLowerCase();
+          final lowerEmail = (session.user.email ?? '').trim().toLowerCase();
+
+          if (dbRole == 'admin' || metaRole == 'admin' || lowerEmail == 'admin@mealmate.com' || lowerEmail == 'admin@test.com') {
+            mergedData['user_type'] = 'admin';
+            mergedData['role'] = 'admin';
+          } else if (metaRole == 'owner') {
+            mergedData['user_type'] = 'owner';
+            mergedData['role'] = 'owner';
+          } else {
+            try {
+              final ownedRests = await supabase
+                  .from('restaurants')
+                  .select('id')
+                  .eq('owner_id', session.user.id)
+                  .limit(1);
+              if (ownedRests is List && ownedRests.isNotEmpty) {
+                mergedData['user_type'] = 'owner';
+                mergedData['role'] = 'owner';
+              }
+            } catch (_) {}
+          }
+          ref.read(authProvider.notifier).setUserFromMap(mergedData);
         } else {
           await ref.read(authProvider.notifier).refreshUser();
         }
 
-        final userType = (userData?['user_type'] ?? userData?['role'])?.toString().toLowerCase();
-        if (userData != null && userType == 'admin') {
+        final userType = (userData?['user_type'] ?? userData?['role'])?.toString().trim().toLowerCase();
+        final metaType = (session.user.userMetadata?['user_type'] ?? session.user.userMetadata?['role'])?.toString().trim().toLowerCase();
+        final authRole = ref.read(authProvider)?.role?.trim().toLowerCase();
+        final lowerEmail = (session.user.email ?? '').trim().toLowerCase();
+        final isAdmin = userType == 'admin' || metaType == 'admin' || authRole == 'admin' || lowerEmail == 'admin@mealmate.com' || lowerEmail == 'admin@test.com';
+
+        // เช็คการยอมรับนโยบายความเป็นส่วนตัว: ถ้า terms_accepted_at ว่าง ต้องขึ้นหน้าข้อตกลงและบังคับกดยืนยันก่อนเข้าแอป
+        final termsAccepted = userData?['terms_accepted_at'] ?? ref.read(authProvider)?.termsAcceptedAt;
+        if (termsAccepted == null || termsAccepted.toString().trim().isEmpty) {
+          _navigateTo(TermsPolicyScreen(
+            targetRoute: isAdmin ? '/admin-dashboard' : '/home',
+          ));
+          return;
+        }
+
+        if (isAdmin) {
           _navigateTo(const AdminDashboard());
         } else {
           _navigateTo(const HomeScreen());

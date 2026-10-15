@@ -6,6 +6,7 @@ import 'owner_menu_screen.dart';
 import 'owner_restaurant_info_screen.dart';
 import 'owner_reviews_screen.dart';
 import 'owner_help_center_screen.dart';
+import '../../widgets/app_adaptive_image.dart';
 
 /// สีหลักของแบรนด์ตามภาพ (แดงเบอร์กันดี / เลือดหมูเข้ม)
 const Color kOwnerPrimaryColor = Color(0xFF7C1431);
@@ -45,45 +46,52 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   }
 
   Future<void> _refreshRestaurantData() async {
-    if (widget.restaurantId == null) return;
+    String? restId = widget.restaurantId;
+
+    // ถ้าไม่มี restaurantId ส่งมา ให้พยายามค้นหาจาก User ปัจจุบัน หรือชื่อร้านใน Supabase
+    if (restId == null || restId.isEmpty) {
+      try {
+        final currentUser = Supabase.instance.client.auth.currentUser;
+        if (currentUser != null) {
+          final userRest = await Supabase.instance.client
+              .from('restaurants')
+              .select('id, name')
+              .eq('owner_id', currentUser.id)
+              .maybeSingle();
+          if (userRest != null && userRest['id'] != null) {
+            restId = userRest['id'].toString();
+          }
+        }
+        if (restId == null || restId.isEmpty) {
+          final nameRest = await Supabase.instance.client
+              .from('restaurants')
+              .select('id, name')
+              .eq('name', _displayName)
+              .maybeSingle();
+          if (nameRest != null && nameRest['id'] != null) {
+            restId = nameRest['id'].toString();
+          }
+        }
+      } catch (_) {}
+    }
+
+    if (restId == null || restId.isEmpty) return;
+
     try {
+      // 1. ดึงข้อมูลพื้นฐานร้าน และประเภทอาหาร
       final res = await Supabase.instance.client
           .from('restaurants')
           .select('*, cuisine_types(id, name)')
-          .eq('id', widget.restaurantId!)
+          .eq('id', restId)
           .maybeSingle();
 
       if (res != null && mounted) {
         setState(() {
           _displayName = res['name']?.toString() ?? _displayName;
-          if (res['image_url'] != null && res['image_url'].toString().isNotEmpty) {
-            _displayImageUrl = res['image_url'].toString();
-          }
           if (res['cuisine_types'] != null && res['cuisine_types']['name'] != null) {
             _displayCategory = res['cuisine_types']['name'].toString();
           }
         });
-
-        if (_displayImageUrl == null || _displayImageUrl!.isEmpty) {
-          try {
-            final imgRes = await Supabase.instance.client
-                .from('restaurant_images')
-                .select('image_url, is_logo, sort_order')
-                .eq('restaurant_id', widget.restaurantId!)
-                .order('sort_order', ascending: true);
-            if (imgRes is List && imgRes.isNotEmpty && mounted) {
-              final match = imgRes.firstWhere(
-                (item) => item['is_logo'] == true,
-                orElse: () => imgRes.first,
-              );
-              if (match['image_url'] != null) {
-                setState(() {
-                  _displayImageUrl = match['image_url'].toString();
-                });
-              }
-            }
-          } catch (_) {}
-        }
 
         if (res['cuisine_types'] == null || res['cuisine_types']['name'] == null) {
           final cTypeId = res['cuisine_type_id'];
@@ -104,7 +112,29 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
           }
         }
       }
-    } catch (_) {}
+
+      // 2. ดึงรูปโปรไฟล์ร้านโดยตรงจากตาราง restaurant_images ที่ is_logo เป็น true ตามฐานข้อมูล
+      final imgRes = await Supabase.instance.client
+          .from('restaurant_images')
+          .select('image_url, is_logo, sort_order')
+          .eq('restaurant_id', restId)
+          .order('sort_order', ascending: true);
+
+      if (imgRes is List && imgRes.isNotEmpty && mounted) {
+        final logoItem = imgRes.firstWhere(
+          (item) => item['is_logo'] == true || item['is_logo'] == 'true' || item['is_logo'] == 1,
+          orElse: () => imgRes.first,
+        );
+        final logoUrl = logoItem['image_url']?.toString();
+        if (logoUrl != null && logoUrl.isNotEmpty) {
+          setState(() {
+            _displayImageUrl = logoUrl;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error refreshing restaurant data & logo: $e');
+    }
   }
 
   void _handleBack() {
@@ -439,17 +469,12 @@ class _OwnerDashboardScreenState extends State<OwnerDashboardScreen> {
   /// รูปภาพโปรไฟล์ของร้านอาหารที่เลือก
   Widget _buildRestaurantAvatar() {
     if (_displayImageUrl != null && _displayImageUrl!.isNotEmpty) {
-      if (_displayImageUrl!.startsWith('assets/')) {
-        return Image.asset(
-          _displayImageUrl!,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildFallbackAvatar(),
-        );
-      }
-      return Image.network(
-        _displayImageUrl!,
+      return AppAdaptiveImage(
+        imageUrl: _displayImageUrl!,
+        width: double.infinity,
+        height: double.infinity,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _buildFallbackAvatar(),
+        fallback: _buildFallbackAvatar(),
       );
     }
     return _buildFallbackAvatar();

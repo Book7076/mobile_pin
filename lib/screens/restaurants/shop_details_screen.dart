@@ -8,6 +8,7 @@ import 'edit_shop_photo_screen.dart';
 import 'edit_shop_info_screen.dart';
 import 'edit_address_screen.dart';
 import 'edit_opening_hours_screen.dart';
+import '../../widgets/app_adaptive_image.dart';
 
 class ShopDetailsScreen extends StatefulWidget {
   final Map<String, dynamic>? shopData;
@@ -158,8 +159,47 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
         _imageUrl = 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=500';
       }
 
+      // ดึงรูปโปรไฟล์ร้านโดยตรงจากตาราง restaurant_images ที่ is_logo เป็น true
+      _loadLogoFromSupabase();
+
       _isInitialized = true;
     }
+  }
+
+  Future<void> _loadLogoFromSupabase() async {
+    String? restId = _restaurantId;
+    try {
+      if (restId == null || restId.isEmpty) {
+        final currentUser = supabase.auth.currentUser;
+        if (currentUser != null) {
+          final r = await supabase.from('restaurants').select('id').eq('owner_id', currentUser.id).maybeSingle();
+          if (r != null && r['id'] != null) restId = r['id'].toString();
+        }
+        if (restId == null || restId.isEmpty) {
+          final r = await supabase.from('restaurants').select('id').eq('name', _name).maybeSingle();
+          if (r != null && r['id'] != null) restId = r['id'].toString();
+        }
+      }
+      if (restId != null && restId.isNotEmpty) {
+        final imgRes = await supabase
+            .from('restaurant_images')
+            .select('image_url, is_logo, sort_order')
+            .eq('restaurant_id', restId)
+            .order('sort_order', ascending: true);
+        if (imgRes is List && imgRes.isNotEmpty && mounted) {
+          final logoItem = imgRes.firstWhere(
+            (item) => item['is_logo'] == true || item['is_logo'] == 'true' || item['is_logo'] == 1,
+            orElse: () => imgRes.first,
+          );
+          final logoUrl = logoItem['image_url']?.toString();
+          if (logoUrl != null && logoUrl.isNotEmpty) {
+            setState(() {
+              _imageUrl = logoUrl;
+            });
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   IconData _getIconForFacility(String facility) {
@@ -888,15 +928,13 @@ class _ShopDetailsScreenState extends State<ShopDetailsScreen> {
                                 ),
                                 child: ClipOval(
                                   child: (_imageUrl != null && _imageUrl!.trim().isNotEmpty)
-                                      ? Image.network(
-                                          _imageUrl!,
+                                      ? AppAdaptiveImage(
+                                          imageUrl: _imageUrl!,
                                           fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return const CustomPaint(
-                                              size: Size(86, 86),
-                                              painter: AvatarPlaceholderPainter(),
-                                            );
-                                          },
+                                          fallback: const CustomPaint(
+                                            size: Size(86, 86),
+                                            painter: AvatarPlaceholderPainter(),
+                                          ),
                                         )
                                       : const CustomPaint(
                                           size: Size(86, 86),

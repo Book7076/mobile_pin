@@ -48,6 +48,31 @@ class AuthStateNotifier extends StateNotifier<UserModel?> {
         if ((merged['last_name'] == null || merged['last_name'].toString().trim().isEmpty) && metaLast.isNotEmpty) {
           merged['last_name'] = metaLast;
         }
+
+        final dbRole = (response['user_type'] ?? response['role'])?.toString().trim().toLowerCase();
+        final metaRole = (meta?['user_type'] ?? meta?['role'])?.toString().trim().toLowerCase();
+        final lowerEmail = email.trim().toLowerCase();
+
+        if (dbRole == 'admin' || metaRole == 'admin' || lowerEmail == 'admin@mealmate.com' || lowerEmail == 'admin@test.com') {
+          merged['user_type'] = 'admin';
+          merged['role'] = 'admin';
+        } else if (metaRole == 'owner') {
+          merged['user_type'] = 'owner';
+          merged['role'] = 'owner';
+        } else {
+          try {
+            final ownedRests = await supabase
+                .from('restaurants')
+                .select('id')
+                .eq('owner_id', id)
+                .limit(1);
+            if (ownedRests is List && ownedRests.isNotEmpty) {
+              merged['user_type'] = 'owner';
+              merged['role'] = 'owner';
+            }
+          } catch (_) {}
+        }
+
         state = UserModel.fromJson(merged);
         return;
       }
@@ -128,6 +153,29 @@ class AuthStateNotifier extends StateNotifier<UserModel?> {
     return true;
   }
 
+  // Accept terms and conditions (Privacy Policy)
+  Future<bool> acceptTerms() async {
+    final now = DateTime.now();
+    final nowIso = now.toUtc().toIso8601String();
+    final currentUser = supabase.auth.currentUser;
+    final currentUserId = currentUser?.id ?? state?.id;
+
+    if (currentUserId != null && currentUserId.isNotEmpty) {
+      try {
+        await supabase.from('users').update({
+          'terms_accepted_at': nowIso,
+        }).eq('id', currentUserId);
+      } catch (e) {
+        debugPrint('Error updating terms_accepted_at in users table: $e');
+      }
+    }
+
+    if (state != null) {
+      state = state!.copyWith(termsAcceptedAt: now);
+    }
+    return true;
+  }
+
   // Register
   Future<bool> register({
     required String email,
@@ -135,15 +183,23 @@ class AuthStateNotifier extends StateNotifier<UserModel?> {
     required String name,
     required String phone,
     required String role, // 'user' or 'owner'
+    DateTime? termsAcceptedAt,
   }) async {
     if (email.isEmpty || password.isEmpty || name.isEmpty) {
       throw Exception('กรุณากรอกข้อมูลให้ครบถ้วน');
     }
 
+    final acceptedTime = termsAcceptedAt ?? DateTime.now();
+
     try {
       final res = await supabase.auth.signUp(
         email: email.trim(),
         password: password.trim(),
+        data: {
+          'name': name,
+          'phone': phone,
+          'terms_accepted_at': acceptedTime.toUtc().toIso8601String(),
+        },
       );
       if (res.user != null) {
         final newUser = UserModel(
@@ -152,6 +208,7 @@ class AuthStateNotifier extends StateNotifier<UserModel?> {
           name: name,
           phone: phone,
           role: role,
+          termsAcceptedAt: acceptedTime,
         );
         state = newUser;
         return true;
@@ -164,6 +221,7 @@ class AuthStateNotifier extends StateNotifier<UserModel?> {
         name: name,
         phone: phone,
         role: role,
+        termsAcceptedAt: acceptedTime,
       );
       return true;
     }

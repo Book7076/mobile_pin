@@ -9,6 +9,7 @@ import 'cancel_rejection_screen.dart';
 import 'confirm_revoke_screen.dart';
 import 'reject_success_screen.dart';
 import 'widgets/restaurant_logo_badge.dart';
+import '../../widgets/app_adaptive_image.dart';
 
 class RestaurantDetailScreen extends ConsumerStatefulWidget {
   final String restaurantId;
@@ -968,12 +969,12 @@ class _RestaurantDetailScreenState extends ConsumerState<RestaurantDetailScreen>
           border: Border.all(color: const Color(0xFFEFE6DC)),
         ),
         clipBehavior: Clip.antiAlias,
-        child: Image.network(
-          imageUrl,
+        child: AppAdaptiveImage(
+          imageUrl: imageUrl,
           width: 78,
           height: 78,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildFallbackFoodBadge(name),
+          fallback: _buildFallbackFoodBadge(name),
         ),
       );
     }

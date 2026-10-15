@@ -6,6 +6,7 @@ import '../../main.dart';
 import '../../core/constants.dart';
 import '../../providers/auth_provider.dart';
 import '../home/home_screen.dart';
+import 'terms_policy_screen.dart';
 
 /// Social Registration Screen:
 /// When a user signs in via Google or Facebook but has no record in the `users` table:
@@ -38,6 +39,7 @@ class _SocialRegisterScreenState extends ConsumerState<SocialRegisterScreen> {
   final _phoneController = TextEditingController();
 
   bool _isLoading = false;
+  bool _acceptedTerms = false;
 
   @override
   void initState() {
@@ -143,6 +145,12 @@ class _SocialRegisterScreenState extends ConsumerState<SocialRegisterScreen> {
       return;
     }
 
+    // ต้องกดยืนยันข้อตกลงและนโยบายความเป็นส่วนตัวก่อนลงทะเบียนได้
+    if (!_acceptedTerms) {
+      _showMessage('กรุณากดยืนยันยอมรับข้อตกลงและนโยบายความเป็นส่วนตัว');
+      return;
+    }
+
     final currentUser = _getAuthUser();
     if (currentUser == null) {
       _showMessage('ไม่พบข้อมูลการยืนยันตัวตน กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
@@ -196,6 +204,8 @@ class _SocialRegisterScreenState extends ConsumerState<SocialRegisterScreen> {
               currentUser.userMetadata?['picture'])
           ?.toString();
 
+      final nowIso = DateTime.now().toUtc().toIso8601String();
+
       final newUserData = <String, dynamic>{
         'id': currentUser.id, // auth.uid() ต้องตรงกับผู้ใช้ที่ล็อกอิน ไม่ใช่สุ่มสร้างใหม่
         'email': currentUser.email ?? '',
@@ -206,6 +216,7 @@ class _SocialRegisterScreenState extends ConsumerState<SocialRegisterScreen> {
         'user_type': 'customer',
         'role': 'customer',
         'swipe_count': 0,
+        'terms_accepted_at': nowIso,
       };
 
       if (avatarUrl != null && avatarUrl.isNotEmpty) {
@@ -458,7 +469,71 @@ class _SocialRegisterScreenState extends ConsumerState<SocialRegisterScreen> {
                           ],
                         ),
 
-                        const SizedBox(height: 28),
+                        const SizedBox(height: 18),
+
+                        // Checkbox ยืนยันข้อตกลงและนโยบายความเป็นส่วนตัว
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: Checkbox(
+                                key: const Key('social_register_terms_checkbox'),
+                                value: _acceptedTerms,
+                                activeColor: burgundy,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _acceptedTerms = val ?? false;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _acceptedTerms = !_acceptedTerms;
+                                  });
+                                },
+                                child: Text.rich(
+                                  TextSpan(
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF555555),
+                                      fontFamily: 'Kanit',
+                                    ),
+                                    children: [
+                                      const TextSpan(text: 'ฉันได้อ่านและยอมรับ '),
+                                      WidgetSpan(
+                                        alignment: PlaceholderAlignment.middle,
+                                        child: GestureDetector(
+                                          onTap: () => showPrivacyPolicyDialog(context),
+                                          child: const Text(
+                                            'นโยบายความเป็นส่วนตัว',
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: burgundy,
+                                              decoration: TextDecoration.underline,
+                                              fontFamily: 'Kanit',
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 22),
 
                         // Submit Button: "ลงทะเบียน"
                         SizedBox(

@@ -400,20 +400,22 @@ class _OwnerEditMenuItemScreenState extends State<OwnerEditMenuItemScreen> {
       // 2. แปลงรูปที่ผ่านการครอบตัดแล้วเป็น Data URL เพื่อให้เป็นลิงก์ที่บันทึกลงใน database
       String convertedUrl = 'data:image/png;base64,${base64Encode(croppedBytes)}';
 
-      // ลองอัปโหลดไปยัง Supabase storage ถ้ามี bucket พร้อมใช้งาน
-      try {
-        final fileName = 'menu_${DateTime.now().millisecondsSinceEpoch}.png';
-        await Supabase.instance.client.storage.from('menu-images').uploadBinary(
-          fileName,
-          croppedBytes,
-          fileOptions: const FileOptions(contentType: 'image/png', upsert: true),
-        );
-        final pubUrl = Supabase.instance.client.storage.from('menu-images').getPublicUrl(fileName);
-        if (pubUrl.isNotEmpty) {
-          convertedUrl = pubUrl;
+      // หากอยู่ในโหมดกรอกข้อมูลลงทะเบียนร้าน (restaurantId == null) ให้ใช้ Data URL ใน local state โดยไม่เรียก storage
+      if (widget.restaurantId != null) {
+        try {
+          final fileName = 'menu_${DateTime.now().millisecondsSinceEpoch}.png';
+          await Supabase.instance.client.storage.from('menu-images').uploadBinary(
+            fileName,
+            croppedBytes,
+            fileOptions: const FileOptions(contentType: 'image/png', upsert: true),
+          );
+          final pubUrl = Supabase.instance.client.storage.from('menu-images').getPublicUrl(fileName);
+          if (pubUrl.isNotEmpty) {
+            convertedUrl = pubUrl;
+          }
+        } catch (_) {
+          // ใช้ Data URL บันทึกลง database ได้อย่างสมบูรณ์
         }
-      } catch (_) {
-        // ใช้ Data URL บันทึกลง database ได้อย่างสมบูรณ์
       }
 
       setState(() {

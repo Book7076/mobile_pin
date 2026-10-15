@@ -6,7 +6,9 @@ import '../../main.dart';
 import '../../providers/auth_provider.dart';
 import 'owner_dashboard_screen.dart';
 import '../restaurants/open_restaurant_intro_screen.dart';
+import '../restaurants/restaurant_pending_review_screen.dart';
 import '../../widgets/meal_mate_logo.dart';
+import '../../widgets/app_adaptive_image.dart';
 
 /// สีหลักของฝั่งเจ้าของร้าน (Burgundy / Red Maroon)
 const Color kOwnerPrimaryColor = Color(0xFF7C1431);
@@ -220,6 +222,26 @@ class _SelectRestaurantScreenState extends ConsumerState<SelectRestaurantScreen>
           );
         }
         if (mounted) {
+          final hasApprovedOrRejected = items.any((r) => r.status == 'approved' || r.status == 'rejected');
+          if (!hasApprovedOrRejected && items.isNotEmpty) {
+            final pendingItem = items.firstWhere(
+              (r) => r.status == 'pending',
+              orElse: () => items.first,
+            );
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => RestaurantPendingReviewScreen(
+                      restaurantName: pendingItem.name,
+                    ),
+                  ),
+                );
+              }
+            });
+            return;
+          }
+
           setState(() {
             _dbRestaurants = items;
           });
@@ -497,15 +519,21 @@ class _SelectRestaurantScreenState extends ConsumerState<SelectRestaurantScreen>
                               decoration: BoxDecoration(
                                 color: restaurant.status == 'approved'
                                     ? Colors.green.withOpacity(0.12)
-                                    : Colors.orange.withOpacity(0.12),
+                                    : (restaurant.status == 'rejected'
+                                        ? Colors.red.withOpacity(0.12)
+                                        : Colors.orange.withOpacity(0.12)),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
-                                restaurant.status == 'approved' ? 'อนุมัติแล้ว' : 'รออนุมัติ',
+                                restaurant.status == 'approved'
+                                    ? 'อนุมัติแล้ว'
+                                    : (restaurant.status == 'rejected' ? 'ไม่อนุมัติ' : 'รออนุมัติ'),
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
-                                  color: restaurant.status == 'approved' ? Colors.green[800] : Colors.orange[800],
+                                  color: restaurant.status == 'approved'
+                                      ? Colors.green[800]
+                                      : (restaurant.status == 'rejected' ? Colors.red[800] : Colors.orange[800]),
                                 ),
                               ),
                             ),
@@ -532,32 +560,17 @@ class _SelectRestaurantScreenState extends ConsumerState<SelectRestaurantScreen>
 
   /// แสดงรูปภาพ Avatar ของร้านค้า
   Widget _buildRestaurantAvatar(OwnerRestaurantItem restaurant) {
-    if (restaurant.imageUrl != null && restaurant.imageUrl!.isNotEmpty) {
-      if (restaurant.imageUrl!.startsWith('assets/')) {
-        return Image.asset(
-          restaurant.imageUrl!,
-          fit: BoxFit.cover,
-          width: 74,
-          height: 74,
-          errorBuilder: (_, __, ___) => _buildFallbackStoreIcon(restaurant),
-        );
-      }
-      return Image.network(
-        restaurant.imageUrl!,
-        fit: BoxFit.cover,
-        width: 74,
-        height: 74,
-        errorBuilder: (_, __, ___) => _buildFallbackStoreIcon(restaurant),
-      );
-    }
+    final effectiveImage = (restaurant.imageUrl != null && restaurant.imageUrl!.isNotEmpty)
+        ? restaurant.imageUrl
+        : restaurant.assetPath;
 
-    if (restaurant.assetPath != null && restaurant.assetPath!.isNotEmpty) {
-      return Image.asset(
-        restaurant.assetPath!,
-        fit: BoxFit.cover,
+    if (effectiveImage != null && effectiveImage.isNotEmpty) {
+      return AppAdaptiveImage(
+        imageUrl: effectiveImage,
         width: 74,
         height: 74,
-        errorBuilder: (_, __, ___) => _buildFallbackStoreIcon(restaurant),
+        fit: BoxFit.cover,
+        fallback: _buildFallbackStoreIcon(restaurant),
       );
     }
 

@@ -51,7 +51,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   }
 
   void _finishOnboarding() {
-    final destination = widget.userRole == 'admin'
+    final destination = widget.userRole?.trim().toLowerCase() == 'admin'
         ? const AdminDashboard()
         : const HomeScreen();
 

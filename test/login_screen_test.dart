@@ -122,6 +122,12 @@ void main() {
     await tester.enterText(find.descendant(of: find.byKey(const Key('confirm_password_field')), matching: find.byType(TextField)), '123456');
     await tester.pump();
 
+    // Ensure terms checkbox is checked
+    final termsCheckbox = find.byKey(const Key('register_terms_checkbox'));
+    await tester.ensureVisible(termsCheckbox);
+    await tester.tap(termsCheckbox);
+    await tester.pump();
+
     // Ensure submit button is visible before tapping
     await tester.ensureVisible(find.byKey(const Key('register_submit_button')));
     await tester.pump();
